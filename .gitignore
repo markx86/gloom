@@ -1,0 +1,4 @@
+.cache/
+trigo.c
+trigo.h
+*.wasm
