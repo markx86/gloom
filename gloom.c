@@ -66,6 +66,12 @@ struct keys {
   b8 left;
 };
 
+struct hit {
+  f32 dist;
+  b8 vertical;
+  u8 cell_id;
+};
+
 static b8 pointer_locked = false;
 
 static struct camera camera;
@@ -185,85 +191,86 @@ static inline void clear_screen(u32 color) {
     fb[i] = color;
 }
 
-static inline void render_scene(void) {
-  vec2f ray_dir, delta_dist, dist, intersec_dist;
+static void trace_ray(const vec2f* ray_dir, struct hit* hit) {
+  vec2f delta_dist, dist, intersec_dist;
   vec2i step_dir;
   vec2u map_coords;
-  f32 cam_x, ray_dist;
-  u32 cell_id, d;
+  u32 d;
+  b8 vertical, cell_id;
+
+  delta_dist.y = abs(1.0f / ray_dir->x);
+  delta_dist.x = abs(1.0f / ray_dir->y);
+
+  dist.x = ray_dir->x > 0 ? (1.0f - player.dpos.x) : player.dpos.x;
+  dist.y = ray_dir->y > 0 ? (1.0f - player.dpos.y) : player.dpos.y;
+
+  intersec_dist.y = delta_dist.y * dist.x;
+  intersec_dist.x = delta_dist.x * dist.y;
+
+  step_dir.x = SIGN(ray_dir->x);
+  step_dir.y = SIGN(ray_dir->y);
+
+  map_coords = REINTERPRET(player.pos, vec2u);
+
+  vertical = true;
+  cell_id = 0;
+  for (d = 0; d < camera.dof; ++d) {
+    if (map_coords.x >= map.w || map_coords.y >= map.h)
+      break;
+
+    if ((cell_id = map.tiles[map_coords.x + map_coords.y * map.w]))
+      break;
+
+    if (intersec_dist.y < intersec_dist.x) {
+      intersec_dist.y += delta_dist.y;
+      map_coords.x += step_dir.x;
+      vertical = true;
+    } else {
+      intersec_dist.x += delta_dist.x;
+      map_coords.y += step_dir.y;
+      vertical = false;
+    }
+  }
+
+  hit->dist = vertical ? intersec_dist.y - delta_dist.y : intersec_dist.x - delta_dist.x;
+  hit->cell_id = cell_id;
+  hit->vertical = vertical;
+}
+
+static inline void render_scene(void) {
   i32 x, y;
   i32 line_y, line_height, line_color;
-  b8 vertical;
+  f32 cam_x;
+  vec2f ray_dir;
+  struct hit hit;
 
   for (x = 0; x < FB_WIDTH; ++x) {
-    // cast ray
-    {
-      cam_x = (2.0f * ((f32)x / FB_WIDTH)) - 1.0f;
+    cam_x = (2.0f * ((f32)x / FB_WIDTH)) - 1.0f;
 
-      // we do not use VEC2* macros, because this is faster
-      ray_dir.x = player.long_dir.x + camera.plane.x * cam_x;
-      ray_dir.y = player.long_dir.y + camera.plane.y * cam_x;
+    // we do not use VEC2* macros, because this is faster
+    ray_dir.x = player.long_dir.x + camera.plane.x * cam_x;
+    ray_dir.y = player.long_dir.y + camera.plane.y * cam_x;
 
-      delta_dist.y = abs(1.0f / ray_dir.x);
-      delta_dist.x = abs(1.0f / ray_dir.y);
-
-      dist.x = ray_dir.x > 0 ? (1.0f - player.dpos.x) : player.dpos.x;
-      dist.y = ray_dir.y > 0 ? (1.0f - player.dpos.y) : player.dpos.y;
-
-      intersec_dist.y = delta_dist.y * dist.x;
-      intersec_dist.x = delta_dist.x * dist.y;
-
-      step_dir.x = SIGN(ray_dir.x);
-      step_dir.y = SIGN(ray_dir.y);
-
-      map_coords = REINTERPRET(player.pos, vec2u);
-
-      vertical = true;
-      cell_id = 0;
-      for (d = 0; d < camera.dof; ++d) {
-        if (map_coords.x >= map.w || map_coords.y >= map.h)
-          break;
-
-        if ((cell_id = map.tiles[map_coords.x + map_coords.y * map.w]))
-          break;
-
-        if (intersec_dist.y < intersec_dist.x) {
-          intersec_dist.y += delta_dist.y;
-          map_coords.x += step_dir.x;
-          vertical = true;
-        } else {
-          intersec_dist.x += delta_dist.x;
-          map_coords.y += step_dir.y;
-          vertical = false;
-        }
-      }
-    }
+    trace_ray(&ray_dir, &hit);
 
     // draw column
-    if (cell_id) {
-      if (vertical) {
-        ray_dist = intersec_dist.y - delta_dist.y;
-        line_color = COLOR_WALLV;
-      } else {
-        ray_dist = intersec_dist.x - delta_dist.x;
-        line_color = COLOR_WALLH;
-      }
-      z_buf[x] = ray_dist * ray_dist; // dist^2
+    if (hit.cell_id) {
+      line_color = hit.vertical ? COLOR_WALLV : COLOR_WALLH;
 
-      line_height = FB_HEIGHT / ray_dist;
+      line_height = FB_HEIGHT / hit.dist;
       if (line_height > FB_HEIGHT)
         line_height = FB_HEIGHT;
       line_y = (FB_HEIGHT - line_height) >> 1;
-    } else {
-      z_buf[x] = 1e10;
+    } else
       line_y = FB_HEIGHT >> 1;
-    }
+
+    z_buf[x] = hit.dist * hit.dist;
 
     // fill column
     y = 0;
     for (; y < line_y; ++y)
       fb[x + y * FB_WIDTH] = COLOR_SKY;
-    if (cell_id) {
+    if (hit.cell_id) {
       line_y += line_height;
       for (; y < line_y; ++y)
         fb[x + y * FB_WIDTH] = line_color;
@@ -358,19 +365,12 @@ static void adjust_position(vec2i* pos, vec2f* dpos) {
     --pos->y;
 }
 
-static void compute_player_position(f32 space, const vec2f* dir, vec2i* pos, vec2f* dpos) {
-  dpos->x += dir->x * space;
-  dpos->y += dir->y * space;
-  adjust_position(pos, dpos);
-}
-
-// TODO improve player collisions
 static inline void update_player_position(f32 delta) {
-  b8 collision;
+  struct hit hit;
   i32 long_dir, side_dir;
   f32 space;
-  vec2i new_pos, pos;
-  vec2f new_dpos, dpos;
+  f32 v_dist, h_dist;
+  vec2f v_dir, h_dir;
   vec2f dir = {
     .x = 0.0f, .y = 0.0f
   };
@@ -400,34 +400,25 @@ static inline void update_player_position(f32 delta) {
     }
   }
 
-  new_pos = pos = player.pos;
-  new_dpos = dpos = player.dpos;
+  // check for collisions on the y-axis
+  v_dir.x = 0.0f;
+  v_dir.y = SIGN(dir.y);
+  v_dist = absf(dir.y) * space;
+  trace_ray(&v_dir, &hit);
+  if (hit.dist < v_dist + PLAYER_RADIUS)
+    v_dist = hit.dist - PLAYER_RADIUS;
 
-  // compute collision check position
-  compute_player_position(space + PLAYER_RADIUS, &dir, &pos, &dpos);
+  // check for collisions on the x-axis
+  h_dir.x = SIGN(dir.x);
+  h_dir.y = 0.0f;
+  h_dist = absf(dir.x) * space;
+  trace_ray(&h_dir, &hit);
+  if (hit.dist < h_dist + PLAYER_RADIUS)
+    h_dist = hit.dist - PLAYER_RADIUS;
 
-  // compute new position
-  compute_player_position(space, &dir, &new_pos, &new_dpos);
-
-  // check for x-axis collision
-  if (map.tiles[pos.y * map.w + player.pos.x]) {
-    new_pos.y = player.pos.y;
-    new_dpos.y = player.dpos.y;
-    collision = true;
-  }
-  // check for y-axis collision
-  if (map.tiles[player.pos.y * map.w + pos.x]) {
-    new_pos.x = player.pos.x;
-    new_dpos.x = player.dpos.x;
-    collision = true;
-  }
-  // check for diagonal collision if no axis collision was detected
-  if (!collision && map.tiles[pos.y * map.w + pos.x])
-    return;
-
-  // update player position
-  player.pos = new_pos;
-  player.dpos = new_dpos;
+  player.dpos.x += h_dir.x * h_dist;
+  player.dpos.y += v_dir.y * v_dist;
+  adjust_position(&player.pos, &player.dpos);
 }
 
 static inline void update_sprites(f32 delta) {
