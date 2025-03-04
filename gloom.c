@@ -37,6 +37,7 @@ struct actor {
 };
 
 struct sprite {
+  u32 color;
   vec2i pos;
   vec2f dpos;
   vec2i dim;
@@ -102,6 +103,7 @@ static struct keys keys;
 
 static struct sprite sprites[] = {
   [0] = {
+    .color = 0xFF0000FF,
     .pos = {
       .x = 5,
       .y = 5
@@ -116,6 +118,7 @@ static struct sprite sprites[] = {
     }
   },
   [1] = {
+    .color = 0xFF00FF00,
     .pos = {
       .x = 8,
       .y = 7
@@ -329,7 +332,7 @@ static void render_sprites(void) {
       if (z_buf[x] < s->dist_from_player2)
         continue;
       for (y = MAX(0, y_start); y < y_end && y < FB_HEIGHT; y++) {
-        fb[x + y * FB_WIDTH] = s->pos.x == 8 ? 0xFF00FF00 : 0xFF0000FF;
+        fb[x + y * FB_WIDTH] = s->color;
       }
     }
   }
@@ -347,25 +350,18 @@ static void compute_player_position(f32 space, i32 long_dir, i32 side_dir, vec2i
   dpos->x += -player.dir.y * side_dir * space;
   dpos->y += +player.dir.x * side_dir * space;
 
-  while (dpos->x >= 1.0f) {
+  for (; dpos->x >= 1.0f; dpos->x -= 1.0f)
     ++pos->x;
-    dpos->x -= 1.0f;
-  }
-  while (dpos->x < 0.0f) {
+  for (; dpos->x < 0.0f; dpos->x += 1.0f)
     --pos->x;
-    dpos->x += 1.0f;
-  }
 
-  while (dpos->y >= 1.0f) {
+  for (; dpos->y >= 1.0f; dpos->y -= 1.0f)
     ++pos->y;
-    dpos->y -= 1.0f;
-  }
-  while (dpos->y < 0.0f) {
+  for (; dpos->y < 0.0f; dpos->y += 1.0f)
     --pos->y;
-    dpos->y += 1.0f;
-  }
 }
 
+// TODO improve player collisions
 static inline void update_player_position(f32 delta) {
   vec2i new_pos, pos;
   vec2f new_dpos, dpos;
@@ -381,7 +377,7 @@ static inline void update_player_position(f32 delta) {
   if (long_dir && side_dir)
     space *= INVSQRT2;
 
-  // compute collision position
+  // compute collision check position
   compute_player_position(space + COLLISION_LOOKAHEAD, long_dir, side_dir, &pos, &dpos);
 
   // compute new position
@@ -414,9 +410,13 @@ static void update(f32 delta) {
 
 void set_pointer_locked(b8 locked) {
   pointer_locked = locked;
+  if (!locked)
+    keys = (struct keys) {0};
 }
 
 void key_event(u32 code, char ch, b8 pressed) {
+  if (!pointer_locked)
+    return;
   switch (code) {
     case 87:
       keys.forward = pressed;
