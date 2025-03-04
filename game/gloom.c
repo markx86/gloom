@@ -1,5 +1,4 @@
 #include <types.h>
-#include <env.h>
 #include <libc.h>
 #include <math.h>
 

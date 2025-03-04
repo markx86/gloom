@@ -1,6 +1,9 @@
-.cache/
-trigo.c
-trigo.h
-*.wasm*
+**/.cache/
 **/__pycache__/
+**/node_modules/
+**/*-lock.json
+**/*.wasm*
 **/compile_commands.json
+**/*.o
+server/dist/
+game/trigo.*

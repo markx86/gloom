@@ -2,11 +2,16 @@
 
 set -e
 
-./tools/gen-trigo.py
+origdir=$PWD
+wasmdir="$(realpath $(dirname $0))"
 
-out=gloom.wasm
+cd $wasmdir
 
-srcs=$(find . -type f -name '*.c')
+../../game/build.sh wasm32 .
+
+out=$origdir/gloom.wasm
+srcs=$(find $wasmdir -type f -name '*.c')
+objs=$(find $wasmdir -type f -name '*.o')
 
 if test -n "$DEBUG"; then
   extra_flags="-ggdb"
@@ -16,6 +21,7 @@ clang \
   --target=wasm32 \
   -Wall \
   -Wextra \
+  -I../../game \
   -I. \
   -O3 \
   -flto \
@@ -27,7 +33,7 @@ clang \
   -Wl,--allow-undefined-file=env.syms \
   $extra_flags \
   -o $out.full \
-  $srcs
+  $srcs $objs
 
 if test -n "$DEBUG"; then
   echo "generating source map..."

@@ -1,0 +1,17 @@
+{
+  "name": "gloom-server",
+  "version": "1.0.0",
+  "author": "markx86",
+  "license": "GPLv3",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.14",
+    "esbuild": "^0.24.2"
+  },
+  "scripts": {
+    "build": "esbuild --minify --bundle --platform=node --target=node10 --outfile=dist/app.js src/app.ts && chmod +x ./dist/app.js",
+    "serve": "npm run build && ./dist/app.js"
+  }
+}
