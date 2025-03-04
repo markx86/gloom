@@ -7,7 +7,7 @@ wasmdir="$(realpath $(dirname $0))"
 
 cd $wasmdir
 
-../../game/build.sh wasm32 .
+../../../game/build.sh wasm32 .
 
 out=$origdir/gloom.wasm
 srcs=$(find $wasmdir -type f -name '*.c')

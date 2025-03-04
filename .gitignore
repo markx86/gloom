@@ -6,4 +6,5 @@
 **/compile_commands.json
 **/*.o
 server/dist/
+client/dist/
 game/trigo.*

@@ -97,7 +97,9 @@
     },
   };
 
-  const obj = await WebAssembly.instantiateStreaming(fetch("/gloom.wasm"), importObject);
+  const wasmBase64 = "@@WASMB64@@";
+  const wasmBytes = Uint8Array.from(atob(wasmBase64), c => c.charCodeAt(0)).buffer;
+  const obj = await WebAssembly.instantiate(wasmBytes, importObject);
   const instance = obj.instance;
 
   memory = instance.exports.memory;
