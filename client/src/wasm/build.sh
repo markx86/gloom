@@ -9,7 +9,9 @@ cd $wasmdir
 
 ../../../game/build.sh wasm32 .
 
-out=$origdir/gloom.wasm
+out=gloom.wasm
+outpath="$origdir/$out"
+
 srcs=$(find $wasmdir -type f -name '*.c')
 objs=$(find $wasmdir -type f -name '*.o')
 
@@ -32,14 +34,14 @@ clang \
   -Wl,--export-all \
   -Wl,--allow-undefined-file=env.syms \
   $extra_flags \
-  -o $out.full \
+  -o $outpath.full \
   $srcs $objs
 
 if test -n "$DEBUG"; then
   echo "generating source map..."
-  llvm-dwarfdump -debug-info -debug-line --recurse-depth=0 $out.full > $out.dwarf
-  ./tools/wasm-sourcemap.py $out.full -w $out -s -p $PWD -u /$out.map -o $out.map --dwarfdump-output=$out.dwarf
+  llvm-dwarfdump -debug-info -debug-line --recurse-depth=0 $outpath.full > $outpath.dwarf
+  ./tools/wasm-sourcemap.py $outpath.full -w $outpath -s -p $PWD -u http://localhost:4444/$out.map -o $outpath.map --dwarfdump-output=$outpath.dwarf
 else
-  mv $out.full $out
+  mv $outpath.full $outpath
 fi
 
