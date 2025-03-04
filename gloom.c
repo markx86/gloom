@@ -8,12 +8,12 @@
 #define FB_SIZE   sizeof(fb)
 #define FB_LEN    ARRLEN(fb)
 
-#define SKY_COLOR   0xFFFF0000
-#define FLOOR_COLOR 0xFF000000
-#define WALLH_COLOR 0xFFFFFFFF
-#define WALLV_COLOR 0xFFAAAAAA
+#define COLOR_SKY   0xFFFF0000
+#define COLOR_FLOOR 0xFF000000
+#define COLOR_WALLH 0xFFFFFFFF
+#define COLOR_WALLV 0xFFAAAAAA
 
-#define PLAYER_RUN_SPEED    3.0f
+#define PLAYER_RUN_SPEED    2.0f
 #define PLAYER_ROT_SPEED    0.01f
 #define PLAYER_RADIUS       0.15f
 
@@ -179,18 +179,18 @@ static inline void off_player_rot(f32 delta) {
   set_player_rot(new_rot);
 }
 
-static void clear_screen(u32 color) {
+static inline void clear_screen(u32 color) {
   u32 i;
   for (i = 0; i < FB_LEN; ++i)
     fb[i] = color;
 }
 
-static void render_scene(void) {
+static inline void render_scene(void) {
   vec2f ray_dir, delta_dist, dist, intersec_dist;
   vec2i step_dir;
   vec2u map_coords;
   f32 cam_x, ray_dist;
-  u32 cell_id, map_off, d;
+  u32 cell_id, d;
   i32 x, y;
   i32 line_y, line_height, line_color;
   b8 vertical;
@@ -224,8 +224,7 @@ static void render_scene(void) {
         if (map_coords.x >= map.w || map_coords.y >= map.h)
           break;
 
-        map_off = map_coords.x + map_coords.y * map.w;
-        if ((cell_id = map.tiles[map_off]))
+        if ((cell_id = map.tiles[map_coords.x + map_coords.y * map.w]))
           break;
 
         if (intersec_dist.y < intersec_dist.x) {
@@ -244,10 +243,10 @@ static void render_scene(void) {
     if (cell_id) {
       if (vertical) {
         ray_dist = intersec_dist.y - delta_dist.y;
-        line_color = WALLV_COLOR;
+        line_color = COLOR_WALLV;
       } else {
         ray_dist = intersec_dist.x - delta_dist.x;
-        line_color = WALLH_COLOR;
+        line_color = COLOR_WALLH;
       }
       z_buf[x] = ray_dist * ray_dist; // dist^2
 
@@ -263,18 +262,18 @@ static void render_scene(void) {
     // fill column
     y = 0;
     for (; y < line_y; ++y)
-      fb[x + y * FB_WIDTH] = SKY_COLOR;
+      fb[x + y * FB_WIDTH] = COLOR_SKY;
     if (cell_id) {
       line_y += line_height;
       for (; y < line_y; ++y)
         fb[x + y * FB_WIDTH] = line_color;
     }
     for (; y < FB_HEIGHT; ++y)
-      fb[x + y * FB_WIDTH] = FLOOR_COLOR;
+      fb[x + y * FB_WIDTH] = COLOR_FLOOR;
   }
 }
 
-static void render_sprites(void) {
+static inline void render_sprites(void) {
   vec2f proj;
   u32 screen_h;
   u32 i, j, k, n;
@@ -347,10 +346,7 @@ static void render(void) {
   render_sprites();
 }
 
-static void compute_player_position(f32 space, const vec2f* dir, vec2i* pos, vec2f* dpos) {
-  dpos->x += dir->x * space;
-  dpos->y += dir->y * space;
-
+static void adjust_position(vec2i* pos, vec2f* dpos) {
   for (; dpos->x >= 1.0f; dpos->x -= 1.0f)
     ++pos->x;
   for (; dpos->x < 0.0f; dpos->x += 1.0f)
@@ -360,6 +356,12 @@ static void compute_player_position(f32 space, const vec2f* dir, vec2i* pos, vec
     ++pos->y;
   for (; dpos->y < 0.0f; dpos->y += 1.0f)
     --pos->y;
+}
+
+static void compute_player_position(f32 space, const vec2f* dir, vec2i* pos, vec2f* dpos) {
+  dpos->x += dir->x * space;
+  dpos->y += dir->y * space;
+  adjust_position(pos, dpos);
 }
 
 // TODO improve player collisions
@@ -428,7 +430,7 @@ static inline void update_player_position(f32 delta) {
   player.dpos = new_dpos;
 }
 
-void update_sprites(f32 delta) {
+static inline void update_sprites(f32 delta) {
   u32 i;
   struct sprite* s;
 

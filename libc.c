@@ -40,9 +40,23 @@ PRINTFHANDLER(s, const char* s) {
     buf_putc(pb, *(s++));
 }
 
-PRINTFHANDLER(u, u32 n) {
-  char tmp[32], c;
+static u32 convert_u32_to_str(u32 n, char* tmp, u32 len) {
+  char c;
   u32 l = 0;
+
+  while (n > 0 && l < len) {
+    c = n % 10;
+    c += '0';
+    tmp[l++] = c;
+    n /= 10;
+  }
+
+  return l;
+}
+
+PRINTFHANDLER(u, u32 n) {
+  char tmp[32];
+  u32 l;
 
   // fast path
   if (n == 0) {
@@ -50,13 +64,7 @@ PRINTFHANDLER(u, u32 n) {
     return;
   }
 
-  while (n > 0 && l < ARRLEN(tmp)) {
-    c = n % 10;
-    c += '0';
-    tmp[l++] = c;
-    n /= 10;
-  }
-
+  l = convert_u32_to_str(n, tmp, ARRLEN(tmp));
   buf_putr(pb, tmp, l);
 }
 
@@ -89,7 +97,8 @@ PRINTFHANDLER(x, u32 n) {
 }
 
 PRINTFHANDLER(f, f32 v) {
-  u32 w, d;
+  char tmp[32];
+  u32 w, d, l;
 
   // fast path
   if (v == 0.0f) {
@@ -107,7 +116,11 @@ PRINTFHANDLER(f, f32 v) {
 
   buf_putu(pb, w);
   buf_putc(pb, '.');
-  buf_putu(pb, d);
+
+  l = convert_u32_to_str(d, tmp, ARRLEN(tmp));
+  while (l < 8)
+    tmp[l++] = '0';
+  buf_putr(pb, tmp, l);
 }
 
 #define va_list        __builtin_va_list
