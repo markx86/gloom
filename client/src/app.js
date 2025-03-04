@@ -54,32 +54,23 @@
   }
 
   // void pointer_lock(void);
-  function pointer_lock() {
+  async function pointer_lock() {
     if (pointerIsLocked()) {
       return;
     }
 
-    const promise = canvas.requestPointerLock({ unadjustedMovement: true });
-
-    if (!promise) {
-      console.warn("disabling mouse acceleration is not supported");
-      canvas.requestPointerLock();
-      return;
-    }
-
-    promise
-      .then(() => {
-        console.assert(pointerIsLocked());
-        console.log("pointer locked");
-      })
-      .catch(error => {
-        if (error.name === "NotSupportedError") {
-          console.warn("disabling mouse acceleration is not supported");
-          canvas.requestPointerLock();
-        } else {
-          console.error("could not lock pointer: " + error.name);
-        }
+    try {
+      await canvas.requestPointerLock({
+        unadjustedMovement: true
       });
+    } catch (error) {
+      if (error.name === "NotSupportedError") {
+        console.warn("disabling mouse acceleration is not supported: %s", error);
+        await canvas.requestPointerLock();
+      } else {
+        console.error("could not lock pointer: %s", error);
+      }
+    }
   }
 
   // void pointer_release(void);
@@ -123,7 +114,7 @@
   window.addEventListener("resize", updateViewportSize);
   window.addEventListener("keydown", processKeyEvent);
   window.addEventListener("keyup", processKeyEvent);
-  window.addEventListener("pointerlockchange", () => instance.exports.set_pointer_locked(pointerIsLocked()));
+  document.addEventListener("pointerlockchange", () => instance.exports.set_pointer_locked(pointerIsLocked()));
   canvas.addEventListener("click", () => instance.exports.mouse_click());
   canvas.addEventListener("mousemove", e => instance.exports.mouse_moved(e.layerX, e.layerY, e.movementX, e.movementY));
   updateViewportSize();
