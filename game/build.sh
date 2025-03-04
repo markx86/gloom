@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -ex
+set -e
 
 outdir="$(realpath $2)"
 cd "$(dirname $0)"
@@ -16,6 +16,7 @@ fi
 
 for src in $srcs; do
   obj=$(basename -s ".c" $src).o
+  echo "compiling $src -> $obj for $cpu"
   clang \
     --target=$cpu \
     -Wall \

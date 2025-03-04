@@ -4,16 +4,17 @@ set -e
 
 origdir=$PWD
 wasmdir="$(realpath $(dirname $0))"
+gamedir="$wasmdir/../../../game"
 
 cd $wasmdir
 
-../../../game/build.sh wasm32 .
+$gamedir/build.sh wasm32 $origdir
 
 out=gloom.wasm
 outpath="$origdir/$out"
 
 srcs=$(find $wasmdir -type f -name '*.c')
-objs=$(find $wasmdir -type f -name '*.o')
+objs=$(find $origdir -type f -name '*.o')
 
 if test -n "$DEBUG"; then
   extra_flags="-ggdb"
@@ -23,7 +24,7 @@ clang \
   --target=wasm32 \
   -Wall \
   -Wextra \
-  -I../../game \
+  -I$gamedir \
   -I. \
   -O3 \
   -flto \
