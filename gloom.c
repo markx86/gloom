@@ -13,8 +13,12 @@
 #define WALLH_COLOR 0xFFFFFFFF
 #define WALLV_COLOR 0xFFAAAAAA
 
-#define PLAYER_SPEED        3.0f
-#define COLLISION_LOOKAHEAD 0.15f
+#define PLAYER_RUN_SPEED    3.0f
+#define PLAYER_ROT_SPEED    0.01f
+#define PLAYER_RADIUS       0.15f
+
+#define CAMERA_FOV 75.0f
+#define CAMERA_DOF 32
 
 #define MAX_SPRITES_ON_SCREEN 128
 
@@ -23,7 +27,6 @@ struct camera {
   f32 fov;
   f32 plane_halfw;
   vec2f plane;
-  vec2f plane_norm;
   struct {
     f32 m11, m12, m21, m22;
   } inv_mat;
@@ -33,7 +36,8 @@ struct actor {
   vec2i pos;
   vec2f dpos;
   f32 rot;
-  vec2f dir;
+  vec2f long_dir;
+  vec2f side_dir;
 };
 
 struct sprite {
@@ -43,13 +47,16 @@ struct sprite {
   vec2i dim;
   struct {
     i32 screen_x;
+    i32 screen_halfw;
+    f32 camera_depth;
     f32 dist_from_player2;
+    vec2f diff;
   };
 };
 
 struct map {
   u32 w, h;
-  u8 data[];
+  u8 tiles[];
 };
 
 struct keys {
@@ -77,7 +84,7 @@ static struct actor player = {
 static struct map map = {
   .w = 12,
   .h = 15,
-  .data = {
+  .tiles = {
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
     1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1,
@@ -146,20 +153,20 @@ static void set_player_rot(f32 new_rot) {
 
   player.rot = new_rot;
   // compute player versor
-  player.dir.x = cos(new_rot);
-  player.dir.y = sin(new_rot);
+  player.long_dir.x = cos(new_rot);
+  player.long_dir.y = sin(new_rot);
   // compute camera plane vector
-  camera.plane_norm.x = -player.dir.y;
-  camera.plane_norm.y = +player.dir.x;
+  player.side_dir.x = -player.long_dir.y;
+  player.side_dir.y = +player.long_dir.x;
   // compute camera plane offset
-  camera.plane = VEC2SCALE(camera.plane_norm, camera.plane_halfw);
+  camera.plane = VEC2SCALE(player.side_dir, camera.plane_halfw);
   // compute camera inverse matrix
   {
-    c = 1.0f / (camera.plane_norm.x * player.dir.y - camera.plane_norm.y * player.dir.x);
-    camera.inv_mat.m11 = +player.dir.y * c;
-    camera.inv_mat.m12 = -player.dir.x * c;
-    camera.inv_mat.m21 = -camera.plane_norm.y * c;
-    camera.inv_mat.m22 = +camera.plane_norm.x * c;
+    c = 1.0f / (camera.plane.x * player.long_dir.y - camera.plane.y * player.long_dir.x);
+    camera.inv_mat.m11 = +player.long_dir.y * c;
+    camera.inv_mat.m12 = -player.long_dir.x * c;
+    camera.inv_mat.m21 = -camera.plane.y * c;
+    camera.inv_mat.m22 = +camera.plane.x * c;
   }
 }
 
@@ -194,8 +201,8 @@ static void render_scene(void) {
       cam_x = (2.0f * ((f32)x / FB_WIDTH)) - 1.0f;
 
       // we do not use VEC2* macros, because this is faster
-      ray_dir.x = player.dir.x + camera.plane.x * cam_x;
-      ray_dir.y = player.dir.y + camera.plane.y * cam_x;
+      ray_dir.x = player.long_dir.x + camera.plane.x * cam_x;
+      ray_dir.y = player.long_dir.y + camera.plane.y * cam_x;
 
       delta_dist.y = abs(1.0f / ray_dir.x);
       delta_dist.x = abs(1.0f / ray_dir.y);
@@ -218,7 +225,7 @@ static void render_scene(void) {
           break;
 
         map_off = map_coords.x + map_coords.y * map.w;
-        if ((cell_id = map.data[map_off]))
+        if ((cell_id = map.tiles[map_off]))
           break;
 
         if (intersec_dist.y < intersec_dist.x) {
@@ -268,12 +275,11 @@ static void render_scene(void) {
 }
 
 static void render_sprites(void) {
-  vec2f diff, proj;
-  u32 w, h;
+  vec2f proj;
+  u32 screen_h;
   u32 i, j, k, n;
   i32 x_start, x_end, y_start, y_end;
   i32 x, y;
-  f32 inv_dist_from_player;
   struct sprite* s;
   struct sprite* to_render[MAX_SPRITES_ON_SCREEN];
 
@@ -281,24 +287,25 @@ static void render_sprites(void) {
   for (i = 0; i < ARRLEN(sprites); ++i) {
     s = sprites + i;
 
-    diff.x = (f32)(s->pos.x - player.pos.x) + (s->dpos.x - player.dpos.x);
-    diff.y = (f32)(s->pos.y - player.pos.y) + (s->dpos.y - player.dpos.y);
-
     // compute coordinates in camera space
-    proj.x = camera.inv_mat.m11 * diff.x + camera.inv_mat.m12 * diff.y;
-    proj.y = camera.inv_mat.m21 * diff.x + camera.inv_mat.m22 * diff.y;
+    proj.x = camera.inv_mat.m11 * s->diff.x + camera.inv_mat.m12 * s->diff.y;
+    proj.y = camera.inv_mat.m21 * s->diff.x + camera.inv_mat.m22 * s->diff.y;
 
     // sprite is behind the camera, ignore it
     if (proj.y < 0.0f)
       continue;
 
-    // sprite is not on screen, ignore it
-    s->screen_x = FB_WIDTH * (0.5f + proj.x / proj.y);
-    if ((u32)s->screen_x >= FB_WIDTH)
-      continue;
+    // save camera depth
+    s->camera_depth = 1.0f / proj.y;
 
-    // compute distance from player
-    s->dist_from_player2 = diff.x * diff.x + diff.y * diff.y;
+    // compute screen x
+    s->screen_x = (FB_WIDTH >> 1) * (1.0f + (proj.x / proj.y));
+    // compute screen width (we divide by two since we always use the half screen width)
+    s->screen_halfw = (i32)((f32)s->dim.x * s->camera_depth) >> 1;
+
+    // sprite is not on screen, ignore it
+    if (s->screen_x + s->screen_halfw < 0 || s->screen_x - s->screen_halfw >= FB_WIDTH)
+      continue;
 
     // look for index to insert the new sprite
     for (j = 0; j < n; ++j) {
@@ -318,16 +325,13 @@ static void render_sprites(void) {
   for (i = 0; i < n; i++) {
     s = to_render[i];
 
-    inv_dist_from_player = inv_sqrt(s->dist_from_player2);
-
-    w = (f32)s->dim.x * inv_dist_from_player;
-    h = (f32)s->dim.y * inv_dist_from_player;
+    screen_h = (f32)s->dim.y * s->camera_depth;
 
     // determine screen coordinates of the sprite
-    x_start = s->screen_x - (w >> 1);
-    x_end = x_start + w;
-    y_end = (f32)(FB_HEIGHT >> 1) * (1.0f + inv_dist_from_player);
-    y_start = y_end - h;
+    x_start = s->screen_x - s->screen_halfw;
+    x_end = s->screen_x + s->screen_halfw;
+    y_end = (f32)(FB_HEIGHT >> 1) * (1.0f + s->camera_depth);
+    y_start = y_end - screen_h;
     for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
       if (z_buf[x] < s->dist_from_player2)
         continue;
@@ -343,12 +347,9 @@ static void render(void) {
   render_sprites();
 }
 
-static void compute_player_position(f32 space, i32 long_dir, i32 side_dir, vec2i* pos, vec2f* dpos) {
-  dpos->x += player.dir.x * long_dir * space;
-  dpos->y += player.dir.y * long_dir * space;
-
-  dpos->x += -player.dir.y * side_dir * space;
-  dpos->y += +player.dir.x * side_dir * space;
+static void compute_player_position(f32 space, const vec2f* dir, vec2i* pos, vec2f* dpos) {
+  dpos->x += dir->x * space;
+  dpos->y += dir->y * space;
 
   for (; dpos->x >= 1.0f; dpos->x -= 1.0f)
     ++pos->x;
@@ -363,40 +364,63 @@ static void compute_player_position(f32 space, i32 long_dir, i32 side_dir, vec2i
 
 // TODO improve player collisions
 static inline void update_player_position(f32 delta) {
+  b8 collision;
+  i32 long_dir, side_dir;
+  f32 space;
   vec2i new_pos, pos;
   vec2f new_dpos, dpos;
-  i32 long_dir = keys.forward - keys.backward;
-  i32 side_dir = keys.right - keys.left;
-  f32 space = delta * PLAYER_SPEED;
-  b8 collision = false;
+  vec2f dir = {
+    .x = 0.0f, .y = 0.0f
+  };
+
+  long_dir = keys.forward - keys.backward;
+  side_dir = keys.right - keys.left;
+
+  space = delta * PLAYER_RUN_SPEED;
+
+  // forward movement
+  if (long_dir) {
+    dir.x += player.long_dir.x * long_dir;
+    dir.y += player.long_dir.y * long_dir;
+  }
+  // sideways movement
+  if (side_dir) {
+    dir.x += player.side_dir.x * side_dir;
+    dir.y += player.side_dir.y * side_dir;
+
+    // if the user is trying to go both forwards and sideways,
+    // we normalize the vector by dividing by sqrt(2).
+    // we divide by sqrt(2), because both player.long_dir and player.side_dir,
+    // have a length of 1, therefore ||player.long_dir + player.side_dir|| = sqrt(2).
+    if (long_dir) {
+      dir.x *= INV_SQRT2;
+      dir.y *= INV_SQRT2;
+    }
+  }
 
   new_pos = pos = player.pos;
   new_dpos = dpos = player.dpos;
 
-  // account for stupid triangle stuff
-  if (long_dir && side_dir)
-    space *= INVSQRT2;
-
   // compute collision check position
-  compute_player_position(space + COLLISION_LOOKAHEAD, long_dir, side_dir, &pos, &dpos);
+  compute_player_position(space + PLAYER_RADIUS, &dir, &pos, &dpos);
 
   // compute new position
-  compute_player_position(space, long_dir, side_dir, &new_pos, &new_dpos);
+  compute_player_position(space, &dir, &new_pos, &new_dpos);
 
   // check for x-axis collision
-  if (map.data[pos.y * map.w + player.pos.x]) {
+  if (map.tiles[pos.y * map.w + player.pos.x]) {
     new_pos.y = player.pos.y;
     new_dpos.y = player.dpos.y;
     collision = true;
   }
   // check for y-axis collision
-  if (map.data[player.pos.y * map.w + pos.x]) {
+  if (map.tiles[player.pos.y * map.w + pos.x]) {
     new_pos.x = player.pos.x;
     new_dpos.x = player.dpos.x;
     collision = true;
   }
   // check for diagonal collision if no axis collision was detected
-  if (!collision && map.data[pos.y * map.w + pos.x])
+  if (!collision && map.tiles[pos.y * map.w + pos.x])
     return;
 
   // update player position
@@ -404,8 +428,28 @@ static inline void update_player_position(f32 delta) {
   player.dpos = new_dpos;
 }
 
+void update_sprites(f32 delta) {
+  u32 i;
+  struct sprite* s;
+
+  for (i = 0; i < ARRLEN(sprites); ++i) {
+    s = sprites + i;
+
+    // since we already need to compute dist_from_player2, might as well
+    // save the diff vector, because we'll also need it during rendering.
+    s->diff.x = (f32)(s->pos.x - player.pos.x) + (s->dpos.x - player.dpos.x);
+    s->diff.y = (f32)(s->pos.y - player.pos.y) + (s->dpos.y - player.dpos.y);
+    // we need to compute dist_from_player2 here, because we need to use it
+    // for collision detection with the player.
+    s->dist_from_player2 = s->diff.x * s->diff.x + s->diff.y * s->diff.y;
+  }
+
+  UNUSED(delta);
+}
+
 static void update(f32 delta) {
   update_player_position(delta);
+  update_sprites(delta);
 }
 
 void set_pointer_locked(b8 locked) {
@@ -447,7 +491,7 @@ void mouse_click(void) {
 void mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
   if (!pointer_locked)
     return;
-  off_player_rot(dx * 0.01f);
+  off_player_rot(dx * PLAYER_ROT_SPEED);
 
   UNUSED(x);
   UNUSED(y);
@@ -457,9 +501,9 @@ void mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
 void init(void) {
   register_fb(fb, FB_WIDTH, FB_HEIGHT, FB_SIZE);
   clear_screen(0xFFFF0000);
-  set_camera_fov(DEG2RAD(90.0f));
+  set_camera_fov(DEG2RAD(CAMERA_FOV));
   set_player_rot(0);
-  camera.dof = 32;
+  camera.dof = CAMERA_DOF;
 }
 
 void tick(f32 delta) {
