@@ -4,7 +4,8 @@ extern void __heap_base;
 
 #define BUFSZ 128
 
-static void* top = &__heap_base;
+static void* heap_top = &__heap_base;
+static u32 heap_size = 0;
 
 // we use a buffer for printf, so that we're not constantly
 // calling out to JS everytime we need to write a character
@@ -166,7 +167,10 @@ void printf(const char* fmt, ...) {
 }
 
 void* malloc(u32 size) {
-  void* ptr = top;
-  top += size;
+  void* ptr = heap_top;
+  if (heap_size < size)
+    heap_size += request_mem(size);
+  heap_top += size;
+  heap_size -= size;
   return ptr;
 }

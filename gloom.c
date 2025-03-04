@@ -3,13 +3,20 @@
 #include <libc.h>
 #include <math.h>
 
+#define FB_WIDTH  640
+#define FB_HEIGHT 480
+#define FB_SIZE   sizeof(fb)
+#define FB_LEN    ARRLEN(fb)
+
 #define SKY_COLOR   0xFFFF0000
 #define FLOOR_COLOR 0xFF000000
 #define WALLH_COLOR 0xFFFFFFFF
 #define WALLV_COLOR 0xFFAAAAAA
 
-#define PLAYER_SPEED 3.0f;
+#define PLAYER_SPEED        3.0f
 #define COLLISION_LOOKAHEAD 0.15f
+
+#define MAX_SPRITES_ON_SCREEN 128
 
 struct camera {
   u32 dof;
@@ -17,6 +24,9 @@ struct camera {
   f32 plane_halfw;
   vec2f plane;
   vec2f plane_norm;
+  struct {
+    f32 m11, m12, m21, m22;
+  } inv_mat;
 };
 
 struct actor {
@@ -30,6 +40,10 @@ struct sprite {
   vec2i pos;
   vec2f dpos;
   vec2i dim;
+  struct {
+    i32 screen_x;
+    f32 dist_from_player2;
+  };
 };
 
 struct map {
@@ -81,9 +95,8 @@ static struct map map = {
   },
 };
 
-static i32 fb_width, fb_height;
-static u32 fb_size, *fb;
-static f32* z_buf;
+static u32 fb[FB_WIDTH * FB_HEIGHT];
+static f32 z_buf[FB_WIDTH];
 
 static struct keys keys;
 
@@ -92,6 +105,20 @@ static struct sprite sprites[] = {
     .pos = {
       .x = 5,
       .y = 5
+    },
+    .dpos = {
+      .x = 0.5f,
+      .y = 0.25f,
+    },
+    .dim = {
+      .x = 128,
+      .y = 480,
+    }
+  },
+  [1] = {
+    .pos = {
+      .x = 8,
+      .y = 7
     },
     .dpos = {
       .x = 0.5f,
@@ -112,6 +139,8 @@ static void set_camera_fov(f32 new_fov) {
 
 // NOTE @new_rot must be in radians
 static void set_player_rot(f32 new_rot) {
+  f32 c;
+
   player.rot = new_rot;
   // compute player versor
   player.dir.x = cos(new_rot);
@@ -121,6 +150,14 @@ static void set_player_rot(f32 new_rot) {
   camera.plane_norm.y = +player.dir.x;
   // compute camera plane offset
   camera.plane = VEC2SCALE(camera.plane_norm, camera.plane_halfw);
+  // compute camera inverse matrix
+  {
+    c = 1.0f / (camera.plane_norm.x * player.dir.y - camera.plane_norm.y * player.dir.x);
+    camera.inv_mat.m11 = +player.dir.y * c;
+    camera.inv_mat.m12 = -player.dir.x * c;
+    camera.inv_mat.m21 = -camera.plane_norm.y * c;
+    camera.inv_mat.m22 = +camera.plane_norm.x * c;
+  }
 }
 
 static inline void off_player_rot(f32 delta) {
@@ -134,7 +171,7 @@ static inline void off_player_rot(f32 delta) {
 
 static void clear_screen(u32 color) {
   u32 i;
-  for (i = 0; i < fb_size; ++i)
+  for (i = 0; i < FB_LEN; ++i)
     fb[i] = color;
 }
 
@@ -148,10 +185,10 @@ static void render_scene(void) {
   i32 line_y, line_height, line_color;
   b8 vertical;
 
-  for (x = 0; x < fb_width; ++x) {
+  for (x = 0; x < FB_WIDTH; ++x) {
     // cast ray
     {
-      cam_x = (2.0f * ((f32)x / fb_width)) - 1.0f;
+      cam_x = (2.0f * ((f32)x / FB_WIDTH)) - 1.0f;
 
       // we do not use VEC2* macros, because this is faster
       ray_dir.x = player.dir.x + camera.plane.x * cam_x;
@@ -204,80 +241,97 @@ static void render_scene(void) {
       }
       z_buf[x] = ray_dist * ray_dist; // dist^2
 
-      line_height = fb_height / ray_dist;
-      if (line_height > fb_height)
-        line_height = fb_height;
-      line_y = (fb_height - line_height) >> 1;
+      line_height = FB_HEIGHT / ray_dist;
+      if (line_height > FB_HEIGHT)
+        line_height = FB_HEIGHT;
+      line_y = (FB_HEIGHT - line_height) >> 1;
     } else {
       z_buf[x] = 1e10;
-      line_y = fb_height >> 1;
+      line_y = FB_HEIGHT >> 1;
     }
 
     // fill column
     y = 0;
     for (; y < line_y; ++y)
-      fb[x + y * fb_width] = SKY_COLOR;
+      fb[x + y * FB_WIDTH] = SKY_COLOR;
     if (cell_id) {
       line_y += line_height;
       for (; y < line_y; ++y)
-        fb[x + y * fb_width] = line_color;
+        fb[x + y * FB_WIDTH] = line_color;
     }
-    for (; y < fb_height; ++y)
-      fb[x + y * fb_width] = FLOOR_COLOR;
+    for (; y < FB_HEIGHT; ++y)
+      fb[x + y * FB_WIDTH] = FLOOR_COLOR;
   }
-}
-
-static inline void compute_inverse_matrix(f32* m11, f32* m12, f32* m21, f32* m22) {
-  f32 c = 1.0f / (camera.plane_norm.x * player.dir.y - camera.plane_norm.y * player.dir.x);
-  *m11 = +player.dir.y * c;
-  *m12 = -player.dir.x * c;
-  *m21 = -camera.plane_norm.y * c;
-  *m22 = +camera.plane_norm.x * c;
 }
 
 static void render_sprites(void) {
   vec2f diff, proj;
-  u32 i;
   u32 w, h;
+  u32 i, j, k, n;
   i32 x_start, x_end, y_start, y_end;
-  i32 screen_x, x, y;
-  f32 m11, m12, m21, m22;
-  f32 dist_from_player2, inv_dist_from_player;
-  struct sprite* s = sprites;
+  i32 x, y;
+  f32 inv_dist_from_player;
+  struct sprite* s;
+  struct sprite* to_render[MAX_SPRITES_ON_SCREEN];
 
-  compute_inverse_matrix(&m11, &m12, &m21, &m22);
+  n = 0;
   for (i = 0; i < ARRLEN(sprites); ++i) {
+    s = sprites + i;
+
     diff.x = (f32)(s->pos.x - player.pos.x) + (s->dpos.x - player.dpos.x);
     diff.y = (f32)(s->pos.y - player.pos.y) + (s->dpos.y - player.dpos.y);
-    dist_from_player2 = diff.x * diff.x + diff.y * diff.y;
-    inv_dist_from_player = inv_sqrt(dist_from_player2);
 
-    proj.x = m11 * diff.x + m12 * diff.y;
-    proj.y = m21 * diff.x + m22 * diff.y;
+    // compute coordinates in camera space
+    proj.x = camera.inv_mat.m11 * diff.x + camera.inv_mat.m12 * diff.y;
+    proj.y = camera.inv_mat.m21 * diff.x + camera.inv_mat.m22 * diff.y;
 
     // sprite is behind the camera, ignore it
     if (proj.y < 0.0f)
-      goto end_loop;
+      continue;
 
-    screen_x = fb_width * (0.5f + proj.x / proj.y);
+    // sprite is not on screen, ignore it
+    s->screen_x = FB_WIDTH * (0.5f + proj.x / proj.y);
+    if ((u32)s->screen_x >= FB_WIDTH)
+      continue;
+
+    // compute distance from player
+    s->dist_from_player2 = diff.x * diff.x + diff.y * diff.y;
+
+    // look for index to insert the new sprite
+    for (j = 0; j < n; ++j) {
+      if (to_render[j]->dist_from_player2 < s->dist_from_player2)
+        break;
+    }
+    // move elements after the entry to the next index
+    for (k = n; k > j; --k)
+      to_render[k] = to_render[k-1];
+    // store the new sprite to render
+    to_render[j] = s;
+
+    if (++n >= MAX_SPRITES_ON_SCREEN)
+      break;
+  }
+
+  for (i = 0; i < n; i++) {
+    s = to_render[i];
+
+    inv_dist_from_player = inv_sqrt(s->dist_from_player2);
+
     w = (f32)s->dim.x * inv_dist_from_player;
     h = (f32)s->dim.y * inv_dist_from_player;
 
     // determine screen coordinates of the sprite
-    x_start = screen_x - (w >> 1);
+    x_start = s->screen_x - (w >> 1);
     x_end = x_start + w;
-    y_end = (f32)(fb_height >> 1) * (1.0f + inv_dist_from_player);
+    y_end = (f32)(FB_HEIGHT >> 1) * (1.0f + inv_dist_from_player);
     y_start = y_end - h;
-    for (x = MAX(0, x_start); x < x_end && x < (i32)fb_width; x++) {
-      if (z_buf[x] < dist_from_player2)
+    for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
+      if (z_buf[x] < s->dist_from_player2)
         continue;
-      for (y = MAX(0, y_start); y < y_end && y < (i32)fb_height; y++) {
-        fb[x + y * fb_width] = 0xFF0000FF;
+      for (y = MAX(0, y_start); y < y_end && y < FB_HEIGHT; y++) {
+        fb[x + y * FB_WIDTH] = s->pos.x == 8 ? 0xFF00FF00 : 0xFF0000FF;
       }
     }
-
-end_loop:
-    ++s;
   }
 }
 
@@ -400,12 +454,8 @@ void mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
   UNUSED(dy);
 }
 
-void init(u32 w, u32 h) {
-  fb_width = w;
-  fb_height = h;
-  fb_size = fb_width * fb_height;
-  fb = malloc(fb_size * sizeof(u32));
-  z_buf = malloc(fb_width * sizeof(f32));
+void init(void) {
+  register_fb(fb, FB_WIDTH, FB_HEIGHT, FB_SIZE);
   clear_screen(0xFFFF0000);
   set_camera_fov(DEG2RAD(90.0f));
   set_player_rot(0);

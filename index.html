@@ -7,9 +7,6 @@
     <canvas id="viewport"></canvas>
     <script>
       (async () => {
-        const fbWidth = 640;
-        const fbHeight = 480;
-
         // remove margin from body to make canvas fullscreen
         document.body.style.margin = "0";
         
@@ -20,12 +17,12 @@
         // set transform origin to top-left corner
         canvas.style.transformOrigin = "0 0";
         canvas.style.imageRendering = "crisp-edges";
-        canvas.width = fbWidth;
-        canvas.height = fbHeight;
 
         let memory = null;
+        let fbView = null;
+        let fb = null;
 
-        // void write(int fd, const char* str, u32 len);
+        // void write(i32 fd, const char* str, u32 len);
         function write(fd, p, l) {
           const s = textDecoder.decode(memory.buffer.slice(p, p + l));
           switch (fd) {
@@ -38,6 +35,26 @@
             default:
               break;
           }
+        }
+
+        // u32 request_mem(u32 size);
+        function request_mem(sz) {
+          if (!memory) {
+            return 0;
+          }
+          const pages = (sz + (1 << 16) - 1) >> 16;
+          memory.grow(pages);
+          return pages << 16;
+        }
+
+        function register_fb(addr, width, height, size) {
+          if (!memory) {
+            return;
+          }
+          fbView = new Uint8ClampedArray(memory.buffer, addr, size);
+          fb = new ImageData(fbView, width, height);
+          canvas.width = width;
+          canvas.height = height;
         }
 
         function pointerIsLocked() {
@@ -83,6 +100,8 @@
             write,
             pointer_lock,
             pointer_release,
+            request_mem,
+            register_fb,
           },
         };
 
@@ -90,16 +109,9 @@
         const instance = obj.instance;
 
         memory = instance.exports.memory;
-
-        const fbSize = fbWidth * fbHeight * 4;
-        const zBufSize = fbWidth * 4;
-        memory.grow(Math.ceil((fbSize + zBufSize) / (64 * 1024)));
         
-        const fbView = new Uint8ClampedArray(memory.buffer, instance.exports.__heap_base, fbSize);
-        const fb = new ImageData(fbView, fbWidth, fbHeight);
-
         // init game
-        instance.exports.init(fbWidth, fbHeight);
+        instance.exports.init();
 
         function updateViewportSize() {
           // shamelessly stolen from
