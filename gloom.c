@@ -13,7 +13,7 @@
 #define COLOR_WALLH 0xFFFFFFFF
 #define COLOR_WALLV 0xFFAAAAAA
 
-#define PLAYER_RUN_SPEED    2.0f
+#define PLAYER_RUN_SPEED    3.5f
 #define PLAYER_ROT_SPEED    0.01f
 #define PLAYER_RADIUS       0.15f
 
@@ -69,7 +69,6 @@ struct keys {
 struct hit {
   f32 dist;
   b8 vertical;
-  u8 cell_id;
 };
 
 static b8 pointer_locked = false;
@@ -191,7 +190,7 @@ static inline void clear_screen(u32 color) {
     fb[i] = color;
 }
 
-static void trace_ray(const vec2f* ray_dir, struct hit* hit) {
+static u8 trace_ray(const vec2f* ray_dir, struct hit* hit) {
   vec2f delta_dist, dist, intersec_dist;
   vec2i step_dir;
   vec2u map_coords;
@@ -233,11 +232,13 @@ static void trace_ray(const vec2f* ray_dir, struct hit* hit) {
   }
 
   hit->dist = vertical ? intersec_dist.y - delta_dist.y : intersec_dist.x - delta_dist.x;
-  hit->cell_id = cell_id;
   hit->vertical = vertical;
+
+  return cell_id;
 }
 
 static inline void render_scene(void) {
+  u8 cell_id;
   i32 x, y;
   i32 line_y, line_height, line_color;
   f32 cam_x;
@@ -251,14 +252,14 @@ static inline void render_scene(void) {
     ray_dir.x = player.long_dir.x + camera.plane.x * cam_x;
     ray_dir.y = player.long_dir.y + camera.plane.y * cam_x;
 
-    trace_ray(&ray_dir, &hit);
+    cell_id = trace_ray(&ray_dir, &hit);
 
     // draw column
-    if (hit.cell_id) {
+    if (cell_id) {
       line_color = hit.vertical ? COLOR_WALLV : COLOR_WALLH;
 
       line_height = FB_HEIGHT / hit.dist;
-      if (line_height > FB_HEIGHT)
+      if ((u32)line_height > FB_HEIGHT)
         line_height = FB_HEIGHT;
       line_y = (FB_HEIGHT - line_height) >> 1;
     } else
@@ -270,7 +271,7 @@ static inline void render_scene(void) {
     y = 0;
     for (; y < line_y; ++y)
       fb[x + y * FB_WIDTH] = COLOR_SKY;
-    if (hit.cell_id) {
+    if (cell_id) {
       line_y += line_height;
       for (; y < line_y; ++y)
         fb[x + y * FB_WIDTH] = line_color;
@@ -404,16 +405,14 @@ static inline void update_player_position(f32 delta) {
   v_dir.x = 0.0f;
   v_dir.y = SIGN(dir.y);
   v_dist = absf(dir.y) * space;
-  trace_ray(&v_dir, &hit);
-  if (hit.dist < v_dist + PLAYER_RADIUS)
+  if (trace_ray(&v_dir, &hit) && hit.dist < v_dist + PLAYER_RADIUS)
     v_dist = hit.dist - PLAYER_RADIUS;
 
   // check for collisions on the x-axis
   h_dir.x = SIGN(dir.x);
   h_dir.y = 0.0f;
   h_dist = absf(dir.x) * space;
-  trace_ray(&h_dir, &hit);
-  if (hit.dist < h_dist + PLAYER_RADIUS)
+  if (trace_ray(&h_dir, &hit) && hit.dist < h_dist + PLAYER_RADIUS)
     h_dist = hit.dist - PLAYER_RADIUS;
 
   player.dpos.x += h_dir.x * h_dist;
@@ -435,6 +434,10 @@ static inline void update_sprites(f32 delta) {
     // we need to compute dist_from_player2 here, because we need to use it
     // for collision detection with the player.
     s->dist_from_player2 = s->diff.x * s->diff.x + s->diff.y * s->diff.y;
+
+    if (s->dist_from_player2 < PLAYER_RADIUS * PLAYER_RADIUS) {
+      // sprite collided with the player
+    }
   }
 
   UNUSED(delta);

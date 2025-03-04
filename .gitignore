@@ -1,4 +1,6 @@
 .cache/
 trigo.c
 trigo.h
-*.wasm
+*.wasm*
+**/__pycache__/
+**/compile_commands.json
