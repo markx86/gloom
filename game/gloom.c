@@ -1,6 +1,7 @@
 #include <gloom.h>
 
 struct camera camera;
+f32 z_buf[FB_WIDTH];
 
 struct player player = {
   .pos = {
@@ -34,8 +35,6 @@ struct map map = {
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
   },
 };
-
-f32 z_buf[FB_WIDTH];
 
 struct keys keys;
 
@@ -101,7 +100,7 @@ void set_player_rot(f32 new_rot) {
   }
 }
 
-u8 trace_ray(const vec2f* ray_dir, struct hit* hit) {
+static u8 trace_ray(const vec2f* ray_dir, struct hit* hit) {
   vec2f delta_dist, dist, intersec_dist;
   vec2i step_dir;
   vec2u map_coords;
@@ -237,7 +236,88 @@ static inline void update_sprites(f32 delta) {
   UNUSED(delta);
 }
 
-void update(f32 delta) {
+static inline void update(f32 delta) {
   update_player_position(delta);
   update_sprites(delta);
+}
+
+static inline void render_scene(void) {
+  u8 cell_id;
+  i32 x;
+  f32 cam_x;
+  vec2f ray_dir;
+  struct hit hit;
+
+  for (x = 0; x < FB_WIDTH; ++x) {
+    cam_x = (2.0f * ((f32)x / FB_WIDTH)) - 1.0f;
+
+    // we do not use VEC2* macros, because this is faster
+    ray_dir.x = player.long_dir.x + camera.plane.x * cam_x;
+    ray_dir.y = player.long_dir.y + camera.plane.y * cam_x;
+
+    cell_id = trace_ray(&ray_dir, &hit);
+
+    z_buf[x] = hit.dist * hit.dist;
+
+    draw_column(cell_id, x, &hit);
+  }
+}
+
+static inline void render_sprites(void) {
+  vec2f proj;
+  u32 i, j, k, n;
+  struct sprite* s;
+  struct sprite* on_screen_sprites[MAX_SPRITES_ON_SCREEN];
+
+  n = 0;
+  for (i = 0; i < ARRLEN(sprites); ++i) {
+    s = sprites + i;
+
+    // compute coordinates in camera space
+    proj.x = camera.inv_mat.m11 * s->diff.x + camera.inv_mat.m12 * s->diff.y;
+    proj.y = camera.inv_mat.m21 * s->diff.x + camera.inv_mat.m22 * s->diff.y;
+
+    // sprite is behind the camera, ignore it
+    if (proj.y < 0.0f)
+      continue;
+
+    // save camera depth
+    s->camera_depth = 1.0f / proj.y;
+
+    // compute screen x
+    s->screen_x = (FB_WIDTH >> 1) * (1.0f + (proj.x / proj.y));
+    // compute screen width (we divide by two since we always use the half screen width)
+    s->screen_halfw = (i32)((f32)s->dim.x * s->camera_depth) >> 1;
+
+    // sprite is not on screen, ignore it
+    if (s->screen_x + s->screen_halfw < 0 || s->screen_x - s->screen_halfw >= FB_WIDTH)
+      continue;
+
+    // look for index to insert the new sprite
+    for (j = 0; j < n; ++j) {
+      if (on_screen_sprites[j]->dist_from_player2 < s->dist_from_player2)
+        break;
+    }
+    // move elements after the entry to the next index
+    for (k = n; k > j; --k)
+      on_screen_sprites[k] = on_screen_sprites[k-1];
+    // store the new sprite to render
+    on_screen_sprites[j] = s;
+
+    if (++n >= MAX_SPRITES_ON_SCREEN)
+      break;
+  }
+
+  for (i = 0; i < n; i++)
+    draw_sprite(on_screen_sprites[i]);
+}
+
+static inline void render(void) {
+  render_scene();
+  render_sprites();
+}
+
+void game_tick(f32 delta) {
+  update(delta);
+  render();
 }

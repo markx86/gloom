@@ -24,6 +24,11 @@ static inline f32 inv_sqrt(f32 n) {
 }
 */
 
+static inline i32 isposf(f32 x) {
+  u32 v = *(u32*)&x;
+  return !(v & (1U << 31));
+}
+
 static inline f32 lerp(f32 weight, f32 v1, f32 v2) {
   return (1.0f - weight) * v1 + weight * v2;
 }

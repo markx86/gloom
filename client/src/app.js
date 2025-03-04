@@ -6,8 +6,11 @@
 
   const canvas = document.getElementById("viewport");
   const ctx = canvas.getContext("2d");
-  // set transform origin to top-left corner
-  canvas.style.transformOrigin = "0 0";
+
+  canvas.style.transformOrigin = "top left";
+  canvas.style.position = "absolute";
+  canvas.style.top = "50%";
+  canvas.style.left = "50%";
   canvas.style.imageRendering = "crisp-edges";
 
   let memory = null;
@@ -104,7 +107,10 @@
     const xScale = window.innerWidth / canvas.width;
     const yScale = window.innerHeight / canvas.height;
     const scaleToFit = Math.min(xScale, yScale);
-    canvas.style.transform = `scale(${scaleToFit})`;
+    // const translationX = (window.innerWidth - canvas.width * scaleToFit) / 2;
+    // const translationY = (window.innerHeight - canvas.height * scaleToFit) / 2;
+    // canvas.style.transform = `scale(${scaleToFit}) translate(${translationX}px, ${translationY}px)`;
+    canvas.style.transform = `scale(${scaleToFit}) translate(-50%, -50%)`;
   }
 
   function processKeyEvent(event) {

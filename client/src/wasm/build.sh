@@ -9,6 +9,7 @@ gamedir="$wasmdir/../../../game"
 cd $wasmdir
 
 $gamedir/build.sh wasm32 $origdir
+$wasmdir/tools/gen-font.py
 
 out=gloom.wasm
 outpath="$origdir/$out"

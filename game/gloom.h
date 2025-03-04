@@ -4,13 +4,6 @@
 
 #define FB_WIDTH  640
 #define FB_HEIGHT 480
-#define FB_SIZE   sizeof(fb)
-#define FB_LEN    ARRLEN(fb)
-
-#define COLOR_SKY   0xFFFF0000
-#define COLOR_FLOOR 0xFF000000
-#define COLOR_WALLH 0xFFFFFFFF
-#define COLOR_WALLV 0xFFAAAAAA
 
 #define PLAYER_RUN_SPEED    3.5f
 #define PLAYER_ROT_SPEED    0.01f
@@ -73,16 +66,16 @@ struct hit {
 extern struct player player;
 extern struct camera camera;
 extern struct map map;
-extern struct sprite sprites[2];
 extern struct keys keys;
 extern f32 z_buf[FB_WIDTH];
 
-u8 trace_ray(const vec2f* ray_dir, struct hit* hit);
-
-void update(f32 delta);
+void draw_column(u8 cell_id, i32 x, const struct hit* hit);
+void draw_sprite(struct sprite* s);
 
 void set_camera_fov(f32 new_fov);
 void set_player_rot(f32 new_rot);
+
+void game_tick(f32 delta);
 
 static inline void off_player_rot(f32 delta) {
   f32 new_rot = player.rot + delta;
