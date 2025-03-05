@@ -1,6 +1,8 @@
 #define DEFINE_FONT
 #include <ui.h>
 
+#define SLIDER_THICKNESS 8
+
 vec2u __cur = {.x = 0, .y = 0};
 u32 __fg_color = 0xFFFFFFFF, __bg_color = 0xFF000000;
 
@@ -106,9 +108,10 @@ void write_text_with_color(u32 scale, u32 color, const char* text) {
   }
 }
 
-void draw_button(u32 x, u32 y, struct button* b) {
+void draw_component(u32 x, u32 y, struct component* c) {
   u32 bg_color, fg_color;
   u32 orig_x, orig_y;
+  char checkbox_tick[] = "[ ]";
 
   orig_x = get_cursor_x();
   orig_y = get_cursor_y();
@@ -116,7 +119,7 @@ void draw_button(u32 x, u32 y, struct button* b) {
   set_cursor_x(x);
   set_cursor_y(y);
 
-  if (b->state == BUTTON_HOVER) {
+  if (c->state != UICOMP_IDLE) {
     bg_color = __fg_color;
     fg_color = __bg_color;
   } else {
@@ -124,15 +127,32 @@ void draw_button(u32 x, u32 y, struct button* b) {
     fg_color = __fg_color;
   }
 
-  draw_rect(b->tl.x - 2, b->tl.y - 2, b->br.x - b->tl.x + 4, b->br.y - b->tl.y + 4, bg_color);
+  draw_rect(c->tl.x, c->tl.y, c->br.x - c->tl.x, c->br.y - c->tl.y, bg_color);
 
-  b->tl.x = x;
-  b->tl.y = y;
+  write_text_with_color(1, fg_color, c->text);
 
-  write_text_with_color(1, fg_color, b->text);
+  c->br.x = get_cursor_x() + 2;
 
-  b->br.x = get_cursor_x();
-  b->br.y = get_cursor_y() + FONT_HEIGHT * 1;
+  if (c->type == UICOMP_CHECKBOX) {
+    checkbox_tick[1] = c->ticked ? 'x' : ' ';
+    set_cursor_x(get_cursor_x() + c->pad - (sizeof(checkbox_tick)-2) * FONT_WIDTH);
+    write_text_with_color(1, fg_color, checkbox_tick);
+  }
+
+  c->br.x = get_cursor_x();
+
+  if (c->type == UICOMP_SLIDER) {
+    draw_rect(
+      c->br.x + FONT_WIDTH, y + ((FONT_HEIGHT - SLIDER_THICKNESS) >> 1),
+      c->width * c->value, SLIDER_THICKNESS,
+      fg_color);
+    c->br.x += c->width + FONT_WIDTH;
+  }
+
+  c->tl.x = x - 2;
+  c->tl.y = y - 2;
+  c->br.x += 2;
+  c->br.y = get_cursor_y() + FONT_HEIGHT + 2;
 
   set_cursor_x(orig_x);
   set_cursor_y(orig_y);

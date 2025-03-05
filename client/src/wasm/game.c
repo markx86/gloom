@@ -70,6 +70,7 @@ static void on_enter(enum client_state prev_state) {
 static void on_key(u32 code, char ch, b8 pressed) {
   if (!pointer_locked)
     return;
+
   switch (code) {
     case KEY_W:
       keys.forward = pressed;
@@ -104,7 +105,11 @@ static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
   UNUSED(dy);
 }
 
-static void on_mouse_click(void) {
+static void on_mouse_down(u32 x, u32 y, u32 button) {
+  UNUSED(button);
+  UNUSED(x);
+  UNUSED(y);
+
   if (!pointer_locked) {
     pointer_lock();
     return;
@@ -116,5 +121,5 @@ const struct state_handlers game_state = {
   .on_enter = on_enter,
   .on_key = on_key,
   .on_mouse_moved = on_mouse_moved,
-  .on_mouse_click = on_mouse_click,
+  .on_mouse_down = on_mouse_down,
 };

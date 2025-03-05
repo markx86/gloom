@@ -108,9 +108,6 @@
     const xScale = window.innerWidth / canvas.width;
     const yScale = window.innerHeight / canvas.height;
     const scaleToFit = Math.min(xScale, yScale);
-    // const translationX = (window.innerWidth - canvas.width * scaleToFit) / 2;
-    // const translationY = (window.innerHeight - canvas.height * scaleToFit) / 2;
-    // canvas.style.transform = `scale(${scaleToFit}) translate(${translationX}px, ${translationY}px)`;
     canvas.style.transform = `scale(${scaleToFit}) translate(-50%, -50%)`;
   }
 
@@ -122,7 +119,8 @@
   window.addEventListener("keydown", processKeyEvent);
   window.addEventListener("keyup", processKeyEvent);
   document.addEventListener("pointerlockchange", () => instance.exports.set_pointer_locked(pointerIsLocked()));
-  canvas.addEventListener("click", () => instance.exports.mouse_click());
+  canvas.addEventListener("mousedown", e => instance.exports.mouse_down(e.offsetX, e.offsetY, e.button));
+  canvas.addEventListener("mouseup", e => instance.exports.mouse_up(e.offsetX, e.offsetY, e.button));
   canvas.addEventListener("mousemove", e => instance.exports.mouse_moved(e.offsetX, e.offsetY, e.movementX, e.movementY));
   updateViewportSize();
 

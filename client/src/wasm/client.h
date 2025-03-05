@@ -13,6 +13,7 @@ enum client_state {
   STATE_MENU,
   STATE_GAME,
   STATE_PAUSE,
+  STATE_OPTIONS,
   STATE_MAX,
 };
 
@@ -27,7 +28,8 @@ struct state_handlers {
   void (*on_enter)(enum client_state);
   void (*on_key)(u32, char, b8);
   void (*on_mouse_moved)(u32, u32, i32, i32);
-  void (*on_mouse_click)(void);
+  void (*on_mouse_down)(u32, u32, u32);
+  void (*on_mouse_up)(u32, u32, u32);
   void (*on_pointer_lock_changed)(void);
 };
 
