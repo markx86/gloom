@@ -11,7 +11,8 @@
   canvas.style.position = "absolute";
   canvas.style.top = "50%";
   canvas.style.left = "50%";
-  canvas.style.imageRendering = "crisp-edges";
+  // TODO maybe use 'crisp-edges' instead of 'pixelated' on Firefox
+  canvas.style.imageRendering = "pixelated";
 
   let memory = null;
   let fbView = null;
@@ -122,7 +123,7 @@
   window.addEventListener("keyup", processKeyEvent);
   document.addEventListener("pointerlockchange", () => instance.exports.set_pointer_locked(pointerIsLocked()));
   canvas.addEventListener("click", () => instance.exports.mouse_click());
-  canvas.addEventListener("mousemove", e => instance.exports.mouse_moved(e.layerX, e.layerY, e.movementX, e.movementY));
+  canvas.addEventListener("mousemove", e => instance.exports.mouse_moved(e.offsetX, e.offsetY, e.movementX, e.movementY));
   updateViewportSize();
 
   let prevTimestamp;

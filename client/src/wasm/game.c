@@ -54,12 +54,17 @@ void draw_sprite(struct sprite* s) {
   }
 }
 
-static void on_enter(void) {
+static void on_enter(enum client_state prev_state) {
   if (!pointer_locked)
     pointer_lock();
-  set_camera_fov(DEG2RAD(CAMERA_FOV));
-  set_player_rot(0);
-  camera.dof = CAMERA_DOF;
+
+  if (prev_state != STATE_PAUSE) {
+    set_camera_fov(DEG2RAD(CAMERA_FOV));
+    set_player_rot(0);
+    player.pos = (vec2i) { .x = 2, .y = 2 };
+    player.dpos = (vec2f) { .x = 0.5f, .y = 0.5f };
+    camera.dof = CAMERA_DOF;
+  }
 }
 
 static void on_key(u32 code, char ch, b8 pressed) {
@@ -78,10 +83,10 @@ static void on_key(u32 code, char ch, b8 pressed) {
     case KEY_D:
       keys.right = pressed;
       break;
-    case KEY_Q:
-      switch_to_state(STATE_MENU);
-      break;
+    case KEY_P:
+      switch_to_state(STATE_PAUSE);
     default:
+      printf("unhandled key %d (%c)\n", code, ch);
       break;
   }
 
@@ -106,7 +111,7 @@ static void on_mouse_click(void) {
   }
 }
 
-struct state_handlers game_state = {
+const struct state_handlers game_state = {
   .on_tick = game_tick,
   .on_enter = on_enter,
   .on_key = on_key,

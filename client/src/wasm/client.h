@@ -12,7 +12,7 @@ extern b8 pointer_locked;
 enum client_state {
   STATE_MENU,
   STATE_GAME,
-  STATE_PAUSED,
+  STATE_PAUSE,
   STATE_MAX,
 };
 
@@ -20,11 +20,11 @@ enum client_state {
 #define KEY_D 68
 #define KEY_S 83
 #define KEY_W 87
-#define KEY_Q 81
+#define KEY_P 80
 
 struct state_handlers {
   void (*on_tick)(f32);
-  void (*on_enter)(void);
+  void (*on_enter)(enum client_state);
   void (*on_key)(u32, char, b8);
   void (*on_mouse_moved)(u32, u32, i32, i32);
   void (*on_mouse_click)(void);

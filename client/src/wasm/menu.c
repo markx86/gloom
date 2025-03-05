@@ -9,7 +9,6 @@ static void on_play_clicked(void) {
 }
 
 static void on_options_clicked(void) {
-
 }
 
 static struct button buttons[] = {
@@ -33,7 +32,9 @@ static void on_tick(f32 delta) {
   }
 }
 
-static void on_enter(void) {
+static void on_enter(enum client_state prev_state) {
+  UNUSED(prev_state);
+
   if (pointer_locked)
     pointer_release();
 
@@ -49,28 +50,22 @@ static void on_enter(void) {
     "\xd1 gloom v1.0 \xd1\r\n"
     "\xd4\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd5\r\n"
   );
+
+  ui_on_enter(buttons, ARRLEN(buttons));
 }
 
 static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
-  u32 i;
-
   UNUSED(dx);
   UNUSED(dy);
 
-  for (i = 0; i < ARRLEN(buttons); ++i)
-    buttons[i].state = is_point_over_button(x, y, &buttons[i]) ? BUTTON_HOVER : BUTTON_IDLE;
+  ui_on_mouse_move(x, y, buttons, ARRLEN(buttons));
 }
 
 static void on_mouse_click(void) {
-  u32 i;
-
-  for (i = 0; i < ARRLEN(buttons); ++i) {
-    if (buttons[i].state == BUTTON_HOVER && buttons[i].on_click)
-      buttons[i].on_click();
-  }
+  ui_on_mouse_click(buttons, ARRLEN(buttons));
 }
 
-struct state_handlers menu_state = {
+const struct state_handlers menu_state = {
   .on_tick = on_tick,
   .on_enter = on_enter,
   .on_mouse_moved = on_mouse_moved,

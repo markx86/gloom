@@ -3,12 +3,13 @@
 u32 fb[FB_WIDTH * FB_HEIGHT];
 b8 pointer_locked = false;
 
-extern struct state_handlers menu_state, game_state;
+extern const struct state_handlers menu_state, game_state, pause_state;
 
 static enum client_state __state;
-static struct state_handlers* __handlers[] = {
-  [STATE_MENU] = &menu_state,
-  [STATE_GAME] = &game_state
+static const struct state_handlers* __handlers[] = {
+  [STATE_MENU]  = &menu_state,
+  [STATE_GAME]  = &game_state,
+  [STATE_PAUSE] = &pause_state,
 };
 
 #define HANDLE(name, ...)                                 \
@@ -40,8 +41,9 @@ void tick(f32 delta) {
 }
 
 void switch_to_state(enum client_state state) {
+  enum client_state prev_state = __state;
   __state = state;
-  HANDLE(on_enter);
+  HANDLE(on_enter, prev_state);
 }
 
 void init(void) {

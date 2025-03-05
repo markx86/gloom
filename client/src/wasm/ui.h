@@ -47,9 +47,30 @@ static inline void clear_screen_with_color(u32 color) {
 
 static inline void clear_screen(void) { clear_screen_with_color(__bg_color); }
 
-static inline b8 is_point_over_button(u32 x, u32 y, struct button* b) {
-  return (x >= b->tl.x && y >= b->tl.y &&
-          x <= b->br.x && y <= b->br.y);
+static inline void ui_on_mouse_move(u32 x, u32 y, struct button* buttons, u32 n) {
+  u32 i;
+  struct button* b;
+
+  for (i = 0; i < n; ++i) {
+    b = &buttons[i];
+    b->state =
+      (x >= b->tl.x && y >= b->tl.y && x <= b->br.x && y <= b->br.y)
+      ? BUTTON_HOVER : BUTTON_IDLE;
+  }
+}
+
+static inline void ui_on_mouse_click(struct button* buttons, u32 n) {
+  u32 i;
+  for (i = 0; i < n; ++i) {
+    if (buttons[i].state == BUTTON_HOVER && buttons[i].on_click)
+      buttons[i].on_click();
+  }
+}
+
+static inline void ui_on_enter(struct button* buttons, u32 n) {
+  u32 i;
+  for (i = 0; i < n; ++i)
+    buttons[i].state = BUTTON_IDLE;
 }
 
 #endif
