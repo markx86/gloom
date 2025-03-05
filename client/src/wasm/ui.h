@@ -70,14 +70,25 @@ static inline b8 component_is_mouse_over(u32 x, u32 y, struct component* c) {
 
 static inline void component_on_mouse_move(u32 x, u32 y, i32 dx, i32 dy, struct component* comps, u32 n) {
   u32 i;
+  b8 interacting;
   struct component* c;
 
   UNUSED(dy);
 
+  // if the user is interacting with a ui element, do not process
+  // other hover events
+  interacting = false;
+  for (i = 0; i < n; ++i) {
+    if (comps[i].state == UICOMP_PRESSED) {
+      interacting = true;
+      break;
+    }
+  }
+
   for (i = 0; i < n; ++i) {
     c = &comps[i];
     if (c->state != UICOMP_PRESSED)
-      c->state = component_is_mouse_over(x, y, c) ? UICOMP_HOVER : UICOMP_IDLE;
+      c->state = !interacting && component_is_mouse_over(x, y, c) ? UICOMP_HOVER : UICOMP_IDLE;
     else if (c->type == UICOMP_SLIDER) {
       c->value += (f32)dx / (SLIDER_WIDTH << 1);
       if (c->value > 1.0f)

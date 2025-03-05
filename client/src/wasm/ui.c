@@ -134,9 +134,7 @@ void draw_component(u32 x, u32 y, struct component* c) {
 
   if (c->type == UICOMP_CHECKBOX) {
     pad = c->pad - (sizeof(checkbox_tick)-1) * FONT_WIDTH;
-    if (pad < 0)
-      pad = 0;
-    pad += FONT_WIDTH;
+    pad = MAX(pad, 0) + FONT_WIDTH;
 
     checkbox_tick[1] = c->ticked ? 'x' : ' ';
     x += pad;
@@ -147,9 +145,7 @@ void draw_component(u32 x, u32 y, struct component* c) {
 
   if (c->type == UICOMP_SLIDER) {
     pad = c->pad - SLIDER_WIDTH - PAD;
-    if (pad < 0)
-      pad = 0;
-    pad += FONT_WIDTH;
+    pad = MAX(pad, 0) + FONT_WIDTH;
 
     draw_rect(
       c->br.x + pad, y + ((FONT_HEIGHT - SLIDER_THICKNESS) >> 1),
@@ -167,7 +163,7 @@ void draw_string(u32 x, u32 y, const char* text) {
 }
 
 void draw_title(u32 x, u32 y, const char* text) {
-  char pad[128];
+  char pad[32];
   u32 end, xx;
 
   end = strlen(text) + 2;

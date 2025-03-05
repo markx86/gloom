@@ -8,12 +8,18 @@ static enum client_state back_state;
 
 static void on_back_clicked(void) { switch_to_state(back_state); }
 
+#define BACK_BUTTON      0
+#define SOUND_CHECKBOX   1
+#define VOLUME_SLIDER    2
+#define DRAWDIST_SLIDER  3
+#define MOUSESENS_SLIDER 4
+
 static struct component comps[] = {
-  { .type = UICOMP_BUTTON,   .text = "> back", .on_click = on_back_clicked },
-  { .type = UICOMP_CHECKBOX, .text = "> sound" },
-  { .type = UICOMP_SLIDER,   .text = "> volume" },
-  { .type = UICOMP_SLIDER,   .text = "> render distance" },
-  { .type = UICOMP_SLIDER,   .text = "> mouse sensitivity" },
+  [BACK_BUTTON     ] = { .type = UICOMP_BUTTON,   .text = "> back", .on_click = on_back_clicked },
+  [SOUND_CHECKBOX  ] = { .type = UICOMP_CHECKBOX, .text = "> sound", .ticked = true },
+  [VOLUME_SLIDER   ] = { .type = UICOMP_SLIDER,   .text = "> volume", .value = 1.0f },
+  [DRAWDIST_SLIDER ] = { .type = UICOMP_SLIDER,   .text = "> draw distance", .value = 0.5f },
+  [MOUSESENS_SLIDER] = { .type = UICOMP_SLIDER,   .text = "> mouse sensitivity", .value = 0.5f },
 };
 
 static void on_enter(enum client_state prev_state) {
