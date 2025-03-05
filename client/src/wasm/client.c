@@ -3,7 +3,12 @@
 u32 fb[FB_WIDTH * FB_HEIGHT];
 b8 pointer_locked = false;
 
-extern const struct state_handlers menu_state, game_state, pause_state, options_state;
+extern const struct state_handlers
+  menu_state,
+  game_state,
+  pause_state,
+  options_state,
+  about_state;
 
 static enum client_state __state;
 static const struct state_handlers* __handlers[] = {
@@ -11,6 +16,7 @@ static const struct state_handlers* __handlers[] = {
   [STATE_GAME]  = &game_state,
   [STATE_PAUSE] = &pause_state,
   [STATE_OPTIONS] = &options_state,
+  [STATE_ABOUT] = &about_state
 };
 
 #define HANDLE(name, ...)                                 \

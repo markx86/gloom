@@ -26,27 +26,25 @@ struct component {
     struct {
       void (*on_click)(void);
     };
-    // slider
     struct {
-      f32 value;
-      u32 width;
-    };
-    // checkbox
-    struct {
-      b8 ticked;
+      union {
+        b8 ticked; // checkbox
+        f32 value; // slider
+      };
       u32 pad;
     };
   };
 };
 
-extern vec2u __cur;
 extern u32 __fg_color, __bg_color;
 
-static inline void set_cursor_x(u32 x) { __cur.x = x % FB_WIDTH; }
-static inline void set_cursor_y(u32 y) { __cur.y = y % FB_HEIGHT; }
+#define TITLE_HEIGHT     (FONT_HEIGHT * 2 * 3)
+#define TITLE_WIDTH(s)   ((strlen(s) + 4) * FONT_WIDTH * 2)
 
-static inline u32 get_cursor_x(void) { return __cur.x; }
-static inline u32 get_cursor_y(void) { return __cur.y; }
+#define STRING_HEIGHT    (FONT_HEIGHT)
+#define STRING_WIDTH(s)  (strlen(s) * FONT_WIDTH)
+
+#define SLIDER_WIDTH     128
 
 static inline void set_colors(u32 fg, u32 bg) {
   __fg_color = fg;
@@ -55,12 +53,8 @@ static inline void set_colors(u32 fg, u32 bg) {
 
 void draw_rect(u32 x, u32 y, u32 w, u32 h, u32 color);
 void draw_component(u32 x, u32 y, struct component* b);
-
-void write_text_with_color(u32 scale, u32 color, const char* text);
-
-static inline void write_text(u32 scale, const char* text) {
-  write_text_with_color(scale, __fg_color, text);
-}
+void draw_title(u32 x, u32 y, const char* text);
+void draw_string(u32 x, u32 y, const char* text);
 
 static inline void clear_screen_with_color(u32 color) {
   u32 i;
@@ -85,7 +79,7 @@ static inline void component_on_mouse_move(u32 x, u32 y, i32 dx, i32 dy, struct 
     if (c->state != UICOMP_PRESSED)
       c->state = component_is_mouse_over(x, y, c) ? UICOMP_HOVER : UICOMP_IDLE;
     else if (c->type == UICOMP_SLIDER) {
-      c->value += (f32)dx / c->width;
+      c->value += (f32)dx / (SLIDER_WIDTH << 1);
       if (c->value > 1.0f)
         c->value = 1.0f;
       else if (c->value < 0.0f)

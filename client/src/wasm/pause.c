@@ -23,11 +23,12 @@ static void on_tick(f32 delta) {
   UNUSED(delta);
 
   for (i = 0; i < ARRLEN(buttons); ++i)
-    draw_component(32, 32 + 24 * i, buttons + i);
+    draw_component(48, 32 + TITLE_HEIGHT + 24 * i, buttons + i);
 }
 
 static void on_enter(enum client_state prev_state) {
   u32 i;
+  const char* title = "paused";
 
   UNUSED(prev_state);
 
@@ -36,14 +37,20 @@ static void on_enter(enum client_state prev_state) {
 
   // darken the screen by decreasing the alpha channel
   for (i = 0; i < FB_LEN; ++i)
-    fb[i] = (fb[i] & ~0xFF000000) | 0x88000000;
+    fb[i] = (fb[i] & ~0xFF000000) | 0x80000000;
 
   set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
+
+  draw_rect(
+    32, 32 + (FONT_HEIGHT >> 1),
+    TITLE_WIDTH(title), TITLE_HEIGHT - FONT_HEIGHT,
+    BACKGROUND_COLOR);
+  draw_title(32, 32, title);
 
   component_on_enter(buttons, ARRLEN(buttons));
 }
 
-static void on_mouse_move(u32 x, u32 y, i32 dx, i32 dy) {
+static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
   component_on_mouse_move(x, y, dx, dy, buttons, ARRLEN(buttons));
 }
 
@@ -60,7 +67,7 @@ static void on_mouse_up(u32 x, u32 y, u32 button) {
 const struct state_handlers pause_state = {
   .on_tick = on_tick,
   .on_enter = on_enter,
-  .on_mouse_moved = on_mouse_move,
+  .on_mouse_moved = on_mouse_moved,
   .on_mouse_down = on_mouse_down,
   .on_mouse_up = on_mouse_up
 };

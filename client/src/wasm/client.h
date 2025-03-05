@@ -14,6 +14,7 @@ enum client_state {
   STATE_GAME,
   STATE_PAUSE,
   STATE_OPTIONS,
+  STATE_ABOUT,
   STATE_MAX,
 };
 

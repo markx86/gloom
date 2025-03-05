@@ -6,23 +6,22 @@
 
 static void on_play_clicked(void) { switch_to_state(STATE_GAME); }
 static void on_options_clicked(void) { switch_to_state(STATE_OPTIONS); }
+static void on_about_clicked(void) { switch_to_state(STATE_ABOUT); }
 
 static struct component comps[] = {
   { .type = UICOMP_BUTTON, .text = "> play", .on_click = on_play_clicked },
   { .type = UICOMP_BUTTON, .text = "> options", .on_click = on_options_clicked },
-  { .type = UICOMP_BUTTON, .text = "> about" }
+  { .type = UICOMP_BUTTON, .text = "> about", .on_click = on_about_clicked }
 };
 
 static void on_tick(f32 delta) {
   u32 i;
-  const u32 y = 32 + 16 * 2 * 3;
 
   UNUSED(delta);
 
   // render buttons menu
-  set_cursor_y(32 + 16 * 2 * 3);
   for (i = 0; i < ARRLEN(comps); ++i)
-    draw_component(48, y + 24 * i, comps + i);
+    draw_component(48, 32 + TITLE_HEIGHT + 24 * i, comps + i);
 }
 
 static void on_enter(enum client_state prev_state) {
@@ -35,14 +34,7 @@ static void on_enter(enum client_state prev_state) {
 
   clear_screen();
 
-  // write menu title
-  set_cursor_x(32);
-  set_cursor_y(32);
-  write_text(2,
-    "\xd2\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd3\r\n"
-    "\xd1 gloom v1.0 \xd1\r\n"
-    "\xd4\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd0\xd5\r\n"
-  );
+  draw_title(32, 32, "gloom");
 
   component_on_enter(comps, ARRLEN(comps));
 }
