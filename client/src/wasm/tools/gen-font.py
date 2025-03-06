@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 
 import struct
-import os
-import sys
+from os import path
+from writeutil import write_file, SCRIPT_DIR
 
-abs_path = os.path.realpath(sys.argv[0])
-work_dir = os.path.dirname(abs_path)
-
-with open(os.path.join(work_dir, "zap-vga16.psf"), "rb") as f:
+with open(path.join(SCRIPT_DIR, "zap-vga16.psf"), "rb") as f:
     raw = f.read()
 
 header, char_data = (raw[:4], raw[4:])
@@ -43,6 +40,4 @@ font_h += """
 
 #endif // DEFINE_FONT
 """
-
-with open(os.path.join(work_dir, "..", "font.h"), "w") as f:
-    f.write(font_h)
+write_file("font.h", font_h)

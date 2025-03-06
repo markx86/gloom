@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import math
+from writeutil import write_file
 
 STEP = 0.005
 RANGE = 2 * math.pi
@@ -22,9 +23,7 @@ const f32 __cos_table[] = {{
     {cos_arr}
 }};
 """
-
-with open("__cos_table.c", "w") as f:
-    f.write(src)
+write_file("cos_table.c", src)
 
 
 hdr = f"""
@@ -37,6 +36,4 @@ extern const f32 __cos_table[];
 #define __SAMPLES         {samples}
 #define __STEP            {1 / STEP}
 """
-
-with open("__cos_table.h", "w") as f:
-    f.write(hdr)
+write_file("cos_table.h", hdr)

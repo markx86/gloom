@@ -73,7 +73,7 @@ static inline u32 abs(i32 v) {
 #define HALF_PI    (PI / 2.0f)
 #define QUARTER_PI (HALF_PI / 2.0f)
 
-#include <__cos_table.h>
+#include <cos_table.h>
 
 static inline f32 cos(f32 angle) {
     f32 w;
