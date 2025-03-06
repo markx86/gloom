@@ -3,60 +3,10 @@
 struct camera camera;
 f32 z_buf[FB_WIDTH];
 
-struct player player = {
-  .pos = {
-    .x = 2,
-    .y = 2,
-  },
-};
-
-struct map map = {
-  .w = 12,
-  .h = 15,
-  .tiles = {
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  },
-};
-
-struct sprite sprites[] = {
-  [0] = {
-    .color = 0xFF0000FF,
-    .pos = {
-      .x = 5,
-      .y = 5
-    },
-    .dim = {
-      .x = 128,
-      .y = 480,
-    }
-  },
-  [1] = {
-    .color = 0xFF00FF00,
-    .pos = {
-      .x = 8,
-      .y = 7
-    },
-    .dim = {
-      .x = 128,
-      .y = 480,
-    }
-  }
-};
+struct player player;
+struct map map;
 union keys keys;
+struct sprites sprites;
 
 // NOTE @new_fov must be in radians
 void set_camera_fov(f32 new_fov) {
@@ -149,6 +99,9 @@ static inline void update_player_position(f32 delta) {
     .x = 0.0f, .y = 0.0f
   };
 
+  if (map.tiles == NULL)
+    return;
+
   long_dir = keys.forward - keys.backward;
   side_dir = keys.right - keys.left;
 
@@ -196,8 +149,11 @@ static inline void update_sprites(f32 delta) {
   u32 i;
   struct sprite* s;
 
-  for (i = 0; i < ARRLEN(sprites); ++i) {
-    s = sprites + i;
+  if (sprites.arr == NULL)
+    return;
+
+  for (i = 0; i < sprites.n; ++i) {
+    s = sprites.arr + i;
 
     // since we already need to compute dist_from_player2, might as well
     // save the diff vector, because we'll also need it during rendering.
@@ -216,6 +172,7 @@ static inline void update_sprites(f32 delta) {
 }
 
 static inline void update(f32 delta) {
+  multiplayer_tick();
   update_player_position(delta);
   update_sprites(delta);
 }
@@ -226,6 +183,9 @@ static inline void render_scene(void) {
   f32 cam_x;
   vec2f ray_dir;
   struct hit hit;
+
+  if (map.tiles == NULL)
+    return;
 
   for (x = 0; x < FB_WIDTH; ++x) {
     cam_x = (2.0f * ((f32)x / FB_WIDTH)) - 1.0f;
@@ -248,9 +208,12 @@ static inline void render_sprites(void) {
   struct sprite* s;
   struct sprite* on_screen_sprites[MAX_SPRITES_ON_SCREEN];
 
+  if (sprites.arr == NULL)
+    return;
+
   n = 0;
-  for (i = 0; i < ARRLEN(sprites); ++i) {
-    s = sprites + i;
+  for (i = 0; i < sprites.n; ++i) {
+    s = sprites.arr + i;
 
     // compute coordinates in camera space
     proj.x = camera.inv_mat.m11 * s->diff.x + camera.inv_mat.m12 * s->diff.y;

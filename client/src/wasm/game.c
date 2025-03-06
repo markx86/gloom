@@ -5,6 +5,8 @@
 #define COLOR_WALLH 0xFFFFFFFF
 #define COLOR_WALLV 0xFFAAAAAA
 
+static f32 last_rot;
+
 void draw_column(u8 cell_id, i32 x, const struct hit* hit) {
   i32 y, line_y, line_height, line_color;
 
@@ -58,6 +60,7 @@ static void on_enter(enum client_state prev_state) {
   if (!pointer_locked)
     pointer_lock();
 
+  last_rot = 0.0f;
   if (prev_state != STATE_PAUSE) {
     set_camera_fov(DEG2RAD(CAMERA_FOV));
     set_player_rot(0);
@@ -66,9 +69,12 @@ static void on_enter(enum client_state prev_state) {
 }
 
 static void on_key(u32 code, char ch, b8 pressed) {
+  u32 prev_keys;
+
   if (!pointer_locked)
     return;
 
+  prev_keys = keys.all_keys;
   switch (code) {
     case KEY_W:
       keys.forward = pressed;
@@ -84,10 +90,14 @@ static void on_key(u32 code, char ch, b8 pressed) {
       break;
     case KEY_P:
       switch_to_state(STATE_PAUSE);
+      return;
     default:
       printf("unhandled key %d (%c)\n", code, ch);
-      break;
+      return;
   }
+
+  if (keys.all_keys != prev_keys)
+    send_update();
 
   UNUSED(ch);
 }
@@ -97,6 +107,11 @@ static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
     return;
 
   off_player_rot(dx * PLAYER_ROT_SPEED);
+
+  if (absf(last_rot - player.rot) > (PI / 8.0f)) {
+    last_rot = player.rot;
+    send_update();
+  }
 
   UNUSED(x);
   UNUSED(y);

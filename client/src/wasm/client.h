@@ -11,6 +11,7 @@ extern b8 pointer_locked;
 
 enum client_state {
   STATE_MENU,
+  STATE_LOADING,
   STATE_GAME,
   STATE_PAUSE,
   STATE_OPTIONS,

@@ -46,9 +46,14 @@ struct sprite {
   };
 };
 
+struct sprites {
+  u32 n;
+  struct sprite* arr;
+};
+
 struct map {
   u32 w, h;
-  u8 tiles[];
+  u8* tiles;
 };
 
 union keys {
@@ -66,11 +71,26 @@ struct hit {
   b8 vertical;
 };
 
+enum connection_state {
+  CONN_UNKNOWN,
+  CONN_DISCONNECTED,
+  CONN_CONNECTED,
+  CONN_JOINING,
+  CONN_UPDATING,
+  CONN_LEAVING
+};
+
+#define PLAYER_SPRITE_W 32
+#define PLAYER_SPRITE_H 64
+
 extern struct player player;
 extern struct camera camera;
+extern struct sprites sprites;
 extern struct map map;
 extern union keys keys;
 extern f32 z_buf[FB_WIDTH];
+
+extern enum connection_state __conn_state;
 
 void draw_column(u8 cell_id, i32 x, const struct hit* hit);
 void draw_sprite(struct sprite* s);
@@ -79,6 +99,28 @@ void set_camera_fov(f32 new_fov);
 void set_player_rot(f32 new_rot);
 
 void game_tick(f32 delta);
+
+static inline void set_online(b8 yes) {
+  if (__conn_state == CONN_UNKNOWN)
+    __conn_state = yes ? CONN_CONNECTED : CONN_DISCONNECTED;
+}
+
+static inline b8 is_disconnected(void) {
+  return __conn_state <= CONN_DISCONNECTED;
+}
+
+static inline b8 is_in_multiplayer_game(void) {
+  return __conn_state == CONN_UPDATING;
+}
+
+static inline enum connection_state get_connection_state(void) {
+  return __conn_state;
+}
+
+b8 join_game(u32 token, u32 game_id);
+b8 leave_game(void);
+void send_update(void);
+void multiplayer_tick(void);
 
 static inline void off_player_rot(f32 delta) {
   f32 new_rot = player.rot + delta;

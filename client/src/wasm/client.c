@@ -5,6 +5,7 @@ b8 pointer_locked = false;
 
 extern const struct state_handlers
   menu_state,
+  loading_state,
   game_state,
   pause_state,
   options_state,
@@ -13,6 +14,7 @@ extern const struct state_handlers
 static enum client_state state;
 static const struct state_handlers* handlers[STATE_MAX] = {
   [STATE_MENU]    = &menu_state,
+  [STATE_LOADING] = &loading_state,
   [STATE_GAME]    = &game_state,
   [STATE_PAUSE]   = &pause_state,
   [STATE_OPTIONS] = &options_state,
@@ -50,6 +52,7 @@ void switch_to_state(enum client_state new_state) {
 }
 
 void init(b8 ws_connected) {
+  set_online(ws_connected);
   register_fb(fb, FB_WIDTH, FB_HEIGHT, FB_SIZE);
   switch_to_state(STATE_MENU);
 }

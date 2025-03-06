@@ -50,7 +50,6 @@ static inline u32 abs(i32 v) {
   return (v > 0) ? v : -v;
 }
 
-
 #define VEC2ADD(v, w) \
   ((typeof(v)) {      \
     .x = v.x + w.x,   \
