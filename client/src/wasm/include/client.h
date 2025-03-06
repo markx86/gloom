@@ -2,6 +2,8 @@
 #define __CLIENT_H__
 
 #include <gloom.h>
+#include <multiplayer.h>
+#include <libc.h>
 
 extern u32 fb[FB_WIDTH * FB_HEIGHT];
 extern b8 pointer_locked;

@@ -1,4 +1,6 @@
+#include <multiplayer.h>
 #include <gloom.h>
+#include <libc.h>
 
 #define PACKED       __attribute__((packed))
 #define WS_PORT      8492
