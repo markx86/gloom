@@ -61,8 +61,6 @@ static void on_enter(enum client_state prev_state) {
   if (prev_state != STATE_PAUSE) {
     set_camera_fov(DEG2RAD(CAMERA_FOV));
     set_player_rot(0);
-    player.pos = (vec2i) { .x = 2, .y = 2 };
-    player.dpos = (vec2f) { .x = 0.5f, .y = 0.5f };
     camera.dof = CAMERA_DOF;
   }
 }

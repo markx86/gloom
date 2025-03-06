@@ -8,6 +8,8 @@
 #define ARRLEN(x)         (sizeof(x) / sizeof(x[0]))
 #define REINTERPRET(x, T) (*(T*)&(x))
 
+#define NULL              ((void*)0)
+
 static inline void strncpy(char* dst, const char* src, u32 len) {
   for (; *src && len > 0; --len)
     *(dst++) = *(src++);
@@ -42,8 +44,32 @@ static inline void puts(const char* s) {
   write(1, s, strlen(s));
 }
 
-void printf(const char* fmt, ...);
+static inline void eputs(const char* s) {
+  write(2, s, strlen(s));
+}
+
+#define va_list        __builtin_va_list
+#define va_start(l, p) __builtin_va_start(l, p)
+#define va_end(l)      __builtin_va_end(l)
+#define va_arg(l, t)   __builtin_va_arg(l, t)
+
+void vfdprintf(int fd, const char* fmt, va_list ap);
+
+static inline void printf(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfdprintf(1, fmt, ap);
+  va_end(ap);
+}
+
+static inline void eprintf(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfdprintf(2, fmt, ap);
+  va_end(ap);
+}
 
 void* malloc(u32 size);
+void free_all(void);
 
 #endif

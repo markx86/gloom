@@ -28,7 +28,7 @@ font_h = f"""
 
 #ifdef DEFINE_FONT
 
-static const char __font[{num_chars}][FONT_HEIGHT] = {{
+static const char font[{num_chars}][FONT_HEIGHT] = {{
 """
 
 for i in range(num_chars):

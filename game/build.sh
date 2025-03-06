@@ -5,7 +5,7 @@ set -e
 outdir="$(realpath $2)"
 cd "$(dirname $0)"
 
-./gen-trigo.py
+./gen-cos-table.py
 
 cpu="$1"
 srcs=$(find . -type f -name '*.c')
@@ -16,7 +16,7 @@ fi
 
 for src in $srcs; do
   obj=$(basename -s ".c" $src).o
-  echo "compiling $src -> $obj for $cpu"
+  echo "compiling $(realpath $src) -> $(realpath $outdir/$obj) for $cpu"
   clang \
     --target=$cpu \
     -Wall \

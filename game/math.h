@@ -29,6 +29,10 @@ static inline i32 isposf(f32 x) {
   return !(v & (1U << 31));
 }
 
+static inline f32 signf(f32 x) {
+  return (isposf(x) << 1) - 1;
+}
+
 static inline f32 lerp(f32 weight, f32 v1, f32 v2) {
   return (1.0f - weight) * v1 + weight * v2;
 }
@@ -42,11 +46,10 @@ static inline f32 absf(f32 f) {
   return *(f32*)&a;
 }
 
-static inline f32 abs(f32 v) {
+static inline u32 abs(i32 v) {
   return (v > 0) ? v : -v;
 }
 
-#define SIGN(x) ((x) < 0 ? -1 : +1)
 
 #define VEC2ADD(v, w) \
   ((typeof(v)) {      \
@@ -66,7 +69,34 @@ static inline f32 abs(f32 v) {
     .y = v.y * s        \
   })
 
-#include <trigo.h>
+#define PI         3.141592653589793f
+#define TWO_PI     (PI * 2.0f)
+#define HALF_PI    (PI / 2.0f)
+#define QUARTER_PI (HALF_PI / 2.0f)
+
+#include <__cos_table.h>
+
+static inline f32 cos(f32 angle) {
+    f32 w;
+    u32 i1, i2;
+    angle = absf(angle);
+    angle = modf(angle, TWO_PI);
+    w = angle * __STEP;
+    i1 = (u32)w;
+    i2 = i1 + 1;
+    if (i2 >= __SAMPLES)
+        i2 = 0;
+    w -= (f32)i1;
+    return lerp(w, __cos_table[i1], __cos_table[i2]);
+}
+
+static inline f32 sin(f32 angle) {
+    return cos(angle - HALF_PI);
+}
+
+static inline f32 tan(f32 angle) {
+    return sin(angle) / cos(angle);
+}
 
 #define DEG2RAD(x) ((x) * (PI / 180.0f))
 

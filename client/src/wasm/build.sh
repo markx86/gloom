@@ -6,21 +6,29 @@ origdir=$PWD
 wasmdir="$(realpath $(dirname $0))"
 gamedir="$wasmdir/../../../game"
 
+# delete all object files in dist directory
+find $origdir -type f -name '*.o' -delete
+
 cd $wasmdir
 
+# build gloom for wasm32
 $gamedir/build.sh wasm32 $origdir
+# generate font.h file
 $wasmdir/tools/gen-font.py
 
 out=gloom.wasm
 outpath="$origdir/$out"
 
+# glob .c and .o files
 srcs=$(find $wasmdir -type f -name '*.c')
 objs=$(find $origdir -type f -name '*.o')
 
+# add debug flags
 if test -n "$DEBUG"; then
   extra_flags="-ggdb"
 fi
 
+# build and link
 clang \
   --target=wasm32 \
   -Wall \

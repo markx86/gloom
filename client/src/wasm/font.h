@@ -8,7 +8,7 @@
 
 #ifdef DEFINE_FONT
 
-static const char __font[256][FONT_HEIGHT] = {
+static const char font[256][FONT_HEIGHT] = {
   [0] = {
     0b00000000,
     0b00000000,

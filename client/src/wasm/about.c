@@ -39,7 +39,7 @@ static void on_tick(f32 delta) {
 }
 
 static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
-  component_on_mouse_move(x, y, dx, dy, comps, ARRLEN(comps));
+  component_on_mouse_moved(x, y, dx, dy, comps, ARRLEN(comps));
 }
 
 static void on_mouse_down(u32 x, u32 y, u32 button) {

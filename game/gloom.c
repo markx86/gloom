@@ -8,10 +8,6 @@ struct player player = {
     .x = 2,
     .y = 2,
   },
-  .dpos = {
-    .x = 0.5f,
-    .y = 0.5f,
-  },
 };
 
 struct map map = {
@@ -36,18 +32,12 @@ struct map map = {
   },
 };
 
-struct keys keys;
-
 struct sprite sprites[] = {
   [0] = {
     .color = 0xFF0000FF,
     .pos = {
       .x = 5,
       .y = 5
-    },
-    .dpos = {
-      .x = 0.5f,
-      .y = 0.25f,
     },
     .dim = {
       .x = 128,
@@ -60,16 +50,13 @@ struct sprite sprites[] = {
       .x = 8,
       .y = 7
     },
-    .dpos = {
-      .x = 0.5f,
-      .y = 0.25f,
-    },
     .dim = {
       .x = 128,
       .y = 480,
     }
   }
 };
+union keys keys;
 
 // NOTE @new_fov must be in radians
 void set_camera_fov(f32 new_fov) {
@@ -102,24 +89,29 @@ void set_player_rot(f32 new_rot) {
 
 static u8 trace_ray(const vec2f* ray_dir, struct hit* hit) {
   vec2f delta_dist, dist, intersec_dist;
+  vec2f dpos;
   vec2i step_dir;
   vec2u map_coords;
   u32 d;
   b8 vertical, cell_id;
 
-  delta_dist.y = abs(1.0f / ray_dir->x);
-  delta_dist.x = abs(1.0f / ray_dir->y);
+  dpos.x = player.pos.x - (i32)player.pos.x;
+  dpos.y = player.pos.y - (i32)player.pos.y;
 
-  dist.x = ray_dir->x > 0 ? (1.0f - player.dpos.x) : player.dpos.x;
-  dist.y = ray_dir->y > 0 ? (1.0f - player.dpos.y) : player.dpos.y;
+  delta_dist.y = absf(1.0f / ray_dir->x);
+  delta_dist.x = absf(1.0f / ray_dir->y);
+
+  dist.x = isposf(ray_dir->x) ? (1.0f - dpos.x) : dpos.x;
+  dist.y = isposf(ray_dir->y) ? (1.0f - dpos.y) : dpos.y;
 
   intersec_dist.y = delta_dist.y * dist.x;
   intersec_dist.x = delta_dist.x * dist.y;
 
-  step_dir.x = SIGN(ray_dir->x);
-  step_dir.y = SIGN(ray_dir->y);
+  step_dir.x = signf(ray_dir->x);
+  step_dir.y = signf(ray_dir->y);
 
-  map_coords = REINTERPRET(player.pos, vec2u);
+  map_coords.x = (u32)player.pos.x;
+  map_coords.y = (u32)player.pos.y;
 
   vertical = true;
   cell_id = 0;
@@ -145,18 +137,6 @@ static u8 trace_ray(const vec2f* ray_dir, struct hit* hit) {
   hit->vertical = vertical;
 
   return cell_id;
-}
-
-static void adjust_position(vec2i* pos, vec2f* dpos) {
-  for (; dpos->x >= 1.0f; dpos->x -= 1.0f)
-    ++pos->x;
-  for (; dpos->x < 0.0f; dpos->x += 1.0f)
-    --pos->x;
-
-  for (; dpos->y >= 1.0f; dpos->y -= 1.0f)
-    ++pos->y;
-  for (; dpos->y < 0.0f; dpos->y += 1.0f)
-    --pos->y;
 }
 
 static inline void update_player_position(f32 delta) {
@@ -196,21 +176,20 @@ static inline void update_player_position(f32 delta) {
 
   // check for collisions on the y-axis
   v_dir.x = 0.0f;
-  v_dir.y = SIGN(dir.y);
+  v_dir.y = signf(dir.y);
   v_dist = absf(dir.y) * space;
   if (trace_ray(&v_dir, &hit) && hit.dist < v_dist + PLAYER_RADIUS)
     v_dist = hit.dist - PLAYER_RADIUS;
 
   // check for collisions on the x-axis
-  h_dir.x = SIGN(dir.x);
+  h_dir.x = signf(dir.x);
   h_dir.y = 0.0f;
   h_dist = absf(dir.x) * space;
   if (trace_ray(&h_dir, &hit) && hit.dist < h_dist + PLAYER_RADIUS)
     h_dist = hit.dist - PLAYER_RADIUS;
 
-  player.dpos.x += h_dir.x * h_dist;
-  player.dpos.y += v_dir.y * v_dist;
-  adjust_position(&player.pos, &player.dpos);
+  player.pos.x += h_dir.x * h_dist;
+  player.pos.y += v_dir.y * v_dist;
 }
 
 static inline void update_sprites(f32 delta) {
@@ -222,8 +201,8 @@ static inline void update_sprites(f32 delta) {
 
     // since we already need to compute dist_from_player2, might as well
     // save the diff vector, because we'll also need it during rendering.
-    s->diff.x = (f32)(s->pos.x - player.pos.x) + (s->dpos.x - player.dpos.x);
-    s->diff.y = (f32)(s->pos.y - player.pos.y) + (s->dpos.y - player.dpos.y);
+    s->diff.x = s->pos.x - player.pos.x;
+    s->diff.y = s->pos.y - player.pos.y;
     // we need to compute dist_from_player2 here, because we need to use it
     // for collision detection with the player.
     s->dist_from_player2 = s->diff.x * s->diff.x + s->diff.y * s->diff.y;

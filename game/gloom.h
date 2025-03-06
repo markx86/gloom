@@ -25,17 +25,17 @@ struct camera {
 };
 
 struct player {
-  vec2i pos;
-  vec2f dpos;
   f32 rot;
+  vec2f pos;
   vec2f long_dir;
   vec2f side_dir;
 };
 
 struct sprite {
   u32 color;
-  vec2i pos;
-  vec2f dpos;
+  f32 rot;
+  vec2f pos;
+  vec2f vel;
   vec2i dim;
   struct {
     i32 screen_x;
@@ -51,11 +51,14 @@ struct map {
   u8 tiles[];
 };
 
-struct keys {
-  b8 forward;
-  b8 backward;
-  b8 right;
-  b8 left;
+union keys {
+  struct {
+    b8 forward;
+    b8 backward;
+    b8 right;
+    b8 left;
+  };
+  u32 all_keys;
 };
 
 struct hit {
@@ -66,7 +69,7 @@ struct hit {
 extern struct player player;
 extern struct camera camera;
 extern struct map map;
-extern struct keys keys;
+extern union keys keys;
 extern f32 z_buf[FB_WIDTH];
 
 void draw_column(u8 cell_id, i32 x, const struct hit* hit);

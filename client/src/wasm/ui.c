@@ -37,7 +37,7 @@ static inline void draw_char(u32 x, u32 y, u32 w, u32 h, u32 scale, u32 color, c
   if (!can_draw(&x, &y, &w, &h))
     return;
 
-  char_data = __font[(u8)c];
+  char_data = font[(u8)c];
   for (h1 = 0; h1 < h; ++h1) {
     c1 = char_data[h1 / scale];
     for (w1 = 0; w1 < w; ++w1) {
@@ -96,7 +96,7 @@ static void write_text_with_color(u32* x, u32* y, u32 scale, u32 color, const ch
     } else if (*x >= FB_WIDTH)
       continue;
 
-    char_data = __font[(u8)c];
+    char_data = font[(u8)c];
     for (h1 = 0; h1 < h; ++h1) {
       c1 = char_data[h1 / scale];
       for (w1 = 0; w1 < w; ++w1) {

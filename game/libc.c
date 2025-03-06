@@ -11,12 +11,13 @@ static u32 heap_size = 0;
 // calling out to JS everytime we need to write a character
 struct printf_buf {
   u32 end;
+  i32 fd;
   char buf[BUFSZ];
 };
 
 static inline void buf_putc(struct printf_buf* pb, char c) {
   if (pb->end >= BUFSZ) {
-    write(1, pb->buf, BUFSZ);
+    write(pb->fd, pb->buf, BUFSZ);
     pb->end = 0;
   }
   pb->buf[pb->end++] = c;
@@ -24,7 +25,7 @@ static inline void buf_putc(struct printf_buf* pb, char c) {
 
 static inline void buf_flush(struct printf_buf* pb) {
   if (pb->end > 0)
-    write(1, pb->buf, pb->end);
+    write(pb->fd, pb->buf, pb->end);
 }
 
 static inline void buf_putr(struct printf_buf* pb, const char* buf, u32 len) {
@@ -123,20 +124,13 @@ PRINTFHANDLER(f, f32 v) {
   buf_putr(pb, tmp, l);
 }
 
-#define va_list        __builtin_va_list
-#define va_start(l, p) __builtin_va_start(l, p)
-#define va_end(l)      __builtin_va_end(l)
-#define va_arg(l, t)   __builtin_va_arg(l, t)
-
 // simple printf implementation
-void printf(const char* fmt, ...) {
+void vfdprintf(int fd, const char* fmt, va_list ap) {
   struct printf_buf pb;
   char c;
-  va_list ap;
-
-  va_start(ap, fmt);
 
   pb.end = 0;
+  pb.fd = fd;
   while ((c = *(fmt++))) {
     if (c != '%') {
       buf_putc(&pb, c);
@@ -174,8 +168,6 @@ void printf(const char* fmt, ...) {
     }
   }
 
-  va_end(ap);
-
   buf_flush(&pb);
 }
 
@@ -186,4 +178,9 @@ void* malloc(u32 size) {
   heap_top += size;
   heap_size -= size;
   return ptr;
+}
+
+void free_all(void) {
+  heap_size += heap_top - &__heap_base;
+  heap_top = &__heap_base;
 }

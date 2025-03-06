@@ -15,10 +15,10 @@ static void on_back_clicked(void) { switch_to_state(back_state); }
 #define MOUSESENS_SLIDER 4
 
 static struct component comps[] = {
-  [BACK_BUTTON     ] = { .type = UICOMP_BUTTON,   .text = "> back", .on_click = on_back_clicked },
-  [SOUND_CHECKBOX  ] = { .type = UICOMP_CHECKBOX, .text = "> sound", .ticked = true },
-  [VOLUME_SLIDER   ] = { .type = UICOMP_SLIDER,   .text = "> volume", .value = 1.0f },
-  [DRAWDIST_SLIDER ] = { .type = UICOMP_SLIDER,   .text = "> draw distance", .value = 0.5f },
+  [BACK_BUTTON]      = { .type = UICOMP_BUTTON,   .text = "> back", .on_click = on_back_clicked },
+  [SOUND_CHECKBOX]   = { .type = UICOMP_CHECKBOX, .text = "> sound", .ticked = true },
+  [VOLUME_SLIDER]    = { .type = UICOMP_SLIDER,   .text = "> volume", .value = 1.0f },
+  [DRAWDIST_SLIDER]  = { .type = UICOMP_SLIDER,   .text = "> draw distance", .value = 0.5f },
   [MOUSESENS_SLIDER] = { .type = UICOMP_SLIDER,   .text = "> mouse sensitivity", .value = 0.5f },
 };
 
@@ -55,7 +55,7 @@ static void on_tick(f32 delta) {
 }
 
 static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
-  component_on_mouse_move(x, y, dx, dy, comps, ARRLEN(comps));
+  component_on_mouse_moved(x, y, dx, dy, comps, ARRLEN(comps));
 }
 
 static void on_mouse_down(u32 x, u32 y, u32 button) {

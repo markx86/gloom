@@ -68,7 +68,7 @@ static inline b8 component_is_mouse_over(u32 x, u32 y, struct component* c) {
   return (x >= c->tl.x && y >= c->tl.y && x <= c->br.x && y <= c->br.y);
 }
 
-static inline void component_on_mouse_move(u32 x, u32 y, i32 dx, i32 dy, struct component* comps, u32 n) {
+static inline void component_on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy, struct component* comps, u32 n) {
   u32 i;
   b8 interacting;
   struct component* c;
