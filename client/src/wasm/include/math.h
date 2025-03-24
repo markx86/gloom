@@ -9,18 +9,7 @@
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
-static inline f32 inv_sqrt(f32 n) {
-  i32 i;
-  f32 x2, y;
-  const f32 three_halfs = 1.5f;
-  x2 = n * 0.5f;
-  y = n;
-  i = *(i32*)&y;
-  i = 0x5F3759DF - (i >> 1);
-  y = *(f32*)&i;
-  y = y * (three_halfs - ( x2 * y * y ) );
-  return y;
-}
+f32 inv_sqrt(f32 n);
 
 static inline i32 isposf(f32 x) {
   u32 v = *(u32*)&x;
@@ -71,21 +60,7 @@ static inline u32 abs(i32 v) {
 #define HALF_PI    (PI / 2.0f)
 #define QUARTER_PI (HALF_PI / 2.0f)
 
-#include <cos_table.h>
-
-static inline f32 cos(f32 angle) {
-    f32 w;
-    u32 i1, i2;
-    angle = absf(angle);
-    angle = modf(angle, TWO_PI);
-    w = angle * __STEP;
-    i1 = (u32)w;
-    i2 = i1 + 1;
-    if (i2 >= __SAMPLES)
-        i2 = 0;
-    w -= (f32)i1;
-    return lerp(w, __cos_table[i1], __cos_table[i2]);
-}
+f32 cos(f32 angle);
 
 static inline f32 sin(f32 angle) {
     return cos(angle - HALF_PI);

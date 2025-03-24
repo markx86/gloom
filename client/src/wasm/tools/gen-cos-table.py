@@ -19,7 +19,7 @@ cos_arr = "f,".join(str(v) for v in cos_table)
 
 src = f"""#include <types.h>
 
-const f32 __cos_table[] = {{
+const f32 cos_table[] = {{
     {cos_arr}
 }};
 """
@@ -31,9 +31,9 @@ hdr = f"""
 #error "Do not include __cos_table.h directly. Include math.h instead"
 #endif
 
-extern const f32 __cos_table[];
+extern const f32 cos_table[];
 
-#define __SAMPLES         {samples}
-#define __STEP            {1 / STEP}
+#define SAMPLES         {samples}
+#define STEP            {1 / STEP}
 """
 write_file("cos_table.h", hdr)

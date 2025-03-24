@@ -99,13 +99,37 @@ struct serv_pkt_nack {
 
 static u8 player_id;
 static u32 player_token, client_seq, server_seq;
+static enum connection_state conn_state = CONN_UNKNOWN;
 
-enum connection_state __conn_state = CONN_UNKNOWN;
 // NOTE: pkt_buf is accessed from JS, when changing the size remember to also
 //       change it in app.js
 char pkt_buf[0x1000];
 
 typedef void (*serv_pkt_handler_t)(void*, u32);
+
+void set_online(b8 yes) {
+  if (conn_state == CONN_UNKNOWN)
+    conn_state = yes ? CONN_CONNECTED : CONN_DISCONNECTED;
+}
+
+b8 is_disconnected(void) {
+  return conn_state <= CONN_DISCONNECTED;
+}
+
+b8 is_in_multiplayer_game(void) {
+  return conn_state == CONN_UPDATING;
+}
+
+enum connection_state get_connection_state(void) {
+  return conn_state;
+}
+
+void force_connection_state(enum connection_state state) {
+  if (conn_state != state) {
+    printf("forcing connection state from %d to %d\n", conn_state, state);
+    conn_state = state;
+  }
+}
 
 static void init_game_pkt(void* hdrp, enum game_pkt_type type) {
   struct game_pkt_hdr* hdr = hdrp;
@@ -124,7 +148,7 @@ b8 join_game(u32 game_id) {
   struct game_pkt_join pkt;
   i32 rc;
 
-  if (__conn_state != CONN_CONNECTED)
+  if (conn_state != CONN_CONNECTED)
     return false;
 
   init_game_pkt(&pkt, GPKT_JOIN);
@@ -132,7 +156,7 @@ b8 join_game(u32 game_id) {
 
   rc = send_packet(&pkt, sizeof(pkt));
   if (rc == sizeof(pkt)) {
-    __conn_state = CONN_JOINING;
+    conn_state = CONN_JOINING;
     return true;
   } else
     return false;
@@ -141,7 +165,7 @@ b8 join_game(u32 game_id) {
 b8 leave_game(void) {
   struct game_pkt_leave pkt;
   i32 rc;
-  __conn_state = CONN_CONNECTED;
+  conn_state = CONN_CONNECTED;
   init_game_pkt(&pkt, GPKT_LEAVE);
   rc = send_packet(&pkt, sizeof(pkt));
   free_all(); // free map data
@@ -150,7 +174,7 @@ b8 leave_game(void) {
 
 void send_update(void) {
   struct game_pkt_update pkt;
-  if (__conn_state != CONN_UPDATING)
+  if (conn_state != CONN_UPDATING)
     return;
   init_game_pkt(&pkt, GPKT_UPDATE);
   pkt.pos = player.pos;
@@ -166,7 +190,7 @@ static void pkt_size_error(const char* pkt_type, u32 got, u32 expected) {
 
 static void pkt_type_error(const char* pkt_type) {
   eprintf("received %s packet, but the connection state is wrong (now in %d)\n",
-          pkt_type, __conn_state);
+          pkt_type, conn_state);
 }
 
 static struct sprite* get_sprite_by_id(u8 id, b8 can_alloc) {
@@ -218,7 +242,7 @@ static void serv_hello_handler(void* buf, u32 len) {
   struct sprite_init* s;
   struct serv_pkt_hello* pkt = buf;
 
-  if (__conn_state != CONN_JOINING) {
+  if (conn_state != CONN_JOINING) {
     pkt_type_error("hello");
     return;
   }
@@ -276,7 +300,7 @@ static void serv_hello_handler(void* buf, u32 len) {
     }
   }
 
-  __conn_state = CONN_UPDATING;
+  conn_state = CONN_UPDATING;
 }
 
 static void serv_update_handler(void* buf, u32 len) {
@@ -284,7 +308,7 @@ static void serv_update_handler(void* buf, u32 len) {
   struct sprite* s;
   struct serv_pkt_update* pkt = buf;
 
-  if (__conn_state != CONN_UPDATING) {
+  if (conn_state != CONN_UPDATING) {
     pkt_type_error("update");
     return;
   }
