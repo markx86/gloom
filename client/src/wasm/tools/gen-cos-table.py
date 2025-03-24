@@ -19,21 +19,15 @@ cos_arr = "f,".join(str(v) for v in cos_table)
 
 src = f"""#include <types.h>
 
-const f32 cos_table[] = {{
-    {cos_arr}
-}};
-"""
-write_file("cos_table.c", src)
-
-
-hdr = f"""
-#ifndef __MATH_H__
-#error "Do not include __cos_table.h directly. Include math.h instead"
-#endif
-
-extern const f32 cos_table[];
-
 #define SAMPLES         {samples}
 #define STEP            {1 / STEP}
+
+#ifdef DECLARE_COS_TABLE
+
+static const f32 cos_table[] = {{
+    {cos_arr}
+}};
+
+#endif
 """
-write_file("cos_table.h", hdr)
+write_file("cos_table.h", src)

@@ -1,4 +1,5 @@
 #include <math.h>
+#define DECLARE_COS_TABLE
 #include <cos_table.h>
 
 f32 inv_sqrt(f32 n) {
