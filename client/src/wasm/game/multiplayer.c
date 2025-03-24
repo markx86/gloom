@@ -1,13 +1,11 @@
 #include <multiplayer.h>
 #include <gloom.h>
-#include <libc.h>
 
 #define PACKED       __attribute__((packed))
 #define WS_PORT      8492
-#define PKT_BUF_SIZE 256
 
 #define MAX_PLAYERS     16
-#define MAX_PACKET_DROP 5
+#define MAX_PACKET_DROP 10
 
 enum game_pkt_type {
   GPKT_JOIN,
@@ -29,7 +27,7 @@ struct game_pkt_join {
 
 struct game_pkt_leave {
   struct game_pkt_hdr hdr;
-};
+} PACKED;
 
 struct game_pkt_update {
   struct game_pkt_hdr hdr;
@@ -41,71 +39,98 @@ struct game_pkt_update {
 enum serv_pkt_type {
   SPKT_HELLO,
   SPKT_UPDATE,
-  SPKT_BYE,
+  SPKT_CREATE,
+  SPKT_DESTROY,
   SPKT_MAX
 };
 
 struct serv_pkt_hdr {
-  u32 seq  : 30;
-  u32 type : 2;
+  u32 seq  : 29;
+  u32 type : 3;
 } PACKED;
 
-struct serv_hello_pkt {
+struct serv_pkt_hello {
   struct serv_pkt_hdr hdr;
-  u32 n_sprites : 24;
-  u32 player_id : 8;
+  u8 n_sprites;
+  u8 player_id;
   u32 map_w, map_h;
-  char data[0];
+  u8 data[0];
 } PACKED;
 
-struct sprite_init {
-  u32 color : 24;
-  u32 id    : 8;
-  vec2f pos;
-} PACKED;
-
-struct sprite_update {
-  u8 id;
+struct sprite_transform {
   f32 rot;
   vec2f pos;
   vec2f vel;
 } PACKED;
 
-struct serv_update_pkt {
+struct sprite_init {
+  union sprite_ic ic;
+  struct sprite_transform transform;
+} PACKED;
+
+struct sprite_update {
+  u8 id;
+  struct sprite_transform transform;
+} PACKED;
+
+struct serv_pkt_update {
   struct serv_pkt_hdr hdr;
   struct sprite_update update;
 } PACKED;
 
-static u8 player_id;
-static u32 player_token, seq;
+struct serv_pkt_create {
+  struct serv_pkt_hdr hdr;
+  struct sprite_init sprite;
+} PACKED;
 
-static char __pkt_buf[PKT_BUF_SIZE];
+struct serv_pkt_destroy {
+  struct serv_pkt_hdr hdr;
+  u8 sprite_id;
+} PACKED;
+
+struct serv_pkt_bye {
+  struct serv_pkt_hdr hdr;
+  u8 id;
+} PACKED;
+
+struct serv_pkt_nack {
+  struct serv_pkt_hdr hdr;
+} PACKED;
+
+static u8 player_id;
+static u32 player_token, client_seq, server_seq;
+
 enum connection_state __conn_state = CONN_UNKNOWN;
+// NOTE: pkt_buf is accessed from JS, when changing the size remember to also
+//       change it in app.js
+char pkt_buf[0x1000];
 
 typedef void (*serv_pkt_handler_t)(void*, u32);
 
 static void init_game_pkt(void* hdrp, enum game_pkt_type type) {
   struct game_pkt_hdr* hdr = hdrp;
   hdr->type = type;
-  hdr->seq = seq++;
+  hdr->seq = client_seq++;
   hdr->player_token = player_token;
 }
 
-b8 join_game(u32 token, u32 game_id) {
+void set_player_token(u32 token) {
+  player_token = token;
+  // reset game packet sequence
+  client_seq = server_seq = 0;
+}
+
+b8 join_game(u32 game_id) {
   struct game_pkt_join pkt;
   i32 rc;
 
   if (__conn_state != CONN_CONNECTED)
     return false;
 
-  player_token = token;
-  seq = 0; // reset game packet sequence
-
   init_game_pkt(&pkt, GPKT_JOIN);
   pkt.game_id = game_id;
 
   rc = send_packet(&pkt, sizeof(pkt));
-
   if (rc == sizeof(pkt)) {
     __conn_state = CONN_JOINING;
     return true;
@@ -116,9 +141,10 @@ b8 join_game(u32 token, u32 game_id) {
 b8 leave_game(void) {
   struct game_pkt_leave pkt;
   i32 rc;
-  __conn_state = CONN_LEAVING;
+  __conn_state = CONN_CONNECTED;
   init_game_pkt(&pkt, GPKT_LEAVE);
   rc = send_packet(&pkt, sizeof(pkt));
+  free_all(); // free map data
   return rc == sizeof(pkt);
 }
 
@@ -133,59 +159,69 @@ void send_update(void) {
   send_packet(&pkt, sizeof(pkt));
 }
 
-static void* next_packet(u32* len) {
-  i32 rc;
-  u32 cpy, n_cpy, i;
-  if (*len) {
-    cpy = sizeof(__pkt_buf) - *len;
-    n_cpy = *len;
-    i = 0;
-    for (; n_cpy > 0; --n_cpy)
-      __pkt_buf[i] = __pkt_buf[cpy + i];
-  }
-  rc = recv_packet(__pkt_buf + *len, sizeof(__pkt_buf) - *len);
-  if (rc < 0) {
-    eputs("packet recv error");
-    __conn_state = CONN_UNKNOWN; // something happened, drop the connection
-    return NULL;
-  }
-  *len = rc;
-  return rc == 0 ? NULL : __pkt_buf;
-}
-
 static void pkt_size_error(const char* pkt_type, u32 got, u32 expected) {
-  eprintf("%s packet size is not what was expected (should be %u, got %u)\n", pkt_type, expected, got);
+  eprintf("%s packet size is not what was expected (should be %u, got %u)\n",
+          pkt_type, expected, got);
 }
 
 static void pkt_type_error(const char* pkt_type) {
-  eprintf("received %s packet, but the connection state is wrong (now in %d)\n", pkt_type, __conn_state);
+  eprintf("received %s packet, but the connection state is wrong (now in %d)\n",
+          pkt_type, __conn_state);
 }
 
-static inline struct sprite* get_sprite_by_id(u8 sid) {
-  u32 id = sid < player_id ? sid : sid - 1;
-  if (id >= sprites.n) {
-    eprintf("invalid sprite with id %u (max. id is %u)\n", sid, sprites.n + 1);
-    return NULL;
+static struct sprite* get_sprite_by_id(u8 id, b8 can_alloc) {
+  u32 i = 0;
+  for (i = 0; i < sprites.n; ++i) {
+    if (sprites.s[i].ic.id == id)
+      return sprites.s + i;
   }
-  return sprites.arr + id;
+  if (can_alloc && sprites.n < ARRLEN(sprites.s))
+    return sprites.s + sprites.n++;
+  return NULL;
+}
+
+static void apply_sprite_transform(struct sprite* s,
+                                   struct sprite_transform* t) {
+  f32 inv_vel = inv_sqrt(t->vel.x * t->vel.x + t->vel.y * t->vel.y);
+  s->rot = t->rot;
+  s->pos = t->pos;
+  s->dir.x = t->vel.x * inv_vel;
+  s->dir.y = t->vel.y * inv_vel;
+  s->vel = 1.0f / inv_vel;
+}
+
+static void init_sprite(struct sprite_init* init) {
+  struct sprite* s;
+  if ((s = get_sprite_by_id(init->ic.id, true))) {
+    *s = (struct sprite) {
+      .ic = init->ic,
+      .dim = { .x = PLAYER_SPRITE_W, .y = PLAYER_SPRITE_H }
+    };
+    apply_sprite_transform(s, &init->transform);
+  }
+}
+
+static void destroy_sprite(u8 id) {
+  u32 i;
+  struct sprite* s = get_sprite_by_id(id, false);
+  if (!s)
+    return;
+  for (i = (u32)(s - sprites.s) + 1; i < sprites.n; ++i)
+    sprites.s[i - 1] = sprites.s[i];
+  --sprites.n;
 }
 
 static void serv_hello_handler(void* buf, u32 len) {
-  void* data;
   u32 pkt_size, sprites_size, map_size;
-  u32 n_sprites, x, y, i, off;
+  u32 n_sprites, x, y, i, j;
   u8 *m, b;
   struct sprite_init* s;
-  struct sprite* sprite;
-  struct serv_hello_pkt* pkt = buf;
+  struct serv_pkt_hello* pkt = buf;
 
   if (__conn_state != CONN_JOINING) {
     pkt_type_error("hello");
     return;
   }
-
-  if (pkt->hdr.seq != 1)
-    printf("hello packet from server, has sequence number %u (expected 1)\n", pkt->hdr.seq);
 
   // size check
   map_size = (pkt->map_h * pkt->map_w) >> 2;
@@ -193,16 +229,13 @@ static void serv_hello_handler(void* buf, u32 len) {
   sprites_size = n_sprites * sizeof(*s);
   pkt_size = sizeof(*pkt) + map_size + sprites_size;
 
-  if (len < PKT_BUF_SIZE && pkt_size != len) {
-size_err:
+  if (pkt_size != len) {
     pkt_size_error("hello", len, pkt_size);
     return; // malformed packet, drop it
   }
+  len -= sizeof(*pkt);
 
-  data = pkt->data;
-
-  sprites.n = n_sprites - 1;
-  sprites.arr = malloc(sprites.n * sizeof(*s));
+  sprites.n = 0;
 
   map.w = pkt->map_w;
   map.h = pkt->map_h;
@@ -210,68 +243,37 @@ size_err:
 
   player_id = pkt->player_id;
 
-  x = y = i = 0;
+  s = (struct sprite_init*)pkt->data;
+  m = pkt->data + sizeof(*s) * n_sprites;
 
-  for (;;) {
-    pkt_size -= len;
-
-    s = data;
-    if (n_sprites > 0) {
-      for (; n_sprites > 0; --n_sprites) {
-        if (len < sizeof(*s))
-          break;
-        if (s->id == player_id) {
-          // init data refers to the player
-          player.pos = s->pos;
-        } else {
-          sprite = get_sprite_by_id(s->id);
-          if (sprite) {
-            *sprite = (struct sprite) {
-              .color = 0xFF000000 | s->color,
-              .pos = s->pos,
-              .dim = {
-                .x = PLAYER_SPRITE_W,
-                .y = PLAYER_SPRITE_H
-              }
-            };
-          }
+  // process sprite data
+  if (n_sprites > 0) {
+    for (; n_sprites > 0; --n_sprites) {
+      if (len < sizeof(*s))
+        break;
+      if (s->ic.id != player_id)
+        init_sprite(s);
+      else
+        // init data refers to the player
+        player.pos = s->transform.pos;
+      len -= sizeof(*s);
+      ++s;
+    }
+  }
+  // process map data
+  if (n_sprites == 0) {
+    x = y = 0;
+    for (i = 0; i < len; ++i) {
+      b = m[i];
+      for (j = 0; j < (8 >> 1); ++j) {
+        map.tiles[x + y * map.w] = b & 0b11;
+        b >>= 2;
+        if (++x == map.w) {
+          x = 0;
+          ++y;
         }
-        len -= sizeof(*s);
-        ++s;
       }
     }
-    if (n_sprites == 0) {
-      m = (u8*)s;
-      b = m[i++];
-      for (; y < map.h; ++y) {
-        for (; x < map.w; ++x) {
-          off = x + y * map.w;
-          map.tiles[x + y * map.w] = b & 0b11;
-          b >>= 2;
-          if ((off & 3) == 3) {
-            b = m[i++];
-            if (--len == 0) {
-              if (++x == map.w) {
-                x = 0;
-                ++y;
-              }
-              goto next;
-            }
-          }
-        }
-        x = 0;
-      }
-    }
-
-next:
-    if (pkt_size == 0)
-      break; // we done, exit the loop
-
-    data = next_packet(&len);
-    if (!data)
-      return; // recv error
-    if (len < PKT_BUF_SIZE && len != pkt_size)
-      goto size_err;
   }
 
   __conn_state = CONN_UPDATING;
@@ -280,95 +282,64 @@ next:
 static void serv_update_handler(void* buf, u32 len) {
   struct sprite_update* u;
   struct sprite* s;
-  struct serv_update_pkt* pkt = buf;
+  struct serv_pkt_update* pkt = buf;
 
   if (__conn_state != CONN_UPDATING) {
     pkt_type_error("update");
     return;
   }
 
-  if (len < PKT_BUF_SIZE && sizeof(*pkt) != len) {
+  if (sizeof(*pkt) != len) {
     pkt_size_error("update", len, sizeof(*pkt));
     return; // malformed packet, drop it
   }
 
   u = &pkt->update;
   if (u->id == player_id) {
-    player.pos = u->pos;
-    set_player_rot(u->rot);
-  } else if ((s = get_sprite_by_id(u->id))) {
-    s->pos = u->pos;
-    s->vel = u->vel;
-    s->rot = u->rot;
-  }
-
-  /*
-  n = pkt->n_updates;
-  u = pkt->updates;
-
-  pkt_size = sizeof(*pkt) + n * sizeof(*u);
-
-  if (len < PKT_BUF_SIZE && pkt_size != len) {
-size_err:
-    pkt_size_error("update", len, pkt_size);
-    return; // malformed packet, drop it
-  }
-
-  for (;;) {
-    pkt_size -= len;
-
-    for (; n > 0; --n) {
-      if (len < sizeof(*u))
-        break;
-      s = get_sprite_by_id(u->id);
-      if (s) {
-        s->pos = u->pos;
-        s->vel = u->vel;
-        s->rot = u->rot;
-      }
-      len -= sizeof(*u);
-      ++u;
-    }
-
-    if (pkt_size == 0)
-      break; // we done, exit the loop
-
-    u = next_packet(&len);
-    if (!u)
-      return; // recv error
-    if (len < PKT_BUF_SIZE && len != pkt_size)
-      goto size_err;
-  }
-  */
+    player.pos = u->transform.pos;
+    set_player_rot(u->transform.rot);
+  } else if ((s = get_sprite_by_id(u->id, false)))
+    apply_sprite_transform(s, &u->transform);
 }
 
-static void serv_bye_handler(void* buf, u32 len) {
-  UNUSED(buf);
-  UNUSED(len);
-
-  if (__conn_state == CONN_LEAVING) {
-    pkt_type_error("bye");
+static void serv_create_handler(void* buf, u32 len) {
+  struct serv_pkt_create* pkt = buf;
+  if (sizeof(*pkt) != len) {
+    pkt_size_error("join", len, sizeof(*pkt));
     return;
   }
+  init_sprite(&pkt->sprite);
+}
 
-  puts("unhandled bye packet");
+static void serv_destroy_handler(void* buf, u32 len) {
+  struct serv_pkt_destroy* pkt = buf;
+  if (sizeof(*pkt) != len) {
+    pkt_size_error("bye", len, sizeof(*pkt));
+    return;
+  }
+  destroy_sprite(pkt->sprite_id);
 }
 
 static const serv_pkt_handler_t serv_pkt_handlers[SPKT_MAX] = {
-  [SPKT_HELLO] = serv_hello_handler,
-  [SPKT_UPDATE] = serv_update_handler,
-  [SPKT_BYE] = serv_bye_handler
+  [SPKT_HELLO]   = serv_hello_handler,
+  [SPKT_UPDATE]  = serv_update_handler,
+  [SPKT_CREATE]  = serv_create_handler,
+  [SPKT_DESTROY] = serv_destroy_handler,
 };
 
-void multiplayer_tick(void) {
-  u32 len, drops;
+void multiplayer_on_recv(u32 len) {
   struct serv_pkt_hdr* hdr;
 
   if (is_disconnected())
     return;
 
-  len = 0;
-  hdr = next_packet(&len);
+  if (len > sizeof(pkt_buf)) {
+    eprintf("packet too big! (max. packet size is %u bytes, but got %u)\n",
+            sizeof(pkt_buf), len);
+    return;
+  }
+
+  hdr = (struct serv_pkt_hdr*)pkt_buf;
   if (!hdr)
     return; // no message received or recv error
   if (len < sizeof(*hdr)) {
@@ -376,13 +347,14 @@ void multiplayer_tick(void) {
     return; // no data?
   }
 
-  drops = abs(hdr->seq - seq);
-  if (drops > MAX_PACKET_DROP) {
-    eprintf("invalid sequence number");
+  // FIXME: fix this lol
+  if (hdr->seq - server_seq < MAX_PACKET_DROP)
+    server_seq = hdr->seq + 1;
+  else {
+    eprintf("invalid sequence number (expected %u got %u)\n",
+            server_seq, hdr->seq);
     return;
   }
-  else if (seq <= hdr->seq)
-    seq = hdr->seq + 1;
 
   if (hdr->type >= SPKT_MAX) {
     eprintf("unknown packet type (got %u)\n", hdr->type);

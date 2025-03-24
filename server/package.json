@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "esbuild --minify --bundle --platform=node --target=node10 --outfile=dist/app.js src/app.ts && chmod +x ./dist/app.js",
+    "dev": "tsc && node ./dist/app.js",
     "serve": "npm run build && ./dist/app.js"
   }
 }

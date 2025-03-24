@@ -9,7 +9,6 @@
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
-/*
 static inline f32 inv_sqrt(f32 n) {
   i32 i;
   f32 x2, y;
@@ -22,7 +21,6 @@ static inline f32 inv_sqrt(f32 n) {
   y = y * (three_halfs - ( x2 * y * y ) );
   return y;
 }
-*/
 
 static inline i32 isposf(f32 x) {
   u32 v = *(u32*)&x;

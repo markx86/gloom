@@ -1,22 +1,16 @@
 #include <client.h>
 
-static f32 last_rot;
-
 static void on_enter(enum client_state prev_state) {
   if (!pointer_locked)
     pointer_lock();
 
-  last_rot = 0.0f;
   if (prev_state != STATE_PAUSE) {
     set_camera_fov(DEG2RAD(CAMERA_FOV));
     set_player_rot(0);
     camera.dof = CAMERA_DOF;
   }
-}
 
-static void on_tick(f32 delta) {
-  multiplayer_tick();
-  game_tick(delta);
+  set_alpha(0xFF);
 }
 
 static void on_key(u32 code, char ch, b8 pressed) {
@@ -59,10 +53,7 @@ static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
 
   off_player_rot(dx * PLAYER_ROT_SPEED);
 
-  if (absf(last_rot - player.rot) > (PI / 8.0f)) {
-    last_rot = player.rot;
-    send_update();
-  }
+  send_update();
 
   UNUSED(x);
   UNUSED(y);
@@ -81,8 +72,8 @@ static void on_mouse_down(u32 x, u32 y, u32 button) {
 }
 
 const struct state_handlers game_state = {
-  .on_tick = on_tick,
   .on_enter = on_enter,
+  .on_tick = gloom_tick,
   .on_key = on_key,
   .on_mouse_moved = on_mouse_moved,
   .on_mouse_down = on_mouse_down,

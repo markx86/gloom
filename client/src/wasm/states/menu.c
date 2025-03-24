@@ -31,11 +31,8 @@ static void on_enter(enum client_state prev_state) {
     pointer_release();
 
   set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
-
   clear_screen();
-
   draw_title(32, 32, "gloom");
-
   component_on_enter(comps, ARRLEN(comps));
 }
 

@@ -51,8 +51,9 @@ void switch_to_state(enum client_state new_state) {
   }
 }
 
-void init(b8 ws_connected) {
+void init(b8 ws_connected, u32 player_token) {
   set_online(ws_connected);
+  set_player_token(player_token);
   register_fb(fb, FB_WIDTH, FB_HEIGHT, FB_SIZE);
   switch_to_state(STATE_MENU);
 }

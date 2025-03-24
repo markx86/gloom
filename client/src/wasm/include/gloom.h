@@ -6,12 +6,12 @@
 
 #define PLAYER_RUN_SPEED    3.5f
 #define PLAYER_ROT_SPEED    0.01f
-#define PLAYER_RADIUS       0.15f
 
 #define CAMERA_FOV 75.0f
 #define CAMERA_DOF 32
 
 #define MAX_SPRITES_ON_SCREEN 128
+#define SPRITE_RADIUS         0.15f
 
 struct camera {
   u32 dof;
@@ -26,15 +26,23 @@ struct camera {
 struct player {
   f32 rot;
   vec2f pos;
-  vec2f long_dir;
-  vec2f side_dir;
+  vec2f dir;
+};
+
+union sprite_ic {
+  u32 __union;
+  struct {
+    u32 color : 24;
+    u32 id    : 8;
+  };
 };
 
 struct sprite {
-  u32 color;
+  union sprite_ic ic;
   f32 rot;
+  f32 vel;
   vec2f pos;
-  vec2f vel;
+  vec2f dir;
   vec2i dim;
   struct {
     i32 screen_x;
@@ -47,7 +55,7 @@ struct sprite {
 
 struct sprites {
   u32 n;
-  struct sprite* arr;
+  struct sprite s[256];
 };
 
 struct map {
@@ -78,8 +86,8 @@ extern union keys keys;
 extern f32 z_buf[FB_WIDTH];
 extern u32 fb[FB_WIDTH * FB_HEIGHT];
 
-#define PLAYER_SPRITE_W 32
-#define PLAYER_SPRITE_H 64
+#define PLAYER_SPRITE_W 128
+#define PLAYER_SPRITE_H 400
 
 #define FB_SIZE   sizeof(fb)
 #define FB_LEN    ARRLEN(fb)
@@ -87,7 +95,9 @@ extern u32 fb[FB_WIDTH * FB_HEIGHT];
 void set_camera_fov(f32 new_fov);
 void set_player_rot(f32 new_rot);
 
-void game_tick(f32 delta);
+void set_alpha(u8 a);
+
+void gloom_tick(f32 delta);
 
 static inline void off_player_rot(f32 delta) {
   f32 new_rot = player.rot + delta;

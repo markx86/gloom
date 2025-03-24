@@ -1,0 +1,151 @@
+import { Game, GameSprite } from "./game";
+import { rainbow } from "./util";
+
+export enum GamePacketType {
+  GPKT_JOIN,
+  GPKT_LEAVE,
+  GPKT_UPDATE,
+  GPKT_MAX
+};
+
+export enum ServerPacketType {
+  SPKT_HELLO,
+  SPKT_UPDATE,
+  SPKT_CREATE,
+  SPKT_DESTROY,
+  SPKT_MAX
+}
+
+function getSpriteIC(sprite: GameSprite) {
+  const color = rainbow(32, Math.floor(Math.random() * 32));
+  return (sprite.id << 24) | (color & 0x00FFFFFF);
+}
+
+export abstract class Packet {
+  private bytes: Uint8Array;
+  private view: DataView;
+  private offset: number;
+  private header: number;
+
+  protected constructor(type: ServerPacketType, extraSize: number = 0) {
+    if (type >= ServerPacketType.SPKT_MAX) {
+      throw new Error("Invalid server packet type: " + type);
+    }
+    this.bytes = new Uint8Array(extraSize + 4); // 4 is the size of the header in bytes
+    this.view = new DataView(this.bytes.buffer);
+    this.offset = 4;
+    this.header = (type & 7) << 29;
+  }
+
+  public getRaw(n: number): ArrayBuffer {
+    this.view.setUint32(0, this.header | (n & 0x1FFFFFFF), true);
+    return this.bytes;
+  }
+
+  private ensureSpace(size: number) {
+    if (this.offset + size > this.view.byteLength) {
+      throw new Error("Out of bounds in packet");
+    }
+  }
+
+  protected pushU8(value: number) {
+    this.ensureSpace(1);
+    this.view.setUint8(this.offset, value);
+    this.offset += 1;
+  }
+
+  protected pushU32(value: number) {
+    this.ensureSpace(4);
+    this.view.setUint32(this.offset, value, true);
+    this.offset += 4;
+  }
+
+  protected pushVec2U(x: number, y: number) {
+    this.pushU32(x);
+    this.pushU32(y);
+  }
+
+  protected pushF32(value: number) {
+    this.ensureSpace(4);
+    this.view.setFloat32(this.offset, value, true);
+    this.offset += 4;
+  }
+
+  protected pushVec2F(x: number, y: number) {
+    this.pushF32(x);
+    this.pushF32(y);
+  }
+
+  protected pushBytes(bytes: Uint8Array) {
+    this.ensureSpace(bytes.byteLength);
+    this.bytes.set(bytes, this.offset);
+    this.offset += bytes.byteLength;
+  }
+
+  protected pushSpriteTransform(sprite: GameSprite) {
+    this.pushF32(sprite.getR());
+    this.pushVec2F(sprite.getX(), sprite.getY());
+    this.pushVec2F(sprite.getVX(), sprite.getVY());
+  }
+
+  protected pushSpriteInit(sprite: GameSprite) {
+    this.pushU32(getSpriteIC(sprite));
+    this.pushSpriteTransform(sprite);
+  }
+
+  protected pushSpriteUpdate(sprite: GameSprite) {
+    this.pushU8(sprite.id);
+    this.pushSpriteTransform(sprite);
+  }
+}
+
+const SIZEOF_STRUCT_SPRITE_INIT =
+    3      // color
+  + 1      // id
+  + 4      // rotation
+  + 4 * 2  // position
+  + 4 * 2; // velocity
+const SIZEOF_STRUCT_SPRITE_UPDATE =
+    1      // sprite id
+  + 4      // rotation
+  + 4 * 2  // position
+  + 4 * 2; // velocity
+
+export class HelloPacket extends Packet {
+  // NOTE: spriteId must be *LESS* than 256
+  public constructor(playerId: number, game: Game) {
+    const size =
+        1                                                // number of sprites
+      + 1                                                // this sprite id
+      + 4 * 2                                            // map size (width and height)
+      + game.map.getSizeInBytes()                        // size of map data
+      + game.sprites.length * SIZEOF_STRUCT_SPRITE_INIT; // size of sprite data
+    super(ServerPacketType.SPKT_HELLO, size)
+    this.pushU8(game.sprites.length);
+    this.pushU8(playerId);
+    this.pushVec2U(game.map.width, game.map.height);
+    game.sprites.forEach(sprite => this.pushSpriteInit(sprite));
+    this.pushBytes(game.map.getCompressedData());
+  }
+}
+
+export class UpdatePacket extends Packet {
+  public constructor(sprite: GameSprite) {
+    super(ServerPacketType.SPKT_UPDATE, SIZEOF_STRUCT_SPRITE_UPDATE)
+    this.pushSpriteUpdate(sprite);
+  }
+}
+
+export class CreatePacket extends Packet {
+  public constructor(sprite: GameSprite) {
+      super(ServerPacketType.SPKT_CREATE, SIZEOF_STRUCT_SPRITE_INIT);
+      this.pushSpriteInit(sprite);
+  }
+}
+
+export class DestroyPacket extends Packet {
+  public constructor(sprite: GameSprite) {
+    super(ServerPacketType.SPKT_DESTROY, 1);
+    this.pushU8(sprite.id);
+  }
+}
