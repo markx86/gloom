@@ -48,8 +48,7 @@ struct sprite {
     i32 screen_x;
     i32 screen_halfw;
     f32 camera_depth;
-    f32 dist_from_player2;
-    vec2f diff;
+    f32 depth;
   };
 };
 

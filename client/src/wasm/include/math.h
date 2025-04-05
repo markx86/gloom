@@ -37,23 +37,26 @@ static inline u32 abs(i32 v) {
   return (v > 0) ? v : -v;
 }
 
-#define VEC2ADD(v, w) \
-  ((typeof(v)) {      \
-    .x = v.x + w.x,   \
-    .y = v.y + w.y    \
+#define VEC2ADD(v, w)     \
+  ((typeof(*(v))) {       \
+    .x = (v)->x + (w)->x, \
+    .y = (v)->y + (w)->y  \
   })
 
-#define VEC2SUB(v, w) \
-  ((typeof(v)) {      \
-    .x = v.x - w.x,   \
-    .y = v.y - w.y    \
+#define VEC2SUB(v, w)     \
+  ((typeof(*(v))) {       \
+    .x = (v)->x - (w)->x, \
+    .y = (v)->y - (w)->y  \
   })
 
-#define VEC2SCALE(v, s) \
-  ((typeof(v)) {        \
-    .x = v.x * s,       \
-    .y = v.y * s        \
+#define VEC2SCALE(v, s)  \
+  ((typeof(*(v))) {      \
+    .x = (v)->x * s,     \
+    .y = (v)->y * s      \
   })
+
+#define VEC2LENGTH2(v) \
+  ((v)->x * (v)->x + (v)->y * (v)->y)
 
 #define PI         3.141592653589793f
 #define TWO_PI     (PI * 2.0f)

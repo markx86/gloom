@@ -173,6 +173,8 @@ static inline void update_player_position(f32 delta) {
 
 static inline void update_sprites(f32 delta) {
   u32 i;
+  f32 dist_from_player2;
+  vec2f diff;
   struct sprite* s;
 
   for (i = 0; i < sprites.n; ++i) {
@@ -182,13 +184,11 @@ static inline void update_sprites(f32 delta) {
 
     // since we already need to compute dist_from_player2, might as well
     // save the diff vector, because we'll also need it during rendering.
-    s->diff.x = s->pos.x - player.pos.x;
-    s->diff.y = s->pos.y - player.pos.y;
-    // we need to compute dist_from_player2 here, because we need to use it
-    // for collision detection with the player.
-    s->dist_from_player2 = s->diff.x * s->diff.x + s->diff.y * s->diff.y;
+    diff = VEC2SUB(&s->pos, &player.pos);
 
-    if (s->dist_from_player2 < SPRITE_RADIUS * SPRITE_RADIUS) {
+    // compute the distance from the player and check if the sprite collided
+    dist_from_player2 = VEC2LENGTH2(&diff);
+    if (dist_from_player2 < SPRITE_RADIUS * SPRITE_RADIUS) {
       // sprite collided with the player
     }
   }
@@ -244,9 +244,7 @@ static void draw_sprite(struct sprite* s) {
   y_start = y_end - screen_h;
   // draw the sprite
   for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
-    // FIXME: sprites get clipped the further away they are from the player,
-    //        even though they're not behind walls
-    if (z_buf[x] < s->dist_from_player2)
+    if (z_buf[x] < s->depth)
       continue;
     for (y = MAX(0, y_start); y < y_end && y < FB_HEIGHT; y++)
       fb[x + y * FB_WIDTH] = color;
@@ -279,7 +277,7 @@ static inline void render_scene(void) {
 }
 
 static inline void render_sprites(void) {
-  vec2f proj;
+  vec2f proj, diff;
   u32 i, j, k, n;
   struct sprite* s;
   struct sprite* on_screen_sprites[MAX_SPRITES_ON_SCREEN];
@@ -288,9 +286,11 @@ static inline void render_sprites(void) {
   for (i = 0; i < sprites.n; ++i) {
     s = sprites.s + i;
 
+    diff = VEC2SUB(&s->pos, &player.pos);
+
     // compute coordinates in camera space
-    proj.x = camera.inv_mat.m11 * s->diff.x + camera.inv_mat.m12 * s->diff.y;
-    proj.y = camera.inv_mat.m21 * s->diff.x + camera.inv_mat.m22 * s->diff.y;
+    proj.x = camera.inv_mat.m11 * diff.x + camera.inv_mat.m12 * diff.y;
+    proj.y = camera.inv_mat.m21 * diff.x + camera.inv_mat.m22 * diff.y;
 
     // sprite is behind the camera, ignore it
     if (proj.y < 0.0f)
@@ -300,7 +300,7 @@ static inline void render_sprites(void) {
     s->camera_depth = 1.0f / proj.y;
 
     // compute screen x
-    s->screen_x = (FB_WIDTH >> 1) * (1.0f + (proj.x / proj.y));
+    s->screen_x = (FB_WIDTH >> 1) * (1.0f + proj.x / proj.y);
     // compute screen width (we divide by two since we always use the half screen width)
     s->screen_halfw = (i32)((f32)s->dim.x * s->camera_depth) >> 1;
 
@@ -308,9 +308,11 @@ static inline void render_sprites(void) {
     if (s->screen_x + s->screen_halfw < 0 || s->screen_x - s->screen_halfw >= FB_WIDTH)
       continue;
 
+    s->depth = proj.y * proj.y;
+
     // look for index to insert the new sprite
     for (j = 0; j < n; ++j) {
-      if (on_screen_sprites[j]->dist_from_player2 < s->dist_from_player2)
+      if (on_screen_sprites[j]->depth < s->depth)
         break;
     }
     // move elements after the entry to the next index
