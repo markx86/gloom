@@ -8,8 +8,6 @@
 #define ARRLEN(x)         (sizeof(x) / sizeof(x[0]))
 #define REINTERPRET(x, T) (*(T*)&(x))
 
-#define NULL              ((void*)0)
-
 static inline void strncpy(char* dst, const char* src, u32 len) {
   for (; *src && len > 0; --len)
     *(dst++) = *(src++);

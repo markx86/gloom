@@ -10,8 +10,30 @@
 #define CAMERA_FOV 75.0f
 #define CAMERA_DOF 32
 
-#define MAX_SPRITES_ON_SCREEN 128
-#define SPRITE_RADIUS         0.15f
+#define MAX_SPRITES   256
+#define SPRITE_RADIUS 0.15f
+
+enum color {
+  COLOR_BLACK,
+  COLOR_PURPLE,
+  COLOR_RED,
+  COLOR_ORANGE,
+  COLOR_YELLOW,
+  COLOR_LIGHTGREEN,
+  COLOR_GREEN,
+  COLOR_TURQUOISE,
+  COLOR_DARKBLUE,
+  COLOR_BLUE,
+  COLOR_CYAN,
+  COLOR_DARKWHITE,
+  COLOR_WHITE,
+  COLOR_LIGHTGRAY,
+  COLOR_GRAY,
+  COLOR_DARKGRAY,
+  COLOR_MAX
+};
+
+#define color(x) get_color(COLOR_##x)
 
 struct camera {
   u32 dof;
@@ -29,32 +51,35 @@ struct player {
   vec2f dir;
 };
 
-union sprite_ic {
-  u32 __union;
-  struct {
-    u32 color : 24;
-    u32 id    : 8;
-  };
+enum sprite_type {
+  SPRITE_PLAYER,
+  SPRITE_BULLET,
+  SPRITE_MAX
+};
+
+struct sprite_it {
+  u16 type : 8;
+  u16 id   : 8;
 };
 
 struct sprite {
-  union sprite_ic ic;
+  struct sprite_it it;
   f32 rot;
   f32 vel;
   vec2f pos;
   vec2f dir;
-  vec2i dim;
   struct {
     i32 screen_x;
     i32 screen_halfw;
-    f32 camera_depth;
-    f32 depth;
+    f32 inv_depth;
+    f32 depth2;
+    b8 disabled;
   };
 };
 
 struct sprites {
   u32 n;
-  struct sprite s[256];
+  struct sprite s[MAX_SPRITES];
 };
 
 struct map {
@@ -77,6 +102,9 @@ struct hit {
   b8 vertical;
 };
 
+extern u32 __alpha_mask;
+extern const u32 __palette[COLOR_MAX];
+
 extern struct player player;
 extern struct camera camera;
 extern struct sprites sprites;
@@ -88,13 +116,26 @@ extern u32 fb[FB_WIDTH * FB_HEIGHT];
 #define PLAYER_SPRITE_W 128
 #define PLAYER_SPRITE_H 400
 
+#define BULLET_SPRITE_W 32
+#define BULLET_SPRITE_H 32
+
 #define FB_SIZE   sizeof(fb)
 #define FB_LEN    ARRLEN(fb)
 
+static inline void set_alpha(u8 a) {
+  __alpha_mask = ((u32)a) << 24;
+}
+
+static inline u32 get_color(u8 index) {
+  return __alpha_mask | __palette[index];
+}
+
+static inline struct sprite* alloc_sprite(void) {
+  return (sprites.n < MAX_SPRITES) ? &sprites.s[sprites.n++] : NULL;
+}
+
 void set_camera_fov(f32 new_fov);
 void set_player_rot(f32 new_rot);
-
-void set_alpha(u8 a);
 
 void gloom_tick(f32 delta);
 

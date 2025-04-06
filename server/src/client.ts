@@ -1,58 +1,19 @@
 import Logger from "./logger";
 import { WebSocket } from "ws";
 import { Game, PlayerSprite } from "./game";
-import { GamePacketType, Packet, HelloPacket, UpdatePacket, CreatePacket, DestroyPacket } from "./packet";
+import { GamePacketType, Packet, HelloPacket, UpdatePacket, DestroyPacket } from "./packet";
+import { Peer } from "./broadcast";
 
 const MAX_PACKET_DROP = 10;
 
-export class Client {
+export class Client extends Peer {
   private token: number | undefined;
   private player: PlayerSprite | undefined;
-  private broadcastGroup: Array<Client> | undefined;
   private ws: WebSocket;
   private clientSequence: number;
   private serverSequence: number;
 
-  private static broadcastGroups = new Map<number, Array<Client>>();
-
-  private registerToBroadcastGroup(gameId: number) {
-    const group = Client.broadcastGroups.get(gameId);
-    if (!group) {
-      Client.broadcastGroups.set(gameId, new Array<Client>());
-      // retry or something, idk ¯\_(ツ)_/¯
-      this.registerToBroadcastGroup(gameId);
-      return;
-    }
-    group.push(this);
-    this.broadcastGroup = group;
-  }
-
-  private removeFromBroadcastGroup() {
-    if (!this.broadcastGroup) {
-      Logger.warning("Tried to remove client from broadcast group, but the client is not in any group!")
-      return;
-    }
-    const index = this.broadcastGroup.indexOf(this);
-    if (index >= 0) {
-      this.broadcastGroup.splice(index, 1);
-      this.broadcastGroup = undefined; // reset the broadcast group
-    }
-  }
-
-  private broadcastPacket(pkt: Packet, includeSelf: boolean = false) {
-    if (!this.broadcastGroup) {
-      Logger.warning("Tried to broadcast even though the client is not registered to any group!");
-      return;
-    }
-    this.broadcastGroup.forEach(peer => {
-      if (!includeSelf && peer === this) {
-        return;
-      }
-      peer.sendPacket(pkt);
-    });
-  }
-
-  private sendPacket(pkt: Packet) {
+  public sendPacket(pkt: Packet) {
     const seq = this.serverSequence++;
     this.ws.send(pkt.getRaw(seq));
   }
@@ -74,14 +35,14 @@ export class Client {
       return;
     }
 
-    if (type >= GamePacketType.GPKT_MAX) {
+    if (type >= GamePacketType.MAX) {
       // invalid packet type
       Logger.error("Invalid client packet type");
       return;
     }
 
     switch (type) {
-      case GamePacketType.GPKT_JOIN: {
+      case GamePacketType.JOIN: {
         if (this.token != null) {
           Logger.error("Player sent hello packet, after it had already sent one!");
           return;
@@ -110,25 +71,23 @@ export class Client {
 
         this.registerToBroadcastGroup(game.id);
         this.sendPacket(new HelloPacket(this.player.id, game));
-        this.broadcastPacket(new CreatePacket(this.player), false);
         break;
       }
   
-      case GamePacketType.GPKT_LEAVE: {
+      case GamePacketType.LEAVE: {
         Logger.info("Got request to leave game");
         if (!this.player) {
           Logger.error("Client is not currently in any game!");
           return;
         }
-        this.broadcastPacket(new DestroyPacket(this.player));
         this.removeFromBroadcastGroup();
-        this.player.game.removePlayer(this.player);
+        this.player.game.removeSprite(this.player);
         this.player = undefined;
         this.token = undefined;
         break;
       }
   
-      case GamePacketType.GPKT_UPDATE: {
+      case GamePacketType.UPDATE: {
         Logger.info("Got update packet");
         if (!this.player || this.token == null) {
           Logger.error("Connection not initialized! Did we miss the JOIN packet?");
@@ -149,10 +108,22 @@ export class Client {
         );
         break;
       }
+
+      case GamePacketType.FIRE: {
+        Logger.info("Got fire packet");
+        if (!this.player || this.token == null) {
+          Logger.error("Connection not initialized! Did we miss the JOIN packet?");
+          break;
+        }
+        this.player.fireBullet();
+        break;
+      }
     }
   }
 
   public constructor(ws: WebSocket) {
+    super();
+
     this.ws = ws;
     this.serverSequence = this.clientSequence = 0;
 
@@ -163,7 +134,7 @@ export class Client {
       Logger.info("Client disconnected");
       if (this.player?.game) {
         Logger.info("Removing player with ID %d from game %s", this.player.id, this.player.game.id.toString(16));
-        this.player.game.removePlayer(this.player);
+        this.player.game.removeSprite(this.player);
         this.broadcastPacket(new DestroyPacket(this.player), false);
       } else {
         Logger.info("Client was not in game, nothing to do");

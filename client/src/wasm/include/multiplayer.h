@@ -23,3 +23,4 @@ b8 join_game(u32 game_id);
 b8 leave_game(void);
 
 void send_update(void);
+void fire_bullet(void);

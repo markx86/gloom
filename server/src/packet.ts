@@ -1,24 +1,23 @@
 import { Game, GameSprite } from "./game";
-import { rainbow } from "./util";
 
 export enum GamePacketType {
-  GPKT_JOIN,
-  GPKT_LEAVE,
-  GPKT_UPDATE,
-  GPKT_MAX
+  JOIN,
+  LEAVE,
+  UPDATE,
+  FIRE,
+  MAX
 };
 
 export enum ServerPacketType {
-  SPKT_HELLO,
-  SPKT_UPDATE,
-  SPKT_CREATE,
-  SPKT_DESTROY,
-  SPKT_MAX
+  HELLO,
+  UPDATE,
+  CREATE,
+  DESTROY,
+  MAX
 }
 
-function getSpriteIC(sprite: GameSprite) {
-  const color = rainbow(32, Math.floor(Math.random() * 32));
-  return (sprite.id << 24) | (color & 0x00FFFFFF);
+function getSpriteIT(sprite: GameSprite): number {
+  return ((sprite.id & 0xff) << 8) | (sprite.type & 0xff);
 }
 
 export abstract class Packet {
@@ -28,7 +27,7 @@ export abstract class Packet {
   private header: number;
 
   protected constructor(type: ServerPacketType, extraSize: number = 0) {
-    if (type >= ServerPacketType.SPKT_MAX) {
+    if (type >= ServerPacketType.MAX) {
       throw new Error("Invalid server packet type: " + type);
     }
     this.bytes = new Uint8Array(extraSize + 4); // 4 is the size of the header in bytes
@@ -52,6 +51,12 @@ export abstract class Packet {
     this.ensureSpace(1);
     this.view.setUint8(this.offset, value);
     this.offset += 1;
+  }
+
+  protected pushU16(value: number) {
+    this.ensureSpace(2);
+    this.view.setUint16(this.offset, value, true);
+    this.offset += 2;
   }
 
   protected pushU32(value: number) {
@@ -89,7 +94,7 @@ export abstract class Packet {
   }
 
   protected pushSpriteInit(sprite: GameSprite) {
-    this.pushU32(getSpriteIC(sprite));
+    this.pushU16(getSpriteIT(sprite));
     this.pushSpriteTransform(sprite);
   }
 
@@ -100,7 +105,7 @@ export abstract class Packet {
 }
 
 const SIZEOF_STRUCT_SPRITE_INIT =
-    3      // color
+    1      // color and type
   + 1      // id
   + 4      // rotation
   + 4 * 2  // position
@@ -120,7 +125,7 @@ export class HelloPacket extends Packet {
       + 4 * 2                                            // map size (width and height)
       + game.map.getSizeInBytes()                        // size of map data
       + game.sprites.length * SIZEOF_STRUCT_SPRITE_INIT; // size of sprite data
-    super(ServerPacketType.SPKT_HELLO, size)
+    super(ServerPacketType.HELLO, size)
     this.pushU8(game.sprites.length);
     this.pushU8(playerId);
     this.pushVec2U(game.map.width, game.map.height);
@@ -131,21 +136,21 @@ export class HelloPacket extends Packet {
 
 export class UpdatePacket extends Packet {
   public constructor(sprite: GameSprite) {
-    super(ServerPacketType.SPKT_UPDATE, SIZEOF_STRUCT_SPRITE_UPDATE)
+    super(ServerPacketType.UPDATE, SIZEOF_STRUCT_SPRITE_UPDATE)
     this.pushSpriteUpdate(sprite);
   }
 }
 
 export class CreatePacket extends Packet {
   public constructor(sprite: GameSprite) {
-      super(ServerPacketType.SPKT_CREATE, SIZEOF_STRUCT_SPRITE_INIT);
+      super(ServerPacketType.CREATE, SIZEOF_STRUCT_SPRITE_INIT);
       this.pushSpriteInit(sprite);
   }
 }
 
 export class DestroyPacket extends Packet {
   public constructor(sprite: GameSprite) {
-    super(ServerPacketType.SPKT_DESTROY, 1);
+    super(ServerPacketType.DESTROY, 1);
     this.pushU8(sprite.id);
   }
 }

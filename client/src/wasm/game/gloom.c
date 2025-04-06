@@ -5,13 +5,6 @@
 #define COLOR_WALLH 0xFFFFFF
 #define COLOR_WALLV 0xAAAAAA
 
-struct colors {
-  u32 sky;
-  u32 floor;
-  u32 wall_h;
-  u32 wall_v;
-};
-
 // reduced DOF for computing collision rays
 #define COLL_DOF 8
 
@@ -21,18 +14,38 @@ union keys keys;
 struct sprites sprites;
 struct camera camera;
 
-static struct colors colors;
-static u32 alpha;
+static const vec2i sprite_dims[] = {
+  [SPRITE_PLAYER] = {.x = PLAYER_SPRITE_W, .y = PLAYER_SPRITE_H},
+  [SPRITE_BULLET] = {.x = BULLET_SPRITE_W, .y = BULLET_SPRITE_H}
+};
+
+static const u8 sprite_colors[] = {
+  [SPRITE_PLAYER] = COLOR_YELLOW,
+  [SPRITE_BULLET] = COLOR_RED
+};
+
+u32 __alpha_mask;
+
+const u32 __palette[] = {
+  [COLOR_BLACK]      = 0x2c1c1a,
+  [COLOR_PURPLE]     = 0x5d275d,
+  [COLOR_RED]        = 0x533eb1,
+  [COLOR_ORANGE]     = 0x577def,
+  [COLOR_YELLOW]     = 0x75cdff,
+  [COLOR_LIGHTGREEN] = 0x70f0a7,
+  [COLOR_GREEN]      = 0x64b738,
+  [COLOR_TURQUOISE]  = 0x257179,
+  [COLOR_DARKBLUE]   = 0x6f3629,
+  [COLOR_BLUE]       = 0xc95d3b,
+  [COLOR_CYAN]       = 0xf6a641,
+  [COLOR_DARKWHITE]  = 0xf7ef73,
+  [COLOR_WHITE]      = 0xf4f4f4,
+  [COLOR_LIGHTGRAY]  = 0xc2b094,
+  [COLOR_GRAY]       = 0x866c56,
+  [COLOR_DARKGRAY]   = 0x573c33
+};
 
 f32 z_buf[FB_WIDTH];
-
-void set_alpha(u8 a) {
-  alpha = ((u32)a) << 24;
-  colors.sky    = alpha | COLOR_SKY;
-  colors.floor  = alpha | COLOR_FLOOR;
-  colors.wall_h = alpha | COLOR_WALLH;
-  colors.wall_v = alpha | COLOR_WALLV;
-}
 
 // NOTE: @new_fov must be in radians
 void set_camera_fov(f32 new_fov) {
@@ -113,27 +126,36 @@ static u8 trace_ray(const vec2f* pos, const vec2f* ray_dir, u32 dof, struct hit*
   return cell_id;
 }
 
-static void move_and_collide(vec2f* pos, vec2f* dir, f32 space) {
+static b8 move_and_collide(vec2f* pos, vec2f* dir, f32 space) {
   struct hit hit;
   f32 v_dist, h_dist;
   vec2f v_dir, h_dir;
+  b8 collided = false;
 
   // check for collisions on the y-axis
   v_dir.x = 0.0f;
   v_dir.y = signf(dir->y);
   v_dist = absf(dir->y) * space;
-  if (trace_ray(pos, &v_dir, COLL_DOF, &hit) && hit.dist < v_dist + SPRITE_RADIUS)
+  if (trace_ray(pos, &v_dir, COLL_DOF, &hit) &&
+      hit.dist < v_dist + SPRITE_RADIUS) {
     v_dist = hit.dist - SPRITE_RADIUS;
+    collided = true;
+  }
 
   // check for collisions on the x-axis
   h_dir.x = signf(dir->x);
   h_dir.y = 0.0f;
   h_dist = absf(dir->x) * space;
-  if (trace_ray(pos, &h_dir, COLL_DOF, &hit) && hit.dist < h_dist + SPRITE_RADIUS)
+  if (trace_ray(pos, &h_dir, COLL_DOF, &hit) &&
+      hit.dist < h_dist + SPRITE_RADIUS) {
     h_dist = hit.dist - SPRITE_RADIUS;
+    collided = true;
+  }
 
   pos->x += h_dir.x * h_dist;
   pos->y += v_dir.y * v_dist;
+
+  return collided;
 }
 
 static inline void update_player_position(f32 delta) {
@@ -172,6 +194,7 @@ static inline void update_player_position(f32 delta) {
 }
 
 static inline void update_sprites(f32 delta) {
+  b8 collided;
   u32 i;
   f32 dist_from_player2;
   vec2f diff;
@@ -180,7 +203,13 @@ static inline void update_sprites(f32 delta) {
   for (i = 0; i < sprites.n; ++i) {
     s = sprites.s + i;
 
-    move_and_collide(&s->pos, &s->dir, s->vel * delta);
+    collided = move_and_collide(&s->pos, &s->dir, s->vel * delta);
+    // disable bullet sprites on collision with a wall
+    if (s->it.type == SPRITE_BULLET)
+      s->disabled = !s->disabled && collided;
+
+    if (s->disabled)
+      continue;
 
     // since we already need to compute dist_from_player2, might as well
     // save the diff vector, because we'll also need it during rendering.
@@ -207,7 +236,7 @@ static void draw_column(u8 cell_id, i32 x, const struct hit* hit) {
 
   // draw column
   if (cell_id) {
-    line_color = hit->vertical ? colors.wall_v : colors.wall_h;
+    line_color = hit->vertical ? color(WHITE) : color(DARKWHITE);
 
     line_height = FB_HEIGHT / hit->dist;
     if ((u32)line_height > FB_HEIGHT)
@@ -219,14 +248,26 @@ static void draw_column(u8 cell_id, i32 x, const struct hit* hit) {
   // fill column
   y = 0;
   for (; y < line_y; ++y)
-    fb[x + y * FB_WIDTH] = colors.sky;
+    fb[x + y * FB_WIDTH] = color(BLUE);
   if (cell_id) {
     line_y += line_height;
     for (; y < line_y; ++y)
       fb[x + y * FB_WIDTH] = line_color;
   }
   for (; y < FB_HEIGHT; ++y)
-    fb[x + y * FB_WIDTH] = colors.floor;
+    fb[x + y * FB_WIDTH] = color(BLACK);
+}
+
+static inline i32 get_y_end(struct sprite* s, u32 screen_h) {
+  switch (s->it.type) {
+    case SPRITE_BULLET:
+      // we add a little offset to the bullet's vertical height so
+      // that it doesn't come out of the player camera
+      return (FB_HEIGHT + screen_h + (i32)(128.0f * s->inv_depth)) >> 1;
+    default:
+      // by default, place objects on the ground
+      return (f32)(FB_HEIGHT >> 1) * (1.0f + s->inv_depth);
+  }
 }
 
 static void draw_sprite(struct sprite* s) {
@@ -234,17 +275,19 @@ static void draw_sprite(struct sprite* s) {
   i32 x_start, x_end, y_start, y_end;
   i32 x, y;
 
-  screen_h = (f32)s->dim.y * s->camera_depth;
-  color = alpha | s->ic.color;
+  screen_h = (f32)sprite_dims[s->it.type].y * s->inv_depth;
+  color = get_color(sprite_colors[s->it.type]);
 
   // determine screen coordinates of the sprite
   x_start = s->screen_x - s->screen_halfw;
   x_end = s->screen_x + s->screen_halfw;
-  y_end = (f32)(FB_HEIGHT >> 1) * (1.0f + s->camera_depth);
+  // y_end = (f32)(FB_HEIGHT >> 1) * (1.0f + s->inv_depth);
+  // y_end = (FB_HEIGHT + screen_h) >> 1;
+  y_end = get_y_end(s, screen_h);
   y_start = y_end - screen_h;
   // draw the sprite
   for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
-    if (z_buf[x] < s->depth)
+    if (z_buf[x] < s->depth2)
       continue;
     for (y = MAX(0, y_start); y < y_end && y < FB_HEIGHT; y++)
       fb[x + y * FB_WIDTH] = color;
@@ -280,11 +323,15 @@ static inline void render_sprites(void) {
   vec2f proj, diff;
   u32 i, j, k, n;
   struct sprite* s;
-  struct sprite* on_screen_sprites[MAX_SPRITES_ON_SCREEN];
+  struct sprite* on_screen_sprites[MAX_SPRITES];
 
   n = 0;
   for (i = 0; i < sprites.n; ++i) {
     s = sprites.s + i;
+
+    // do not render disabled sprites
+    if (s->disabled)
+      continue;
 
     diff = VEC2SUB(&s->pos, &player.pos);
 
@@ -297,22 +344,22 @@ static inline void render_sprites(void) {
       continue;
 
     // save camera depth
-    s->camera_depth = 1.0f / proj.y;
+    s->inv_depth = 1.0f / proj.y;
 
     // compute screen x
     s->screen_x = (FB_WIDTH >> 1) * (1.0f + proj.x / proj.y);
     // compute screen width (we divide by two since we always use the half screen width)
-    s->screen_halfw = (i32)((f32)s->dim.x * s->camera_depth) >> 1;
+    s->screen_halfw = (i32)((f32)sprite_dims[s->it.type].x * s->inv_depth) >> 1;
 
     // sprite is not on screen, ignore it
     if (s->screen_x + s->screen_halfw < 0 || s->screen_x - s->screen_halfw >= FB_WIDTH)
       continue;
 
-    s->depth = proj.y * proj.y;
+    s->depth2 = proj.y * proj.y;
 
     // look for index to insert the new sprite
     for (j = 0; j < n; ++j) {
-      if (on_screen_sprites[j]->depth < s->depth)
+      if (on_screen_sprites[j]->depth2 < s->depth2)
         break;
     }
     // move elements after the entry to the next index
@@ -321,7 +368,7 @@ static inline void render_sprites(void) {
     // store the new sprite to render
     on_screen_sprites[j] = s;
 
-    if (++n >= MAX_SPRITES_ON_SCREEN)
+    if (++n >= MAX_SPRITES)
       break;
   }
 

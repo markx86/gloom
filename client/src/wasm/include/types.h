@@ -32,4 +32,6 @@ typedef struct { f32 x, y; } vec2f;
 
 #undef __STATICASSERT
 
+#define NULL ((void*)0)
+
 #endif

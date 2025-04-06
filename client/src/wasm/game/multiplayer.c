@@ -11,6 +11,7 @@ enum game_pkt_type {
   GPKT_JOIN,
   GPKT_LEAVE,
   GPKT_UPDATE,
+  GPKT_FIRE,
   GPKT_MAX
 };
 
@@ -34,6 +35,10 @@ struct game_pkt_update {
   vec2f pos;
   f32 rot;
   u32 keys;
+} PACKED;
+
+struct game_pkt_fire {
+  struct game_pkt_hdr hdr;
 } PACKED;
 
 enum serv_pkt_type {
@@ -64,7 +69,7 @@ struct sprite_transform {
 } PACKED;
 
 struct sprite_init {
-  union sprite_ic ic;
+  struct sprite_it it;
   struct sprite_transform transform;
 } PACKED;
 
@@ -183,6 +188,14 @@ void send_update(void) {
   send_packet(&pkt, sizeof(pkt));
 }
 
+void fire_bullet(void) {
+  struct game_pkt_fire pkt;
+  if (conn_state != CONN_UPDATING)
+    return;
+  init_game_pkt(&pkt, GPKT_FIRE);
+  send_packet(&pkt, sizeof(pkt));
+}
+
 static void pkt_size_error(const char* pkt_type, u32 got, u32 expected) {
   eprintf("%s packet size is not what was expected (should be %u, got %u)\n",
           pkt_type, expected, got);
@@ -194,13 +207,16 @@ static void pkt_type_error(const char* pkt_type) {
 }
 
 static struct sprite* get_sprite_by_id(u8 id, b8 can_alloc) {
+  struct sprite* s;
   u32 i = 0;
   for (i = 0; i < sprites.n; ++i) {
-    if (sprites.s[i].ic.id == id)
+    if (sprites.s[i].it.id == id)
       return sprites.s + i;
   }
-  if (can_alloc && sprites.n < ARRLEN(sprites.s))
-    return sprites.s + sprites.n++;
+  if (can_alloc && (s = alloc_sprite())) {
+    s->it.id = id;
+    return s;
+  }
   return NULL;
 }
 
@@ -212,15 +228,16 @@ static void apply_sprite_transform(struct sprite* s,
   s->dir.x = t->vel.x * inv_vel;
   s->dir.y = t->vel.y * inv_vel;
   s->vel = 1.0f / inv_vel;
+  s->disabled = false; // reset disabled flag
 }
 
 static void init_sprite(struct sprite_init* init) {
   struct sprite* s;
-  if ((s = get_sprite_by_id(init->ic.id, true))) {
-    *s = (struct sprite) {
-      .ic = init->ic,
-      .dim = { .x = PLAYER_SPRITE_W, .y = PLAYER_SPRITE_H }
-    };
+  if (init->it.type >= SPRITE_MAX)
+    return;
+  if ((s = get_sprite_by_id(init->it.id, true))) {
+    memset(s, 0, sizeof(*s));
+    s->it = init->it;
     apply_sprite_transform(s, &init->transform);
   }
 }
@@ -275,7 +292,7 @@ static void serv_hello_handler(void* buf, u32 len) {
     for (; n_sprites > 0; --n_sprites) {
       if (len < sizeof(*s))
         break;
-      if (s->ic.id != player_id)
+      if (s->it.id != player_id)
         init_sprite(s);
       else
         // init data refers to the player
