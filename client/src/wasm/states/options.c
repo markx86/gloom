@@ -1,8 +1,8 @@
 #include <client.h>
 #include <ui.h>
 
-#define FOREGROUND_COLOR 0xFF55FFFF
-#define BACKGROUND_COLOR 0xFFAA0000
+#define FOREGROUND_COLOR solid_color(YELLOW)
+#define BACKGROUND_COLOR solid_color(BLUE)
 
 static enum client_state back_state;
 

@@ -1,8 +1,8 @@
 #include <client.h>
 #include <ui.h>
 
-#define FOREGROUND_COLOR 0xFFAAAAAA
-#define BACKGROUND_COLOR 0xFF000000
+#define FOREGROUND_COLOR solid_color(LIGHTGRAY)
+#define BACKGROUND_COLOR solid_color(BLACK)
 
 static void on_resume_clicked(void) {
   switch_to_state(STATE_GAME);

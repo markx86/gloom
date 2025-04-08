@@ -1,9 +1,9 @@
 #include <client.h>
 #include <ui.h>
 
-#define FOREGROUND_COLOR 0xFFAAAAAA
-#define BACKGROUND_COLOR 0xFF000000
-#define ERROR_COLOR      0xFF0000AA
+#define FOREGROUND_COLOR solid_color(LIGHTGRAY)
+#define BACKGROUND_COLOR solid_color(BLACK)
+#define ERROR_COLOR      solid_color(RED)
 
 static void on_back_clicked(void) { switch_to_state(STATE_MENU); }
 

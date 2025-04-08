@@ -15,25 +15,26 @@
 
 enum color {
   COLOR_BLACK,
-  COLOR_PURPLE,
+  COLOR_GRAY,
+  COLOR_LIGHTGRAY,
+  COLOR_WHITE,
+  COLOR_DARKRED,
   COLOR_RED,
-  COLOR_ORANGE,
-  COLOR_YELLOW,
-  COLOR_LIGHTGREEN,
+  COLOR_DARKGREEN,
   COLOR_GREEN,
-  COLOR_TURQUOISE,
+  COLOR_DARKYELLOW,
+  COLOR_YELLOW,
   COLOR_DARKBLUE,
   COLOR_BLUE,
+  COLOR_DARKMAGENTA,
+  COLOR_MAGENTA,
+  COLOR_DARKCYAN,
   COLOR_CYAN,
-  COLOR_DARKWHITE,
-  COLOR_WHITE,
-  COLOR_LIGHTGRAY,
-  COLOR_GRAY,
-  COLOR_DARKGRAY,
   COLOR_MAX
 };
 
-#define color(x) get_color(COLOR_##x)
+#define color(x)       get_color(COLOR_##x)
+#define solid_color(x) get_solid_color(COLOR_##x)
 
 struct camera {
   u32 dof;
@@ -128,6 +129,10 @@ static inline void set_alpha(u8 a) {
 
 static inline u32 get_color(u8 index) {
   return __alpha_mask | __palette[index];
+}
+
+static inline u32 get_solid_color(u8 index) {
+  return 0xFF000000 | __palette[index];
 }
 
 static inline struct sprite* alloc_sprite(void) {

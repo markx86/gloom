@@ -1,10 +1,5 @@
 #include <client.h>
 
-#define COLOR_SKY   0xFF0000
-#define COLOR_FLOOR 0x000000
-#define COLOR_WALLH 0xFFFFFF
-#define COLOR_WALLV 0xAAAAAA
-
 // reduced DOF for computing collision rays
 #define COLL_DOF 8
 
@@ -27,22 +22,22 @@ static const u8 sprite_colors[] = {
 u32 __alpha_mask;
 
 const u32 __palette[] = {
-  [COLOR_BLACK]      = 0x2c1c1a,
-  [COLOR_PURPLE]     = 0x5d275d,
-  [COLOR_RED]        = 0x533eb1,
-  [COLOR_ORANGE]     = 0x577def,
-  [COLOR_YELLOW]     = 0x75cdff,
-  [COLOR_LIGHTGREEN] = 0x70f0a7,
-  [COLOR_GREEN]      = 0x64b738,
-  [COLOR_TURQUOISE]  = 0x257179,
-  [COLOR_DARKBLUE]   = 0x6f3629,
-  [COLOR_BLUE]       = 0xc95d3b,
-  [COLOR_CYAN]       = 0xf6a641,
-  [COLOR_DARKWHITE]  = 0xf7ef73,
-  [COLOR_WHITE]      = 0xf4f4f4,
-  [COLOR_LIGHTGRAY]  = 0xc2b094,
-  [COLOR_GRAY]       = 0x866c56,
-  [COLOR_DARKGRAY]   = 0x573c33
+  [COLOR_BLACK]       = 0x000000,
+  [COLOR_GRAY]        = 0x7e7e7e,
+  [COLOR_LIGHTGRAY]   = 0xbebebe,
+  [COLOR_WHITE]       = 0xffffff,
+  [COLOR_DARKRED]     = 0x00007e,
+  [COLOR_RED]         = 0x0000fe,
+  [COLOR_DARKGREEN]   = 0x007e04,
+  [COLOR_GREEN]       = 0x04ff06,
+  [COLOR_DARKYELLOW]  = 0x007e7e,
+  [COLOR_YELLOW]      = 0x04ffff,
+  [COLOR_DARKBLUE]    = 0x7e0000,
+  [COLOR_BLUE]        = 0xff0000,
+  [COLOR_DARKMAGENTA] = 0x7e007e,
+  [COLOR_MAGENTA]     = 0xff00fe,
+  [COLOR_DARKCYAN]    = 0x7e7e04,
+  [COLOR_CYAN]        = 0xffff06,
 };
 
 f32 z_buf[FB_WIDTH];
@@ -236,7 +231,7 @@ static void draw_column(u8 cell_id, i32 x, const struct hit* hit) {
 
   // draw column
   if (cell_id) {
-    line_color = hit->vertical ? color(WHITE) : color(DARKWHITE);
+    line_color = hit->vertical ? color(WHITE) : color(LIGHTGRAY);
 
     line_height = FB_HEIGHT / hit->dist;
     if ((u32)line_height > FB_HEIGHT)
