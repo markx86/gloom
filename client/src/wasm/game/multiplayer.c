@@ -4,7 +4,6 @@
 #define PACKED       __attribute__((packed))
 #define WS_PORT      8492
 
-#define MAX_PLAYERS     16
 #define MAX_PACKET_DROP 10
 
 enum game_pkt_type {
@@ -46,6 +45,9 @@ enum serv_pkt_type {
   SPKT_UPDATE,
   SPKT_CREATE,
   SPKT_DESTROY,
+  SPKT_HIT,
+  SPKT_DEATH,
+  SPKT_WAIT,
   SPKT_MAX
 };
 
@@ -366,6 +368,10 @@ static const serv_pkt_handler_t serv_pkt_handlers[SPKT_MAX] = {
   [SPKT_UPDATE]  = serv_update_handler,
   [SPKT_CREATE]  = serv_create_handler,
   [SPKT_DESTROY] = serv_destroy_handler,
+  // FIXME: implement this packet handlers
+  [SPKT_HIT]     = NULL,
+  [SPKT_DEATH]   = NULL,
+  [SPKT_WAIT]    = NULL,
 };
 
 void multiplayer_on_recv(u32 len) {

@@ -13,6 +13,10 @@ export enum ServerPacketType {
   UPDATE,
   CREATE,
   DESTROY,
+  // FIXME: implement this packets
+  HIT,
+  DEATH,
+  WAIT,
   MAX
 }
 

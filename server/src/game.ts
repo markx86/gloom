@@ -2,11 +2,13 @@ import { BroadcastGroup } from "./broadcast";
 import Logger from "./logger";
 import { CreatePacket, DestroyPacket } from "./packet";
 
-const MAX_PLAYERS = 16;
+const MAX_PLAYERS = 4;
 const MAX_SPRITES = 256;
 const SPRITE_RADIUS = 0.15;
 const PLAYER_RUN_SPEED = 3.5;
+const PLAYER_HEALTH = 100;
 const BULLET_INITIAL_SPEED = 10;
+const BULLET_DAMAGE = 25;
 const COLL_DOF = 8
 
 enum GameSpriteType {
@@ -86,7 +88,7 @@ export abstract class GameSprite {
     this.game = game;
   }
 
-  protected abstract onCollision(): void;
+  protected abstract onWallCollision(): void;
 
   public tick(delta: number) {
     const space = this.velocity * delta;
@@ -121,7 +123,7 @@ export abstract class GameSprite {
     this.y += signDirY * vDist;
 
     if (collided === true) {
-      this.onCollision();
+      this.onWallCollision();
     }
   }
 
@@ -147,11 +149,42 @@ export abstract class GameSprite {
 }
 
 export class PlayerSprite extends GameSprite {
+  private health: number;
+
   public constructor(game: Game, id: number, x: number, y: number, r: number = 0) {
     super(game, id, GameSpriteType.PLAYER, x, y, 0, r);
+    this.health = PLAYER_HEALTH;
   }
   
-  protected onCollision() {}
+  protected onWallCollision() {}
+
+  private onSpriteCollision(other: GameSprite) {
+    if (other instanceof BulletSprite && other.owner !== this) {
+      this.health -= BULLET_DAMAGE;
+      this.game.removeSprite(other);
+    }
+  }
+
+  private distanceFrom(sprite: GameSprite): number {
+    const dx = sprite.getX() - this.x;
+    const dy = sprite.getY() - this.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  public override tick(delta: number) {
+    super.tick(delta);
+    this.game.sprites.forEach(other => {
+      if (this === other) {
+        return;
+      }
+      if (this.distanceFrom(other) < SPRITE_RADIUS) {
+        this.onSpriteCollision(other);
+      }
+    })
+    if (this.health <= 0) {
+      // FIXME: send game over packet and remove the player from the game
+    }
+  }
 
   public acknowledgeUpdatePacket(x: number, y: number, rotation: number, keys: number): boolean {
     const dist = Math.pow(x - this.x, 2) + Math.pow(y - this.y, 2);
@@ -202,18 +235,25 @@ export class PlayerSprite extends GameSprite {
   public fireBullet(): BulletSprite | undefined {
     return this.game.newBullet(this);
   }
+
+  public getHealth(): number {
+    return this.health;
+  }
 }
 
 export class BulletSprite extends GameSprite {
+  readonly owner: PlayerSprite;
+
   public constructor(player: PlayerSprite, id: number) {
     super(
       player.game, id, GameSpriteType.BULLET,
       player.getX(), player.getY(),
       BULLET_INITIAL_SPEED, player.getR()
     );
+    this.owner = player;
   }
 
-  protected onCollision() {
+  protected onWallCollision() {
     console.log("[#] Bullet hit wall, destroying");
     this.game.removeSprite(this);
   }
@@ -311,7 +351,18 @@ export class Game {
   }
 
   private nextEntityID(): number {
-    return this.sprites.reduce((max, sprite) => sprite.id > max ? sprite.id : max, -1) + 1;
+    let id = -1;
+    const sortedIds = this.sprites
+      .flatMap(sprite => sprite.id)
+      .sort();
+    for (let i = 0; i < sortedIds.length; i++) {
+      const spriteId = sortedIds[i];
+      if (spriteId - id > 1) {
+        break;
+      }
+      id = spriteId;
+    }
+    return id + 1;
   }
 
   public newPlayer(): PlayerSprite | undefined {
