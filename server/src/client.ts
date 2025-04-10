@@ -134,7 +134,7 @@ export class Client extends Peer {
       Logger.info("Client disconnected");
       if (this.player?.game) {
         Logger.info("Removing player with ID %d from game %s", this.player.id, this.player.game.id.toString(16));
-        this.player.game.removeSprite(this.player);
+        this.player.game.removePlayer(this.player);
         this.broadcastPacket(new DestroyPacket(this.player), false);
       } else {
         Logger.info("Client was not in game, nothing to do");
