@@ -3,6 +3,11 @@
 // reduced DOF for computing collision rays
 #define COLL_DOF 8
 
+#define CURSOR_SIZE      16
+#define CURSOR_THICKNESS 2
+
+#define BULLET_SCREEN_OFF 128
+
 struct player player;
 struct map map;
 union keys keys;
@@ -10,8 +15,8 @@ struct sprites sprites;
 struct camera camera;
 
 static const vec2i sprite_dims[] = {
-  [SPRITE_PLAYER] = {.x = PLAYER_SPRITE_W, .y = PLAYER_SPRITE_H},
-  [SPRITE_BULLET] = {.x = BULLET_SPRITE_W, .y = BULLET_SPRITE_H}
+  [SPRITE_PLAYER] = { .x = PLAYER_SPRITE_W, .y = PLAYER_SPRITE_H },
+  [SPRITE_BULLET] = { .x = BULLET_SPRITE_W, .y = BULLET_SPRITE_H }
 };
 
 static const u8 sprite_colors[] = {
@@ -270,7 +275,7 @@ static inline i32 get_y_end(struct sprite* s, u32 screen_h) {
     case SPRITE_BULLET:
       // we add a little offset to the bullet's vertical height so
       // that it doesn't come out of the player camera
-      return (FB_HEIGHT + screen_h + (i32)(128.0f * s->inv_depth)) >> 1;
+      return (FB_HEIGHT + screen_h + (i32)((f32)BULLET_SCREEN_OFF * s->inv_depth)) >> 1;
     default:
       // by default, place objects on the ground
       return (f32)(FB_HEIGHT >> 1) * (1.0f + s->inv_depth);
@@ -288,8 +293,6 @@ static void draw_sprite(struct sprite* s) {
   // determine screen coordinates of the sprite
   x_start = s->screen_x - s->screen_halfw;
   x_end = s->screen_x + s->screen_halfw;
-  // y_end = (f32)(FB_HEIGHT >> 1) * (1.0f + s->inv_depth);
-  // y_end = (FB_HEIGHT + screen_h) >> 1;
   y_end = get_y_end(s, screen_h);
   y_start = y_end - screen_h;
   // draw the sprite
@@ -383,9 +386,58 @@ static inline void render_sprites(void) {
     draw_sprite(on_screen_sprites[i]);
 }
 
+static inline u32 invert_color(u32 color) {
+  union {
+    u32 u;
+    struct {
+      u32 r : 8;
+      u32 g : 8;
+      u32 b : 8;
+      u32 a : 8;
+    };
+  } comps;
+
+  comps.u = color;
+
+  comps.r = 0xff - comps.r;
+  comps.g = 0xff - comps.g;
+  comps.b = 0xff - comps.b;
+  comps.a = 0;
+
+  return comps.u | __alpha_mask;
+}
+
+static inline void render_cursor(void) {
+  u32 i, j;
+  u32 x, y;
+  u32* px;
+  b8 draw_x, draw_y;
+  vec2u coords = {
+    .x = (FB_WIDTH  - CURSOR_SIZE) >> 1,
+    .y = (FB_HEIGHT - CURSOR_SIZE) >> 1,
+  };
+
+#define CURSOR_DRAW_START ((CURSOR_SIZE - CURSOR_THICKNESS) >> 1)
+#define CURSOR_DRAW_END   ((CURSOR_SIZE + CURSOR_THICKNESS) >> 1)
+
+  for (i = 0; i < CURSOR_SIZE; ++i) {
+    draw_x = i >= CURSOR_DRAW_START && i < CURSOR_DRAW_END;
+    for (j = 0; j < CURSOR_SIZE; ++j) {
+      draw_y = j >= CURSOR_DRAW_START && j < CURSOR_DRAW_END;
+      if (draw_x || draw_y) {
+        x = coords.x + i;
+        y = coords.y + j;
+        px = &fb[y * FB_WIDTH + x];
+        *px = invert_color(*px);
+      }
+    }
+  }
+}
+
 static inline void render(void) {
   render_scene();
   render_sprites();
+  render_cursor();
 }
 
 void gloom_tick(f32 delta) {
