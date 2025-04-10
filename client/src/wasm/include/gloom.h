@@ -59,10 +59,10 @@ enum sprite_type {
 };
 
 struct sprite_desc {
-  u32 type  : 8;
-  u32 id    : 8;
-  u32 owner : 8;
-  u32 _     : 8;
+  u32 type  : 8; // sprite type
+  u32 id    : 8; // sprite id
+  u32 owner : 8; // instantiator id
+  u32 coll  : 8; // last collider's id
 };
 
 struct sprite {

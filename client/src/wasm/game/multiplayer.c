@@ -45,7 +45,6 @@ enum serv_pkt_type {
   SPKT_UPDATE,
   SPKT_CREATE,
   SPKT_DESTROY,
-  SPKT_HIT,
   SPKT_DEATH,
   SPKT_WAIT,
   SPKT_MAX
@@ -92,14 +91,14 @@ struct serv_pkt_create {
 
 struct serv_pkt_destroy {
   struct serv_pkt_hdr hdr;
-  u8 sprite_id;
+  struct sprite_desc desc;
 } PACKED;
 
-struct serv_pkt_bye {
+struct serv_pkt_wait {
   struct serv_pkt_hdr hdr;
-  u8 id;
 } PACKED;
-struct serv_pkt_nack {
+
+struct serv_pkt_death {
   struct serv_pkt_hdr hdr;
 } PACKED;
 
@@ -359,7 +358,16 @@ static void serv_destroy_handler(void* buf, u32 len) {
     pkt_size_error("bye", len, sizeof(*pkt));
     return;
   }
-  destroy_sprite(pkt->sprite_id);
+  destroy_sprite(pkt->desc.id);
+  // handle bullet points and damage
+  if (pkt->desc.type == SPRITE_BULLET && pkt->desc.coll != 0) {
+    if (pkt->desc.owner == player_id)
+      // TODO: add player reward
+      puts("player score!");
+    else if (pkt->desc.coll == player_id)
+      // TODO: player damage
+      puts("player hit!");
+  }
 }
 
 static const serv_pkt_handler_t serv_pkt_handlers[SPKT_MAX] = {
@@ -368,7 +376,6 @@ static const serv_pkt_handler_t serv_pkt_handlers[SPKT_MAX] = {
   [SPKT_CREATE]  = serv_create_handler,
   [SPKT_DESTROY] = serv_destroy_handler,
   // FIXME: implement this packet handlers
-  [SPKT_HIT]     = NULL,
   [SPKT_DEATH]   = NULL,
   [SPKT_WAIT]    = NULL,
 };

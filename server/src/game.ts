@@ -161,7 +161,7 @@ export class PlayerSprite extends GameSprite {
   private onSpriteCollision(other: GameSprite) {
     if (other instanceof BulletSprite && other.owner !== this) {
       this.health -= BULLET_DAMAGE;
-      this.game.removeSprite(other);
+      this.game.removeSprite(other, this);
     }
   }
 
@@ -350,8 +350,9 @@ export class Game {
     return this.sprites.filter(sprite => sprite.id === id).pop();
   }
 
+  // NOTE: entity IDs start from 1 and go up to 255
   private nextEntityID(): number {
-    let id = -1;
+    let id = 0;
     const sortedIds = this.sprites
       .flatMap(sprite => sprite.id)
       .sort();
@@ -392,13 +393,13 @@ export class Game {
     }
   }
 
-  public removeSprite(sprite: GameSprite): boolean {
+  public removeSprite(sprite: GameSprite, collider: GameSprite | undefined = undefined): boolean {
     const index = this.sprites.indexOf(sprite);
     if (index < 0) {
       return false;
     }
     this.sprites.splice(index, 1);
-    this.broadcastGroup.send(new DestroyPacket(sprite));
+    this.broadcastGroup.send(new DestroyPacket(sprite, collider));
     return true;
   }
 }

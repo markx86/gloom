@@ -20,11 +20,6 @@ export enum ServerPacketType {
   MAX
 }
 
-function getSpriteDescriptor(sprite: GameSprite): number {
-  const owner = (sprite instanceof BulletSprite) ? sprite.owner.id : 0;
-  return ((owner & 0xff) << 16) | ((sprite.id & 0xff) << 8) | (sprite.type & 0xff);
-}
-
 export abstract class Packet {
   private bytes: Uint8Array;
   private view: DataView;
@@ -56,12 +51,6 @@ export abstract class Packet {
     this.ensureSpace(1);
     this.view.setUint8(this.offset, value);
     this.offset += 1;
-  }
-
-  protected pushU16(value: number) {
-    this.ensureSpace(2);
-    this.view.setUint16(this.offset, value, true);
-    this.offset += 2;
   }
 
   protected pushU32(value: number) {
@@ -99,13 +88,24 @@ export abstract class Packet {
   }
 
   protected pushSpriteInit(sprite: GameSprite) {
-    this.pushU32(getSpriteDescriptor(sprite));
+    this.pushSpriteDescriptor(sprite);
     this.pushSpriteTransform(sprite);
   }
 
   protected pushSpriteUpdate(sprite: GameSprite) {
     this.pushU8(sprite.id);
     this.pushSpriteTransform(sprite);
+  }
+
+  protected pushSpriteDescriptor(sprite: GameSprite, collider: GameSprite | undefined = undefined) {
+    const owner = (sprite instanceof BulletSprite) ? sprite.owner.id : 0;
+    const coll = collider?.id ?? 0;
+    const desc =
+      ((coll & 0xff) << 24)
+      | ((owner & 0xff) << 16)
+      | ((sprite.id & 0xff) << 8)
+      | (sprite.type & 0xff);
+    this.pushU32(desc);
   }
 }
 
@@ -156,8 +156,8 @@ export class CreatePacket extends Packet {
 }
 
 export class DestroyPacket extends Packet {
-  public constructor(sprite: GameSprite) {
-    super(ServerPacketType.DESTROY, 1);
-    this.pushU8(sprite.id);
+  public constructor(sprite: GameSprite, collider: GameSprite | undefined = undefined) {
+    super(ServerPacketType.DESTROY, 4);
+    this.pushSpriteDescriptor(sprite, collider);
   }
 }
