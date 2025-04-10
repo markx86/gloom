@@ -58,13 +58,15 @@ enum sprite_type {
   SPRITE_MAX
 };
 
-struct sprite_it {
-  u16 type : 8;
-  u16 id   : 8;
+struct sprite_desc {
+  u32 type  : 8;
+  u32 id    : 8;
+  u32 owner : 8;
+  u32 _     : 8;
 };
 
 struct sprite {
-  struct sprite_it it;
+  struct sprite_desc desc;
   f32 rot;
   f32 vel;
   vec2f pos;

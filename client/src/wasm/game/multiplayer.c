@@ -71,7 +71,7 @@ struct sprite_transform {
 } PACKED;
 
 struct sprite_init {
-  struct sprite_it it;
+  struct sprite_desc desc;
   struct sprite_transform transform;
 } PACKED;
 
@@ -99,7 +99,6 @@ struct serv_pkt_bye {
   struct serv_pkt_hdr hdr;
   u8 id;
 } PACKED;
-
 struct serv_pkt_nack {
   struct serv_pkt_hdr hdr;
 } PACKED;
@@ -212,11 +211,11 @@ static struct sprite* get_sprite_by_id(u8 id, b8 can_alloc) {
   struct sprite* s;
   u32 i = 0;
   for (i = 0; i < sprites.n; ++i) {
-    if (sprites.s[i].it.id == id)
+    if (sprites.s[i].desc.id == id)
       return sprites.s + i;
   }
   if (can_alloc && (s = alloc_sprite())) {
-    s->it.id = id;
+    s->desc.id = id;
     return s;
   }
   return NULL;
@@ -235,11 +234,11 @@ static void apply_sprite_transform(struct sprite* s,
 
 static void init_sprite(struct sprite_init* init) {
   struct sprite* s;
-  if (init->it.type >= SPRITE_MAX)
+  if (init->desc.type >= SPRITE_MAX)
     return;
-  if ((s = get_sprite_by_id(init->it.id, true))) {
+  if ((s = get_sprite_by_id(init->desc.id, true))) {
     memset(s, 0, sizeof(*s));
-    s->it = init->it;
+    s->desc = init->desc;
     apply_sprite_transform(s, &init->transform);
   }
 }
@@ -294,7 +293,7 @@ static void serv_hello_handler(void* buf, u32 len) {
     for (; n_sprites > 0; --n_sprites) {
       if (len < sizeof(*s))
         break;
-      if (s->it.id != player_id)
+      if (s->desc.id != player_id)
         init_sprite(s);
       else
         // init data refers to the player

@@ -1,4 +1,4 @@
-import { Game, GameSprite } from "./game";
+import { BulletSprite, Game, GameSprite } from "./game";
 
 export enum GamePacketType {
   JOIN,
@@ -20,8 +20,9 @@ export enum ServerPacketType {
   MAX
 }
 
-function getSpriteIT(sprite: GameSprite): number {
-  return ((sprite.id & 0xff) << 8) | (sprite.type & 0xff);
+function getSpriteDescriptor(sprite: GameSprite): number {
+  const owner = (sprite instanceof BulletSprite) ? sprite.owner.id : 0;
+  return ((owner & 0xff) << 16) | ((sprite.id & 0xff) << 8) | (sprite.type & 0xff);
 }
 
 export abstract class Packet {
@@ -98,7 +99,7 @@ export abstract class Packet {
   }
 
   protected pushSpriteInit(sprite: GameSprite) {
-    this.pushU16(getSpriteIT(sprite));
+    this.pushU32(getSpriteDescriptor(sprite));
     this.pushSpriteTransform(sprite);
   }
 
@@ -109,8 +110,10 @@ export abstract class Packet {
 }
 
 const SIZEOF_STRUCT_SPRITE_INIT =
-    1      // color and type
+    1      // type
   + 1      // id
+  + 1      // owner
+  + 1      // unused
   + 4      // rotation
   + 4 * 2  // position
   + 4 * 2; // velocity

@@ -190,30 +190,42 @@ static inline void update_player_position(f32 delta) {
 
 static inline void update_sprites(f32 delta) {
   b8 collided;
-  u32 i;
-  f32 dist_from_player2;
+  u32 i, j;
+  f32 dist_from_other2;
   vec2f diff;
-  struct sprite* s;
+  struct sprite *s, *other;
 
   for (i = 0; i < sprites.n; ++i) {
     s = sprites.s + i;
 
     collided = move_and_collide(&s->pos, &s->dir, s->vel * delta);
     // disable bullet sprites on collision with a wall
-    if (s->it.type == SPRITE_BULLET)
+    if (s->desc.type == SPRITE_BULLET)
       s->disabled = !s->disabled && collided;
 
-    if (s->disabled)
+    // if the sprite is disabled or the sprite is not a player,
+    // do not do collision checks with other sprites.
+    if (s->disabled || s->desc.type != SPRITE_PLAYER)
       continue;
 
-    // since we already need to compute dist_from_player2, might as well
-    // save the diff vector, because we'll also need it during rendering.
-    diff = VEC2SUB(&s->pos, &player.pos);
+    for (j = 0; j < sprites.n; ++j) {
+      other = sprites.s + j;
 
-    // compute the distance from the player and check if the sprite collided
-    dist_from_player2 = VEC2LENGTH2(&diff);
-    if (dist_from_player2 < SPRITE_RADIUS * SPRITE_RADIUS) {
-      // sprite collided with the player
+      if (other->disabled || other == s)
+        continue;
+
+      // since we already need to compute dist_from_player2, might as well
+      // save the diff vector, because we'll also need it during rendering.
+      diff = VEC2SUB(&other->pos, &s->pos);
+
+      // compute the distance from the player and check if the sprite collided
+      dist_from_other2 = VEC2LENGTH2(&diff);
+      if (dist_from_other2 < SPRITE_RADIUS * SPRITE_RADIUS) {
+        if (other->desc.type == SPRITE_BULLET &&
+            other->desc.owner != s->desc.id)
+          // disable the bullet sprite if it collided with a player sprite.
+          other->disabled = true;
+      }
     }
   }
 
@@ -254,7 +266,7 @@ static void draw_column(u8 cell_id, i32 x, const struct hit* hit) {
 }
 
 static inline i32 get_y_end(struct sprite* s, u32 screen_h) {
-  switch (s->it.type) {
+  switch (s->desc.type) {
     case SPRITE_BULLET:
       // we add a little offset to the bullet's vertical height so
       // that it doesn't come out of the player camera
@@ -270,8 +282,8 @@ static void draw_sprite(struct sprite* s) {
   i32 x_start, x_end, y_start, y_end;
   i32 x, y;
 
-  screen_h = (f32)sprite_dims[s->it.type].y * s->inv_depth;
-  color = get_color(sprite_colors[s->it.type]);
+  screen_h = (f32)sprite_dims[s->desc.type].y * s->inv_depth;
+  color = get_color(sprite_colors[s->desc.type]);
 
   // determine screen coordinates of the sprite
   x_start = s->screen_x - s->screen_halfw;
@@ -344,7 +356,7 @@ static inline void render_sprites(void) {
     // compute screen x
     s->screen_x = (FB_WIDTH >> 1) * (1.0f + proj.x / proj.y);
     // compute screen width (we divide by two since we always use the half screen width)
-    s->screen_halfw = (i32)((f32)sprite_dims[s->it.type].x * s->inv_depth) >> 1;
+    s->screen_halfw = (i32)((f32)sprite_dims[s->desc.type].x * s->inv_depth) >> 1;
 
     // sprite is not on screen, ignore it
     if (s->screen_x + s->screen_halfw < 0 || s->screen_x - s->screen_halfw >= FB_WIDTH)
