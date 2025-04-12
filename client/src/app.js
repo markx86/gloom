@@ -15,14 +15,8 @@
   // TODO maybe use 'crisp-edges' instead of 'pixelated' on Firefox
   canvas.style.imageRendering = "pixelated";
 
-  let memory = null;
   let fbView = null;
   let fb = null;
-
-  const url = `ws://${window.location.hostname}:8492`;
-
-  let ws = new WebSocket(url);
-  ws.binaryType = "arraybuffer";
 
   function getPlayerToken() {
     // TODO: fetch this from params or cookie or whatever
@@ -46,9 +40,6 @@
 
   // u32 request_mem(u32 size);
   function request_mem(sz) {
-    if (!memory) {
-      return 0;
-    }
     const pages = (sz + (1 << 16) - 1) >> 16;
     const fbAddress = fbView.byteOffset;
     const fbSize = fbView.byteLength;
@@ -63,9 +54,6 @@
 
   // void register_fb(void* addr, u32 width, u32 height, u32 size);
   function register_fb(addr, width, height, size) {
-    if (!memory) {
-      return;
-    }
     fbView = new Uint8ClampedArray(memory.buffer, addr, size);
     fb = new ImageData(fbView, width, height);
     canvas.width = width;
@@ -103,10 +91,6 @@
 
   // i32 send_packet(void* pkt, u32 len);
   function send_packet(bufptr, len) {
-    if (!memory || !ws) {
-      return -1;
-    }
-
     try {
       ws.send(memory.buffer.slice(bufptr, bufptr + len));
       return len;
@@ -131,7 +115,7 @@
   const obj = await WebAssembly.instantiate(wasmBytes, importObject);
   const instance = obj.instance;
 
-  memory = instance.exports.memory;
+  const memory = instance.exports.memory;
 
   function updateViewportSize() {
     // shamelessly stolen from
@@ -147,6 +131,7 @@
   }
 
   document.addEventListener("pointerlockchange", () => instance.exports.set_pointer_locked(pointerIsLocked()));
+  window.addEventListener("load", updateViewportSize);
   window.addEventListener("resize", updateViewportSize);
   window.addEventListener("keydown", processKeyEvent);
   window.addEventListener("keyup", processKeyEvent);
@@ -164,11 +149,23 @@
     window.requestAnimationFrame(tick);
   }
 
+  function sendHandshake(token) {
+    data = new ArrayBuffer(8);
+    view = new DataView(data);
+    view.setUint32(0, token, true);
+    view.setUint32(4, 0xBADC0FFE, true); // Handshake magic
+    ws.send(data);
+  }
+
   // init game
   function launchGame(online) {
     ws.removeEventListener("error", launchGameOffline);
     ws.removeEventListener("open", launchGameOnline);
-    instance.exports.init(online, getPlayerToken());
+    const token = getPlayerToken()
+    if (online) {
+      sendHandshake(token);
+    }
+    instance.exports.init(online, token);
     window.requestAnimationFrame((timestamp) => {
       updateViewportSize();
       prevTimestamp = timestamp;
@@ -179,6 +176,10 @@
   const launchGameOffline = () => launchGame(false);
   const launchGameOnline = () => launchGame(true);
 
+  const url = `ws://${window.location.hostname}:8492`;
+
+  const ws = new WebSocket(url);
+  ws.binaryType = "arraybuffer";
   ws.addEventListener("message", e => {
     if (e.data instanceof ArrayBuffer) {
       const pkt = new Uint8Array(e.data);

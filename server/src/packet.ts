@@ -14,8 +14,6 @@ export enum ServerPacketType {
   CREATE,
   DESTROY,
   // FIXME: implement this packets
-  HIT,
-  DEATH,
   WAIT,
   MAX
 }
@@ -97,9 +95,9 @@ export abstract class Packet {
     this.pushSpriteTransform(sprite);
   }
 
-  protected pushSpriteDescriptor(sprite: GameSprite, collider: GameSprite | undefined = undefined) {
+  protected pushSpriteDescriptor(sprite: GameSprite, actor: GameSprite | undefined = undefined) {
     const owner = (sprite instanceof BulletSprite) ? sprite.owner.id : 0;
-    const coll = collider?.id ?? 0;
+    const coll = actor?.id ?? 0;
     const desc =
       ((coll & 0xff) << 24)
       | ((owner & 0xff) << 16)
@@ -113,7 +111,7 @@ const SIZEOF_STRUCT_SPRITE_INIT =
     1      // type
   + 1      // id
   + 1      // owner
-  + 1      // unused
+  + 1      // generic field
   + 4      // rotation
   + 4 * 2  // position
   + 4 * 2; // velocity
@@ -156,8 +154,8 @@ export class CreatePacket extends Packet {
 }
 
 export class DestroyPacket extends Packet {
-  public constructor(sprite: GameSprite, collider: GameSprite | undefined = undefined) {
+  public constructor(sprite: GameSprite, actor: GameSprite | undefined = undefined) {
     super(ServerPacketType.DESTROY, 4);
-    this.pushSpriteDescriptor(sprite, collider);
+    this.pushSpriteDescriptor(sprite, actor);
   }
 }

@@ -1,12 +1,16 @@
 #include <client.h>
+#include <globals.h>
 
 // reduced DOF for computing collision rays
 #define COLL_DOF 8
 
-#define CURSOR_SIZE      16
-#define CURSOR_THICKNESS 2
+#define CROSSHAIR_SIZE      16
+#define CROSSHAIR_THICKNESS 2
+
+#define PLAYER_MAX_HEALTH 100
 
 #define BULLET_SCREEN_OFF 128
+#define BULLET_DAMAGE     25
 
 struct player player;
 struct map map;
@@ -46,6 +50,14 @@ const u32 __palette[] = {
 };
 
 f32 z_buf[FB_WIDTH];
+
+void reset_player_health(void) {
+  player.health = PLAYER_MAX_HEALTH;
+}
+
+void damage_player(void) {
+  player.health -= BULLET_DAMAGE;
+}
 
 // NOTE: @new_fov must be in radians
 void set_camera_fov(f32 new_fov) {
@@ -165,6 +177,10 @@ static inline void update_player_position(f32 delta) {
   };
 
   if (map.tiles == NULL)
+    return;
+
+  // a dead man cannot move :^)
+  if (player.health <= 0)
     return;
 
   long_dir = keys.forward - keys.backward;
@@ -343,6 +359,11 @@ static inline void render_sprites(void) {
     if (s->disabled)
       continue;
 
+    // do not render the tracked sprite
+    // FIXME: find a better way to do this maybe?
+    if (s == tracked_sprite)
+      continue;
+
     diff = VEC2SUB(&s->pos, &player.pos);
 
     // compute coordinates in camera space
@@ -407,23 +428,23 @@ static inline u32 invert_color(u32 color) {
   return comps.u | __alpha_mask;
 }
 
-static inline void render_cursor(void) {
+static inline void render_crosshair(void) {
   u32 i, j;
   u32 x, y;
   u32* px;
   b8 draw_x, draw_y;
   vec2u coords = {
-    .x = (FB_WIDTH  - CURSOR_SIZE) >> 1,
-    .y = (FB_HEIGHT - CURSOR_SIZE) >> 1,
+    .x = (FB_WIDTH  - CROSSHAIR_SIZE) >> 1,
+    .y = (FB_HEIGHT - CROSSHAIR_SIZE) >> 1,
   };
 
-#define CURSOR_DRAW_START ((CURSOR_SIZE - CURSOR_THICKNESS) >> 1)
-#define CURSOR_DRAW_END   ((CURSOR_SIZE + CURSOR_THICKNESS) >> 1)
+#define CROSSHAIR_DRAW_START ((CROSSHAIR_SIZE - CROSSHAIR_THICKNESS) >> 1)
+#define CROSSHAIR_DRAW_END   ((CROSSHAIR_SIZE + CROSSHAIR_THICKNESS) >> 1)
 
-  for (i = 0; i < CURSOR_SIZE; ++i) {
-    draw_x = i >= CURSOR_DRAW_START && i < CURSOR_DRAW_END;
-    for (j = 0; j < CURSOR_SIZE; ++j) {
-      draw_y = j >= CURSOR_DRAW_START && j < CURSOR_DRAW_END;
+  for (i = 0; i < CROSSHAIR_SIZE; ++i) {
+    draw_x = i >= CROSSHAIR_DRAW_START && i < CROSSHAIR_DRAW_END;
+    for (j = 0; j < CROSSHAIR_SIZE; ++j) {
+      draw_y = j >= CROSSHAIR_DRAW_START && j < CROSSHAIR_DRAW_END;
       if (draw_x || draw_y) {
         x = coords.x + i;
         y = coords.y + j;
@@ -437,7 +458,7 @@ static inline void render_cursor(void) {
 static inline void render(void) {
   render_scene();
   render_sprites();
-  render_cursor();
+  render_crosshair();
 }
 
 void gloom_tick(f32 delta) {

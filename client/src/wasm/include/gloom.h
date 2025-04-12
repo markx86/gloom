@@ -1,3 +1,6 @@
+#ifndef __GLOOM_H__
+#define __GLOOM_H__
+
 #include <types.h>
 #include <math.h>
 
@@ -10,7 +13,7 @@
 #define CAMERA_FOV 75.0f
 #define CAMERA_DOF 32
 
-#define MAX_SPRITES   256
+#define MAX_SPRITES   255
 #define SPRITE_RADIUS 0.15f
 
 enum color {
@@ -50,6 +53,7 @@ struct player {
   f32 rot;
   vec2f pos;
   vec2f dir;
+  i32 health;
 };
 
 enum sprite_type {
@@ -62,7 +66,7 @@ struct sprite_desc {
   u32 type  : 8; // sprite type
   u32 id    : 8; // sprite id
   u32 owner : 8; // instantiator id
-  u32 coll  : 8; // last collider's id
+  u32 field : 8; // generic field used for extra data in requests
 };
 
 struct sprite {
@@ -144,6 +148,9 @@ static inline struct sprite* alloc_sprite(void) {
 void set_camera_fov(f32 new_fov);
 void set_player_rot(f32 new_rot);
 
+void damage_player(void);
+void reset_player_health(void);
+
 void gloom_tick(f32 delta);
 
 static inline void off_player_rot(f32 delta) {
@@ -154,3 +161,5 @@ static inline void off_player_rot(f32 delta) {
     new_rot += TWO_PI;
   set_player_rot(new_rot);
 }
+
+#endif

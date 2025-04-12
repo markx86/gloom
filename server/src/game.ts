@@ -7,6 +7,7 @@ const MAX_SPRITES = 256;
 const SPRITE_RADIUS = 0.15;
 const PLAYER_RUN_SPEED = 3.5;
 const PLAYER_HEALTH = 100;
+const PLAYER_RELOAD_TIME = 0.25;
 const BULLET_INITIAL_SPEED = 10;
 const BULLET_DAMAGE = 25;
 const COLL_DOF = 8
@@ -148,20 +149,34 @@ export abstract class GameSprite {
   }
 }
 
+export interface PlayerHolder {
+  unsetPlayer(): void;
+}
+
 export class PlayerSprite extends GameSprite {
   private health: number;
+  private reloadTime: number;
+  private holder: PlayerHolder;
 
-  public constructor(game: Game, id: number, x: number, y: number, r: number = 0) {
+  public constructor(holder: PlayerHolder, game: Game, id: number,
+                     x: number, y: number, r: number = 0) {
     super(game, id, GameSpriteType.PLAYER, x, y, 0, r);
+    this.holder = holder;
     this.health = PLAYER_HEALTH;
+    this.reloadTime = 0;
   }
   
   protected onWallCollision() {}
 
   private onSpriteCollision(other: GameSprite) {
     if (other instanceof BulletSprite && other.owner !== this) {
-      this.health -= BULLET_DAMAGE;
       this.game.removeSprite(other, this);
+      this.health -= BULLET_DAMAGE;
+      if (this.health <= 0) {
+        Logger.info("Player %d killed by player %d", this.id, other.owner.id);
+        this.game.removePlayer(this, other.owner);
+        this.holder.unsetPlayer();
+      }
     }
   }
 
@@ -173,6 +188,9 @@ export class PlayerSprite extends GameSprite {
 
   public override tick(delta: number) {
     super.tick(delta);
+    if (this.reloadTime > 0) {
+      this.reloadTime -= delta;
+    }
     this.game.sprites.forEach(other => {
       if (this === other) {
         return;
@@ -181,9 +199,6 @@ export class PlayerSprite extends GameSprite {
         this.onSpriteCollision(other);
       }
     })
-    if (this.health <= 0) {
-      // FIXME: send game over packet and remove the player from the game
-    }
   }
 
   public acknowledgeUpdatePacket(x: number, y: number, rotation: number, keys: number): boolean {
@@ -233,7 +248,10 @@ export class PlayerSprite extends GameSprite {
   }
 
   public fireBullet(): BulletSprite | undefined {
-    return this.game.newBullet(this);
+    if (this.reloadTime <= 0) {
+      this.reloadTime = PLAYER_RELOAD_TIME;
+      return this.game.newBullet(this);
+    }
   }
 
   public getHealth(): number {
@@ -366,12 +384,12 @@ export class Game {
     return id + 1;
   }
 
-  public newPlayer(): PlayerSprite | undefined {
+  public newPlayer(holder: PlayerHolder): PlayerSprite | undefined {
     if (this.numOfPlayers++ >= MAX_PLAYERS) {
       Logger.warning("Max players reached in game %s", this.id.toString(16));
       return undefined;
     }
-    return this.addSprite(new PlayerSprite(this, this.nextEntityID(), 1.5, 1.5));
+    return this.addSprite(new PlayerSprite(holder, this, this.nextEntityID(), 1.5, 1.5));
   }
 
   public newBullet(player: PlayerSprite): BulletSprite | undefined {
@@ -387,19 +405,19 @@ export class Game {
     return sprite;
   }
 
-  public removePlayer(player: PlayerSprite) {
-    if (this.removeSprite(player)) {
+  public removePlayer(player: PlayerSprite, actor: PlayerSprite | undefined = undefined) {
+    if (this.removeSprite(player, actor)) {
       --this.numOfPlayers;
     }
   }
 
-  public removeSprite(sprite: GameSprite, collider: GameSprite | undefined = undefined): boolean {
+  public removeSprite(sprite: GameSprite, actor: GameSprite | undefined = undefined): boolean {
     const index = this.sprites.indexOf(sprite);
     if (index < 0) {
       return false;
     }
     this.sprites.splice(index, 1);
-    this.broadcastGroup.send(new DestroyPacket(sprite, collider));
+    this.broadcastGroup.send(new DestroyPacket(sprite, actor));
     return true;
   }
 }

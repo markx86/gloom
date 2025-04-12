@@ -1,3 +1,6 @@
+#ifndef __MULTIPLAYER_H__
+#define __MULTIPLAYER_H__
+
 #include <types.h>
 #include <libc.h>
 
@@ -17,10 +20,12 @@ b8 is_in_multiplayer_game(void);
 
 enum connection_state get_connection_state(void);
 
-void force_connection_state(enum connection_state state);
+void set_connection_state(enum connection_state state);
 
 b8 join_game(u32 game_id);
 b8 leave_game(void);
 
 void send_update(void);
 void fire_bullet(void);
+
+#endif

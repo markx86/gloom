@@ -18,6 +18,7 @@ enum client_state {
   STATE_PAUSE,
   STATE_OPTIONS,
   STATE_ABOUT,
+  STATE_DEAD,
   STATE_MAX,
 };
 

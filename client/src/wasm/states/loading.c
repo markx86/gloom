@@ -27,7 +27,7 @@ static void on_tick(f32 delta) {
     // the connection state has not changed in the last 10s, assume something
     // went wrong (this is not the cleanest way to do this, but bad design
     // forced my hand!)
-    force_connection_state(CONN_UNKNOWN);
+    set_connection_state(CONN_UNKNOWN);
 
   draw_component(48, FB_HEIGHT - 32 - STRING_HEIGHT, &back_button);
 

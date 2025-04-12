@@ -9,7 +9,7 @@ static void on_back_clicked(void) {
 }
 
 static struct component comps[] = {
-  { .text = "> back", .on_click = on_back_clicked }
+  { .type = UICOMP_BUTTON, .text = "> back", .on_click = on_back_clicked }
 };
 
 static void on_enter(enum client_state prev_state) {

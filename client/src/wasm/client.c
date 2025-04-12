@@ -1,15 +1,8 @@
 #include <client.h>
+#include <globals.h>
 
 u32 fb[FB_WIDTH * FB_HEIGHT];
 b8 pointer_locked = false;
-
-extern const struct state_handlers
-  menu_state,
-  loading_state,
-  game_state,
-  pause_state,
-  options_state,
-  about_state;
 
 static enum client_state state;
 static const struct state_handlers* handlers[STATE_MAX] = {
@@ -18,7 +11,8 @@ static const struct state_handlers* handlers[STATE_MAX] = {
   [STATE_GAME]    = &game_state,
   [STATE_PAUSE]   = &pause_state,
   [STATE_OPTIONS] = &options_state,
-  [STATE_ABOUT]   = &about_state
+  [STATE_ABOUT]   = &about_state,
+  [STATE_DEAD]    = &dead_state
 };
 
 #define HANDLE(name, ...)                           \

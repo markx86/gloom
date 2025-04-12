@@ -1,5 +1,7 @@
 #include <multiplayer.h>
 #include <gloom.h>
+#include <client.h>
+#include <globals.h>
 
 #define PACKED       __attribute__((packed))
 #define WS_PORT      8492
@@ -45,7 +47,6 @@ enum serv_pkt_type {
   SPKT_UPDATE,
   SPKT_CREATE,
   SPKT_DESTROY,
-  SPKT_DEATH,
   SPKT_WAIT,
   SPKT_MAX
 };
@@ -129,7 +130,7 @@ enum connection_state get_connection_state(void) {
   return conn_state;
 }
 
-void force_connection_state(enum connection_state state) {
+void set_connection_state(enum connection_state state) {
   if (conn_state != state) {
     printf("forcing connection state from %d to %d\n", conn_state, state);
     conn_state = state;
@@ -210,8 +211,9 @@ static struct sprite* get_sprite_by_id(u8 id, b8 can_alloc) {
   struct sprite* s;
   u32 i = 0;
   for (i = 0; i < sprites.n; ++i) {
-    if (sprites.s[i].desc.id == id)
-      return sprites.s + i;
+    s = &sprites.s[i];
+    if (s->desc.id == id)
+      return s;
   }
   if (can_alloc && (s = alloc_sprite())) {
     s->desc.id = id;
@@ -317,6 +319,8 @@ static void serv_hello_handler(void* buf, u32 len) {
     }
   }
 
+  reset_player_health();
+  tracked_sprite = NULL;
   conn_state = CONN_UPDATING;
 }
 
@@ -358,15 +362,20 @@ static void serv_destroy_handler(void* buf, u32 len) {
     pkt_size_error("bye", len, sizeof(*pkt));
     return;
   }
+  if (pkt->desc.id == player_id) {
+    switch_to_state(STATE_DEAD);
+    tracked_sprite = get_sprite_by_id(pkt->desc.field, false);
+    return;
+  }
+
   destroy_sprite(pkt->desc.id);
   // handle bullet points and damage
-  if (pkt->desc.type == SPRITE_BULLET && pkt->desc.coll != 0) {
+  if (pkt->desc.type == SPRITE_BULLET && pkt->desc.field != 0) {
     if (pkt->desc.owner == player_id)
       // TODO: add player reward
       puts("player score!");
-    else if (pkt->desc.coll == player_id)
-      // TODO: player damage
-      puts("player hit!");
+    else if (pkt->desc.field == player_id)
+      damage_player();
   }
 }
 
@@ -376,7 +385,6 @@ static const serv_pkt_handler_t serv_pkt_handlers[SPKT_MAX] = {
   [SPKT_CREATE]  = serv_create_handler,
   [SPKT_DESTROY] = serv_destroy_handler,
   // FIXME: implement this packet handlers
-  [SPKT_DEATH]   = NULL,
   [SPKT_WAIT]    = NULL,
 };
 
