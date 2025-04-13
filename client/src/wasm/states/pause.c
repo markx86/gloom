@@ -51,10 +51,10 @@ static void on_enter(enum client_state prev_state) {
 
   // darken the screen by decreasing the alpha channel
   if (is_in_multiplayer_game())
-    set_alpha(0x80);
+    set_alpha(0x7F);
   else {
     for (i = 0; i < FB_LEN; ++i)
-      fb[i] = (fb[i] & 0xFFFFFF) | 0x80000000;
+      fb[i] = (fb[i] & 0xFFFFFF) | 0x7F000000;
     title();
   }
 

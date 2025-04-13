@@ -20,11 +20,11 @@ static struct component back_btn = {
 
 static void on_enter(enum client_state prev_state) {
   UNUSED(prev_state);
-  set_alpha(0x80);
 
   if (pointer_locked)
     pointer_release();
 
+  set_alpha(0x7F);
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
   component_on_enter(&back_btn, 1);
 }
