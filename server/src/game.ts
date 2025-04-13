@@ -11,6 +11,7 @@ const PLAYER_RELOAD_TIME = 0.25;
 const BULLET_INITIAL_SPEED = 10;
 const BULLET_DAMAGE = 25;
 const COLL_DOF = 8
+const POS_DIFF_THRESHOLD = 0.5;
 
 enum GameSpriteType {
   PLAYER,
@@ -91,7 +92,7 @@ export abstract class GameSprite {
 
   protected abstract onWallCollision(): void;
 
-  public tick(delta: number) {
+  protected moveAndCollide(delta: number, x: number = this.x, y: number = this.y): readonly [boolean, number, number] {
     const space = this.velocity * delta;
 
     const signDirX = (this.dirX < 0) ? -1 : +1;
@@ -103,7 +104,7 @@ export abstract class GameSprite {
     let collided = false;
 
     const vDistMax = traceRay(
-      this.x, this.y,
+      x, y,
       0, signDirY,
       this.game.map);
     if (vDistMax < vDist + SPRITE_RADIUS) {
@@ -112,7 +113,7 @@ export abstract class GameSprite {
     }
 
     const hDistMax = traceRay(
-      this.x, this.y,
+      x, y,
       signDirX, 0,
       this.game.map);
     if (hDistMax < hDist + SPRITE_RADIUS) {
@@ -120,9 +121,16 @@ export abstract class GameSprite {
       collided = true;
     }
 
-    this.x += signDirX * hDist;
-    this.y += signDirY * vDist;
+    x += signDirX * hDist;
+    y += signDirY * vDist;
+    
+    return [collided, x, y];
+  }
 
+  public tick(delta: number) {
+    const [collided, newX, newY] = this.moveAndCollide(delta);
+    this.x = newX;
+    this.y = newY;
     if (collided === true) {
       this.onWallCollision();
     }
@@ -165,7 +173,7 @@ export class PlayerSprite extends GameSprite {
     this.health = PLAYER_HEALTH;
     this.reloadTime = 0;
   }
-  
+
   protected onWallCollision() {}
 
   private onSpriteCollision(other: GameSprite) {
@@ -201,33 +209,19 @@ export class PlayerSprite extends GameSprite {
     })
   }
 
-  public acknowledgeUpdatePacket(x: number, y: number, rotation: number, keys: number): boolean {
-    const dist = Math.pow(x - this.x, 2) + Math.pow(y - this.y, 2);
-    if (dist > 0.25) {
-      // the player has moved way too much between updates
-      return false;
-    }
+  public acknowledgeUpdatePacket(ts: number, x: number, y: number, rotation: number, keys: number): boolean {
+    const delta = this.game.getTime() - ts;
+
+    const [_, predictedX, predictedY] = this.moveAndCollide(delta, x, y);
+    const dist = Math.sqrt(Math.pow(predictedX - this.x, 2) + Math.pow(predictedY - this.y, 2));
+    Logger.info("Distance from prediction: %d", dist)
+    const ack = dist <= POS_DIFF_THRESHOLD;
 
     // FIXME: limit angle between updates
-    /*
-    let minTheta = Math.min(this.r, rot) / Math.PI;
-    let maxTheta = Math.max(this.r, rot) / Math.PI;
-    if (maxTheta - minTheta > 1.0) {
-      maxTheta -= 1.0;
-    }
-    if (maxTheta - minTheta > 0.25) {
-      // The player has rotate too much between updates
-      return false;
-    }
-    */
-    this.rotation = rotation;
-
-    this.x = x;
-    this.y = y;
-
-    const longDir = ((keys & 0x00ff) !== 0 ? 1 : 0) - ((keys & 0xff00) !== 0 ? 1 : 0);
+  
+    const longDir = ((keys & 0x00FF) !== 0 ? 1 : 0) - ((keys & 0xFF00) !== 0 ? 1 : 0);
     keys >>= 16;
-    const sideDir = ((keys & 0x00ff) !== 0 ? 1 : 0) - ((keys & 0xff00) !== 0 ? 1 : 0);
+    const sideDir = ((keys & 0x00FF) !== 0 ? 1 : 0) - ((keys & 0xFF00) !== 0 ? 1 : 0);
 
     const longDirX = Math.cos(rotation);
     const longDirY = Math.sin(rotation);
@@ -244,7 +238,15 @@ export class PlayerSprite extends GameSprite {
     }
     this.velocity = (longDir !== 0 || sideDir !== 0) ? PLAYER_RUN_SPEED : 0;
 
-    return true;
+    if (ack) {
+      this.x = x;
+      this.y = y;
+      this.rotation = rotation;
+    }
+
+    super.tick(delta);
+
+    return ack;
   }
 
   public fireBullet(): BulletSprite | undefined {
@@ -332,6 +334,8 @@ export class Game {
   readonly sprites: Array<GameSprite>;
   readonly broadcastGroup: BroadcastGroup;
   private numOfPlayers: number;
+  private time: number;
+  private deadSprites: Set<number>;
 
   private static games = new Map<number, Game>();
 
@@ -339,7 +343,9 @@ export class Game {
     this.id = id;
     this.map = map;
     this.sprites = new Array<GameSprite>();
+    this.deadSprites = new Set<number>();
     this.numOfPlayers = 0;
+    this.time = 0;
     this.broadcastGroup = BroadcastGroup.get(id);
   }
 
@@ -361,7 +367,10 @@ export class Game {
   }
 
   private tick(delta: number) {
+    this.time += delta;
+    // Logger.info("Game time: %d (delta %d)", this.time, delta);
     this.sprites.forEach(sprite => sprite.tick(delta)); // tick the game world
+    this.cleanupSprites();
   }
 
   public getSpriteByID(id: number): GameSprite | undefined {
@@ -405,6 +414,11 @@ export class Game {
     return sprite;
   }
 
+  private cleanupSprites() {
+    this.deadSprites.forEach(spriteIndex => this.sprites.splice(spriteIndex, 1));
+    this.deadSprites.clear();
+  }
+
   public removePlayer(player: PlayerSprite, actor: PlayerSprite | undefined = undefined) {
     if (this.removeSprite(player, actor)) {
       --this.numOfPlayers;
@@ -416,8 +430,12 @@ export class Game {
     if (index < 0) {
       return false;
     }
-    this.sprites.splice(index, 1);
+    this.deadSprites.add(index);
     this.broadcastGroup.send(new DestroyPacket(sprite, actor));
     return true;
+  }
+
+  public getTime(): number {
+    return this.time;
   }
 }

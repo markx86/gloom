@@ -18,7 +18,44 @@ export enum ServerPacketType {
   MAX
 }
 
-export abstract class Packet {
+export class GamePacket {
+  private offset: number;
+  private view: DataView;
+
+  public constructor(data: ArrayBuffer) {
+    this.offset = 0;
+    this.view = new DataView(data);
+  }
+
+  private ensureData(size: number) {
+    if (this.offset + size > this.view.byteLength) {
+      throw new Error("Out of bounds in packet");
+    }
+  }
+
+  public popF32(): number {
+    this.ensureData(4);
+    const value = this.view.getFloat32(this.offset, true);
+    this.offset += 4;
+    return value;
+  }
+
+  public popU32(): number {
+    this.ensureData(4);
+    const value = this.view.getUint32(this.offset, true);
+    this.offset += 4;
+    return value;
+  }
+
+  public popU8(): number {
+    this.ensureData(1);
+    const value = this.view.getUint8(this.offset);
+    this.offset += 1;
+    return value;
+  }
+}
+
+export abstract class ServerPacket {
   private bytes: Uint8Array;
   private view: DataView;
   private offset: number;
@@ -121,39 +158,41 @@ const SIZEOF_STRUCT_SPRITE_UPDATE =
   + 4 * 2  // position
   + 4 * 2; // velocity
 
-export class HelloPacket extends Packet {
+export class HelloPacket extends ServerPacket {
   // NOTE: spriteId must be *LESS* than 256
   public constructor(playerId: number, game: Game) {
     const size =
         1                                                // number of sprites
       + 1                                                // this sprite id
+      + 4                                                // game timer
       + 4 * 2                                            // map size (width and height)
       + game.map.getSizeInBytes()                        // size of map data
       + game.sprites.length * SIZEOF_STRUCT_SPRITE_INIT; // size of sprite data
     super(ServerPacketType.HELLO, size)
     this.pushU8(game.sprites.length);
     this.pushU8(playerId);
+    this.pushF32(game.getTime());
     this.pushVec2U(game.map.width, game.map.height);
     game.sprites.forEach(sprite => this.pushSpriteInit(sprite));
     this.pushBytes(game.map.getCompressedData());
   }
 }
 
-export class UpdatePacket extends Packet {
+export class UpdatePacket extends ServerPacket {
   public constructor(sprite: GameSprite) {
     super(ServerPacketType.UPDATE, SIZEOF_STRUCT_SPRITE_UPDATE)
     this.pushSpriteUpdate(sprite);
   }
 }
 
-export class CreatePacket extends Packet {
+export class CreatePacket extends ServerPacket {
   public constructor(sprite: GameSprite) {
       super(ServerPacketType.CREATE, SIZEOF_STRUCT_SPRITE_INIT);
       this.pushSpriteInit(sprite);
   }
 }
 
-export class DestroyPacket extends Packet {
+export class DestroyPacket extends ServerPacket {
   public constructor(sprite: GameSprite, actor: GameSprite | undefined = undefined) {
     super(ServerPacketType.DESTROY, 4);
     this.pushSpriteDescriptor(sprite, actor);

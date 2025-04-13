@@ -33,6 +33,7 @@ struct game_pkt_leave {
 
 struct game_pkt_update {
   struct game_pkt_hdr hdr;
+  f32 ts;
   vec2f pos;
   f32 rot;
   u32 keys;
@@ -60,6 +61,7 @@ struct serv_pkt_hello {
   struct serv_pkt_hdr hdr;
   u8 n_sprites;
   u8 player_id;
+  f32 game_timer;
   u32 map_w, map_h;
   u8 data[0];
 } PACKED;
@@ -183,6 +185,7 @@ void send_update(void) {
   if (conn_state != CONN_UPDATING)
     return;
   init_game_pkt(&pkt, GPKT_UPDATE);
+  pkt.ts = game_time;
   pkt.pos = player.pos;
   pkt.rot = player.rot;
   pkt.keys = keys.all_keys;
@@ -235,6 +238,7 @@ static void apply_sprite_transform(struct sprite* s,
 
 static void init_sprite(struct sprite_init* init) {
   struct sprite* s;
+  printf("initializing sprite: %u\n", init->desc.id);
   if (init->desc.type >= SPRITE_MAX)
     return;
   if ((s = get_sprite_by_id(init->desc.id, true))) {
@@ -285,6 +289,7 @@ static void serv_hello_handler(void* buf, u32 len) {
   map.tiles = malloc(map_size);
 
   player_id = pkt->player_id;
+  game_time = pkt->game_timer;
 
   s = (struct sprite_init*)pkt->data;
   m = pkt->data + sizeof(*s) * n_sprites;
@@ -319,8 +324,6 @@ static void serv_hello_handler(void* buf, u32 len) {
     }
   }
 
-  reset_player_health();
-  tracked_sprite = NULL;
   conn_state = CONN_UPDATING;
 }
 

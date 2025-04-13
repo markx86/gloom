@@ -1,32 +1,32 @@
 import Logger from "./logger";
 import { WebSocket } from "ws";
 import { Game, PlayerHolder, PlayerSprite } from "./game";
-import { GamePacketType, Packet, HelloPacket, UpdatePacket, DestroyPacket } from "./packet";
+import { GamePacketType, ServerPacket, HelloPacket, UpdatePacket, DestroyPacket, GamePacket } from "./packet";
 import { Peer } from "./broadcast";
 
 const MAX_PACKET_DROP = 10;
 
 export class Client extends Peer implements PlayerHolder {
   readonly token: number;
-  private player: PlayerSprite | undefined;
+  private player: PlayerSprite | null;
   private ws: WebSocket;
   private clientSequence: number;
   private serverSequence: number;
 
   public unsetPlayer(): void {
-    this.player = undefined;
+    this.player = null;
   }
 
-  public sendPacket(pkt: Packet) {
+  public sendPacket(pkt: ServerPacket) {
     const seq = this.serverSequence++;
     this.ws.send(pkt.getRaw(seq));
   }
 
-  private handlePacket(type: GamePacketType, sequence: number, playerToken: number, view: DataView) {
+  private checkPacket(type: GamePacketType, sequence: number, playerToken: number): boolean {
     if (type >= GamePacketType.MAX) {
       // invalid packet type
       Logger.error("Invalid client packet type");
-      return;
+      return false;
     }
 
     if (sequence >= this.clientSequence && sequence - this.clientSequence < MAX_PACKET_DROP) {
@@ -34,94 +34,104 @@ export class Client extends Peer implements PlayerHolder {
     } else {
       // invalid packet sequence
       Logger.error("Expected sequence number %d, got %d", this.clientSequence, sequence);
-      return;
+      return false;
     }
 
     if (this.token !== playerToken) {
       Logger.error("Invalid player token! Got %s expected %s", playerToken.toString(16), this.token?.toString(16));
-      return;
-    } else if (type !== GamePacketType.JOIN && !this.player) {
+      return false;
+    } else if (type !== GamePacketType.JOIN && !this.inBroadcastGroup()) {
       Logger.error("Player is not in any game!");
+      return false;
+    }
+    
+    return true;
+  }
+
+  private handleJoinPacket(packet: GamePacket) {
+    if (this.player) {
+      Logger.error("Player sent hello packet, after it had already sent one!");
+      return;
+    }
+
+    const gameId = packet.popU32();
+    Logger.info("Got request to join game with ID: %s", gameId.toString(16));
+
+    const game = Game.getByID(gameId);
+    if (!game) {
+      return;
+    }
+
+    const player = game.newPlayer(this);
+    if (!player) {
+      return;
+    }
+
+    this.player = player;
+
+    Logger.info("Client (%s) joined game (%s) with ID %d", this.token.toString(16), this.player.game.id.toString(16), this.player.id);
+
+    this.registerToBroadcastGroup(game.id);
+    this.sendPacket(new HelloPacket(this.player.id, game));
+  }
+
+  private handleLeavePacket(_packet: GamePacket) {
+    Logger.info("Got request to leave game");
+    if (!this.inBroadcastGroup()) {
+      // NOTE: unreachable
+      return;
+    }
+
+    this.removeFromBroadcastGroup();
+    this.player?.game.removePlayer(this.player);
+    this.unsetPlayer();
+  }
+
+  private handleUpdatePacket(packet: GamePacket) {
+    Logger.info("Got update packet");
+    if (!this.player) {
+      // NOTE: unreachable
+      return;
+    }
+
+    const ts = packet.popF32();
+    const x = packet.popF32();
+    const y = packet.popF32();
+    const rot = packet.popF32();
+    const keys = packet.popU32();
+    Logger.info("pos = (%f, %f), rot = %f, keys = %s", x, y, rot, keys.toString(16));
+
+    const includeSelf = !this.player.acknowledgeUpdatePacket(ts, x, y, rot, keys);
+    if (includeSelf) {
+      Logger.warning("Update packet not acknowledged");
+    }
+
+    this.broadcastPacket(
+      new UpdatePacket(this.player),
+      includeSelf
+    );
+  }
+
+  private handleFirePacket(_packet: GamePacket) {
+    Logger.info("Got fire packet");
+    if (!this.player) {
+      // NOTE: unreachable
+      return;
+    }
+
+    this.player.fireBullet();
+  }
+
+  private handlePacket(type: GamePacketType, sequence: number, playerToken: number, packet: GamePacket) {
+    if (!this.checkPacket(type, sequence, playerToken)) {
       return;
     }
 
     switch (type) {
-      case GamePacketType.JOIN: {
-        if (this.player) {
-          Logger.error("Player sent hello packet, after it had already sent one!");
-          return;
-        }
-        if (sequence != 0) {
-          Logger.warning("Sequence number for player %s's JOIN packet is not 0", playerToken.toString(16));
-        }
-
-        const gameId = view.getUint32(8, true);
-        Logger.info("Got request to join game with ID: %s", gameId.toString(16));
-
-        const game = Game.getByID(gameId);
-        if (!game) {
-          return;
-        }
-
-        const player = game.newPlayer(this);
-        if (!player) {
-          return;
-        }
-
-        this.player = player;
-
-        Logger.info("Client (%s) joined game (%s) with ID %d", this.token.toString(16), this.player.game.id.toString(16), this.player.id);
-
-        this.registerToBroadcastGroup(game.id);
-        this.sendPacket(new HelloPacket(this.player.id, game));
-        break;
-      }
-  
-      case GamePacketType.LEAVE: {
-        Logger.info("Got request to leave game");
-        if (!this.player) {
-          // NOTE: unreachable
-          break;
-        }
-
-        this.removeFromBroadcastGroup();
-        this.player.game.removeSprite(this.player);
-        this.player = undefined;
-        break;
-      }
-  
-      case GamePacketType.UPDATE: {
-        Logger.info("Got update packet");
-        if (!this.player) {
-          // NOTE: unreachable
-          break;
-        }
-
-        const x = view.getFloat32(8, true);
-        const y = view.getFloat32(12, true);
-        const rot = view.getFloat32(16, true);
-        const keys = view.getUint32(20, true);
-        Logger.info("pos = (%f, %f), rot = %f, keys = %s", x, y, rot, keys.toString(16));
-
-        const includeSelf = !this.player.acknowledgeUpdatePacket(x, y, rot, keys);
-
-        this.broadcastPacket(
-          new UpdatePacket(this.player),
-          includeSelf
-        );
-        break;
-      }
-
-      case GamePacketType.FIRE: {
-        Logger.info("Got fire packet");
-        if (!this.player) {
-          // NOTE: unreachable
-          break;
-        }
-
-        this.player.fireBullet();
-        break;
-      }
+      case GamePacketType.JOIN:   { this.handleJoinPacket(packet); break; }
+      case GamePacketType.LEAVE:  { this.handleLeavePacket(packet); break; }
+      case GamePacketType.UPDATE: { this.handleUpdatePacket(packet); break; }
+      case GamePacketType.FIRE:   { this.handleFirePacket(packet); break; }
     }
   }
 
@@ -130,6 +140,7 @@ export class Client extends Peer implements PlayerHolder {
 
     this.ws = ws;
     this.token = token;
+    this.player = null;
     this.serverSequence = this.clientSequence = 0;
 
     this.ws.on("error", Logger.error);
@@ -153,19 +164,19 @@ export class Client extends Peer implements PlayerHolder {
       if (!isBinary || !(data instanceof Buffer)) {
         return;
       }
-      const view = new DataView(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+      const packet = new GamePacket(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
       
-      const typeAndSeq = view.getUint32(0, true);
+      const typeAndSeq = packet.popU32();
       const type = (typeAndSeq >> 30) & 3;
       const sequence = (typeAndSeq & 0x3FFFFFFF);
 
-      const playerToken = view.getUint32(4, true);
+      const playerToken = packet.popU32();
       
       Logger.info("Packet type: %s", type.toString(16));
       Logger.info("Sequence number: %s", sequence);
       Logger.info("Player token: %s", playerToken.toString(16));
 
-      this.handlePacket(type, sequence, playerToken, view);
+      this.handlePacket(type, sequence, playerToken, packet);
     });
   }
 }

@@ -117,6 +117,7 @@ extern struct camera camera;
 extern struct sprites sprites;
 extern struct map map;
 extern union keys keys;
+extern f32 game_time;
 extern f32 z_buf[FB_WIDTH];
 extern u32 fb[FB_WIDTH * FB_HEIGHT];
 
@@ -149,7 +150,6 @@ void set_camera_fov(f32 new_fov);
 void set_player_rot(f32 new_rot);
 
 void damage_player(void);
-void reset_player_health(void);
 
 void gloom_init(f32 camera_fov, u32 camera_dof);
 void gloom_tick(f32 delta);

@@ -1,7 +1,7 @@
-import { Packet } from "./packet"
+import { ServerPacket } from "./packet"
 
 export abstract class Peer {
-  private broadcastGroup: BroadcastGroup | undefined;
+  private broadcastGroup: BroadcastGroup | null;
 
   protected registerToBroadcastGroup(gameId: number) {
     this.broadcastGroup = BroadcastGroup.get(gameId);
@@ -10,15 +10,19 @@ export abstract class Peer {
 
   protected removeFromBroadcastGroup() {
     if (this.broadcastGroup?.remove(this)) {
-      this.broadcastGroup = undefined;
+      this.broadcastGroup = null;
     }
   }
 
-  protected broadcastPacket(packet: Packet, includeSelf: boolean = false) {
-    this.broadcastGroup?.send(packet, includeSelf ? undefined : this);
+  protected broadcastPacket(packet: ServerPacket, includeSelf: boolean = false) {
+    this.broadcastGroup?.send(packet, includeSelf ? null : this);
   }
 
-  public abstract sendPacket(pkt: Packet): void;
+  protected inBroadcastGroup(): boolean {
+    return this.broadcastGroup != null;
+  }
+
+  public abstract sendPacket(pkt: ServerPacket): void;
 }
 
 export class BroadcastGroup {
@@ -43,7 +47,7 @@ export class BroadcastGroup {
     return true;
   }
 
-  public send(pkt: Packet, self: Peer | undefined = undefined) {
+  public send(pkt: ServerPacket, self: Peer | null = null) {
     this.peers.forEach(socket => {
       if (self !== socket) {
         socket.sendPacket(pkt);

@@ -30,6 +30,7 @@ static const u8 sprite_colors[] = {
 };
 
 u32 __alpha_mask;
+f32 game_time;
 
 const u32 __palette[] = {
   [COLOR_BLACK]       = 0x000000,
@@ -484,6 +485,7 @@ void gloom_init(f32 camera_fov, u32 camera_dof) {
 }
 
 void gloom_tick(f32 delta) {
+  game_time += delta;
   update(delta);
   render();
 }

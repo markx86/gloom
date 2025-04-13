@@ -52,4 +52,4 @@ setInterval(() => {
   const delta = (newTimestamp - timestamp) / 1000.0;
   Game.tickAll(delta);
   timestamp = newTimestamp;
-}, 1000 / 100);
+}, 1000 / 60);
