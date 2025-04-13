@@ -151,6 +151,7 @@ void set_player_rot(f32 new_rot);
 void damage_player(void);
 void reset_player_health(void);
 
+void gloom_init(f32 camera_fov, u32 camera_dof);
 void gloom_tick(f32 delta);
 
 static inline void off_player_rot(f32 delta) {

@@ -460,6 +460,12 @@ static inline void render(void) {
   render_scene();
   render_sprites();
   render_crosshair();
+void gloom_init(f32 camera_fov, u32 camera_dof) {
+  set_alpha(0xFF);
+  set_camera_fov(camera_fov);
+  set_player_rot(0);
+  camera.dof = camera_dof;
+  player.health = PLAYER_MAX_HEALTH;
 }
 
 void gloom_tick(f32 delta) {
