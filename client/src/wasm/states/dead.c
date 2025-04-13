@@ -7,7 +7,8 @@
 struct sprite* tracked_sprite;
 
 static void on_back_clicked(void) {
-  set_connection_state(is_disconnected() ? CONN_DISCONNECTED : CONN_CONNECTED);
+  leave_game();
+  tracked_sprite = NULL;
   switch_to_state(STATE_MENU);
 }
 
