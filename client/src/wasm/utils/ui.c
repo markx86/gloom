@@ -162,6 +162,10 @@ void draw_string(u32 x, u32 y, const char* text) {
   write_text_with_color(&x, &y, 1, __fg_color, text);
 }
 
+void draw_string_with_color(u32 x, u32 y, const char* text, u32 color) {
+  write_text_with_color(&x, &y, 1, color, text);
+}
+
 void draw_title(u32 x, u32 y, const char* text) {
   char pad[32];
   u32 end, xx;

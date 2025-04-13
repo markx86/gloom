@@ -456,10 +456,25 @@ static inline void render_crosshair(void) {
   }
 }
 
+static inline void render_hud(void) {
+  u32 health_bar_w, health_bar_c;
+  const char health_lbl[] = "H";
+
+  health_bar_w = ((f32)player.health / PLAYER_MAX_HEALTH) * 64.0f;
+  health_bar_c = COLOR(RED);
+  draw_string_with_color(8, 8, health_lbl, health_bar_c);
+  draw_rect(8 + STRING_WIDTH_IMM(health_lbl) + 4, 8,
+            health_bar_w, STRING_HEIGHT - 1,
+            health_bar_c);
+}
+
 static inline void render(void) {
   render_scene();
   render_sprites();
   render_crosshair();
+  render_hud();
+}
+
 void gloom_init(f32 camera_fov, u32 camera_dof) {
   set_alpha(0xFF);
   set_camera_fov(camera_fov);

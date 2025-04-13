@@ -30,11 +30,10 @@ static void title(void) {
 static void on_tick(f32 delta) {
   u32 i;
 
-  if (is_in_multiplayer_game()) {
+  if (is_in_multiplayer_game())
     gloom_tick(delta);
-    title();
-  }
 
+  title();
   for (i = 0; i < ARRLEN(buttons); ++i)
     draw_component(48, 32 + TITLE_HEIGHT + 24 * i, buttons + i);
 }

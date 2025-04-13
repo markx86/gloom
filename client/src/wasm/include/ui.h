@@ -56,6 +56,7 @@ void draw_rect(u32 x, u32 y, u32 w, u32 h, u32 color);
 void draw_component(u32 x, u32 y, struct component* b);
 void draw_title(u32 x, u32 y, const char* text);
 void draw_string(u32 x, u32 y, const char* text);
+void draw_string_with_color(u32 x, u32 y, const char* text, u32 color);
 
 static inline void clear_screen_with_color(u32 color) {
   u32 i;
