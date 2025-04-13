@@ -1,5 +1,6 @@
-#include <client.h>
+#include <gloom.h>
 #include <globals.h>
+#include <ui.h>
 
 // reduced DOF for computing collision rays
 #define COLL_DOF 8
@@ -14,9 +15,9 @@
 
 struct player player;
 struct map map;
-union keys keys;
 struct sprites sprites;
 struct camera camera;
+union keys keys;
 
 static const vec2i sprite_dims[] = {
   [SPRITE_PLAYER] = { .x = PLAYER_SPRITE_W, .y = PLAYER_SPRITE_H },
@@ -32,21 +33,21 @@ u32 __alpha_mask;
 
 const u32 __palette[] = {
   [COLOR_BLACK]       = 0x000000,
-  [COLOR_GRAY]        = 0x7e7e7e,
-  [COLOR_LIGHTGRAY]   = 0xbebebe,
-  [COLOR_WHITE]       = 0xffffff,
-  [COLOR_DARKRED]     = 0x00007e,
-  [COLOR_RED]         = 0x0000fe,
-  [COLOR_DARKGREEN]   = 0x007e04,
-  [COLOR_GREEN]       = 0x04ff06,
-  [COLOR_DARKYELLOW]  = 0x007e7e,
-  [COLOR_YELLOW]      = 0x04ffff,
-  [COLOR_DARKBLUE]    = 0x7e0000,
-  [COLOR_BLUE]        = 0xff0000,
-  [COLOR_DARKMAGENTA] = 0x7e007e,
-  [COLOR_MAGENTA]     = 0xff00fe,
-  [COLOR_DARKCYAN]    = 0x7e7e04,
-  [COLOR_CYAN]        = 0xffff06,
+  [COLOR_GRAY]        = 0x7E7E7E,
+  [COLOR_LIGHTGRAY]   = 0xBEBEBE,
+  [COLOR_WHITE]       = 0xFFFFFF,
+  [COLOR_DARKRED]     = 0x00007E,
+  [COLOR_RED]         = 0x0000FE,
+  [COLOR_DARKGREEN]   = 0x007E04,
+  [COLOR_GREEN]       = 0x04FF06,
+  [COLOR_DARKYELLOW]  = 0x007E7E,
+  [COLOR_YELLOW]      = 0x04FFFF,
+  [COLOR_DARKBLUE]    = 0x7E0000,
+  [COLOR_BLUE]        = 0xFF0000,
+  [COLOR_DARKMAGENTA] = 0x7E007E,
+  [COLOR_MAGENTA]     = 0xFF00FE,
+  [COLOR_DARKCYAN]    = 0x7E7E04,
+  [COLOR_CYAN]        = 0xFFFF06,
 };
 
 f32 z_buf[FB_WIDTH];
@@ -264,7 +265,7 @@ static void draw_column(u8 cell_id, i32 x, const struct hit* hit) {
 
   // draw column
   if (cell_id) {
-    line_color = hit->vertical ? color(WHITE) : color(LIGHTGRAY);
+    line_color = hit->vertical ? COLOR(WHITE) : COLOR(LIGHTGRAY);
 
     line_height = FB_HEIGHT / hit->dist;
     if ((u32)line_height > FB_HEIGHT)
@@ -276,14 +277,14 @@ static void draw_column(u8 cell_id, i32 x, const struct hit* hit) {
   // fill column
   y = 0;
   for (; y < line_y; ++y)
-    fb[x + y * FB_WIDTH] = color(BLUE);
+    fb[x + y * FB_WIDTH] = COLOR(BLUE);
   if (cell_id) {
     line_y += line_height;
     for (; y < line_y; ++y)
       fb[x + y * FB_WIDTH] = line_color;
   }
   for (; y < FB_HEIGHT; ++y)
-    fb[x + y * FB_WIDTH] = color(BLACK);
+    fb[x + y * FB_WIDTH] = COLOR(BLACK);
 }
 
 static inline i32 get_y_end(struct sprite* s, u32 screen_h) {
@@ -420,9 +421,9 @@ static inline u32 invert_color(u32 color) {
 
   comps.u = color;
 
-  comps.r = 0xff - comps.r;
-  comps.g = 0xff - comps.g;
-  comps.b = 0xff - comps.b;
+  comps.r = 0xFF - comps.r;
+  comps.g = 0xFF - comps.g;
+  comps.b = 0xFF - comps.b;
   comps.a = 0;
 
   return comps.u | __alpha_mask;

@@ -1,8 +1,8 @@
 #include <client.h>
 #include <ui.h>
 
-#define FOREGROUND_COLOR solid_color(LIGHTGRAY)
-#define BACKGROUND_COLOR solid_color(BLACK)
+#define FOREGROUND_COLOR SOLIDCOLOR(LIGHTGRAY)
+#define BACKGROUND_COLOR SOLIDCOLOR(BLACK)
 
 static void on_play_clicked(void) { switch_to_state(STATE_LOADING); }
 static void on_options_clicked(void) { switch_to_state(STATE_OPTIONS); }
@@ -30,7 +30,7 @@ static void on_enter(enum client_state prev_state) {
   if (pointer_locked)
     pointer_release();
 
-  set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
+  ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
   clear_screen();
   draw_title(32, 32, "gloom");
   component_on_enter(comps, ARRLEN(comps));

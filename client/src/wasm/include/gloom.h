@@ -36,8 +36,8 @@ enum color {
   COLOR_MAX
 };
 
-#define color(x)       get_color(COLOR_##x)
-#define solid_color(x) get_solid_color(COLOR_##x)
+#define COLOR(x)       get_color(COLOR_##x)
+#define SOLIDCOLOR(x)  get_solid_color(COLOR_##x)
 
 struct camera {
   u32 dof;

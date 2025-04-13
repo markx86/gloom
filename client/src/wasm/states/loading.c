@@ -1,9 +1,9 @@
 #include <client.h>
 #include <ui.h>
 
-#define FOREGROUND_COLOR solid_color(LIGHTGRAY)
-#define BACKGROUND_COLOR solid_color(BLACK)
-#define ERROR_COLOR      solid_color(RED)
+#define FOREGROUND_COLOR SOLIDCOLOR(LIGHTGRAY)
+#define BACKGROUND_COLOR SOLIDCOLOR(BLACK)
+#define ERROR_COLOR      SOLIDCOLOR(RED)
 
 static void on_back_clicked(void) { switch_to_state(STATE_MENU); }
 
@@ -58,9 +58,9 @@ static void on_tick(f32 delta) {
     // invalid state, display error
     case CONN_UNKNOWN:
     case CONN_DISCONNECTED:
-      set_colors(ERROR_COLOR, BACKGROUND_COLOR);
+      ui_set_colors(ERROR_COLOR, BACKGROUND_COLOR);
       add_message("> an error has occurred");
-      set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
+      ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
       break;
   }
 }
@@ -78,7 +78,7 @@ static void on_enter(enum client_state prev_state) {
   time_in_state = 0.0f;
   message_y = 32 + TITLE_HEIGHT;
 
-  set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
+  ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
   clear_screen();
   draw_title(32, 32, "loading");
   component_on_enter(&back_button, 1);

@@ -1,8 +1,8 @@
 #include <client.h>
 #include <ui.h>
 
-#define FOREGROUND_COLOR solid_color(WHITE)
-#define BACKGROUND_COLOR solid_color(RED)
+#define FOREGROUND_COLOR SOLIDCOLOR(WHITE)
+#define BACKGROUND_COLOR SOLIDCOLOR(RED)
 
 struct sprite* tracked_sprite;
 
@@ -20,7 +20,7 @@ static struct component back_btn = {
 static void on_enter(enum client_state prev_state) {
   UNUSED(prev_state);
   set_alpha(0x80);
-  set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
+  ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
   component_on_enter(&back_btn, 1);
 }
 

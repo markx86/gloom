@@ -1,8 +1,8 @@
 #include <client.h>
 #include <ui.h>
 
-#define FOREGROUND_COLOR solid_color(YELLOW)
-#define BACKGROUND_COLOR solid_color(BLUE)
+#define FOREGROUND_COLOR SOLIDCOLOR(YELLOW)
+#define BACKGROUND_COLOR SOLIDCOLOR(BLUE)
 
 static enum client_state back_state;
 
@@ -26,7 +26,7 @@ static void on_enter(enum client_state prev_state) {
   u32 i;
   struct component* c;
 
-  set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
+  ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
 
   clear_screen();
 

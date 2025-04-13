@@ -1,8 +1,8 @@
 #include <client.h>
 #include <ui.h>
 
-#define FOREGROUND_COLOR solid_color(WHITE)
-#define BACKGROUND_COLOR solid_color(RED)
+#define FOREGROUND_COLOR SOLIDCOLOR(WHITE)
+#define BACKGROUND_COLOR SOLIDCOLOR(RED)
 
 static void on_back_clicked(void) {
   switch_to_state(STATE_MENU);
@@ -15,7 +15,7 @@ static struct component comps[] = {
 static void on_enter(enum client_state prev_state) {
   UNUSED(prev_state);
 
-  set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
+  ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
 
   clear_screen();
 
