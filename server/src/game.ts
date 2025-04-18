@@ -209,11 +209,11 @@ export class PlayerSprite extends GameSprite {
     })
   }
 
-  public acknowledgeUpdatePacket(ts: number, x: number, y: number, rotation: number, keys: number): boolean {
+  public acknowledgeUpdatePacket(ts: number, x: number, y: number, rotation: number, keys: number): [boolean, number] {
     const delta = this.game.getTime() - ts;
 
-    const [_, predictedX, predictedY] = this.moveAndCollide(delta, x, y);
-    const dist = Math.sqrt(Math.pow(predictedX - this.x, 2) + Math.pow(predictedY - this.y, 2));
+    const [_, predictedX, predictedY] = this.moveAndCollide(-delta);
+    const dist = Math.sqrt(Math.pow(predictedX - x, 2) + Math.pow(predictedY - y, 2));
     Logger.info("Distance from prediction: %d", dist)
     const ack = dist <= POS_DIFF_THRESHOLD;
 
@@ -244,9 +244,7 @@ export class PlayerSprite extends GameSprite {
       this.rotation = rotation;
     }
 
-    super.tick(delta);
-
-    return ack;
+    return [ack, delta];
   }
 
   public fireBullet(): BulletSprite | undefined {

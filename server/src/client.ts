@@ -94,22 +94,25 @@ export class Client extends Peer implements PlayerHolder {
       return;
     }
 
-    const ts = packet.popF32();
-    const x = packet.popF32();
-    const y = packet.popF32();
-    const rot = packet.popF32();
+    const ts   = packet.popF32();
+    const x    = packet.popF32();
+    const y    = packet.popF32();
+    const rot  = packet.popF32();
     const keys = packet.popU32();
     Logger.info("pos = (%f, %f), rot = %f, keys = %s", x, y, rot, keys.toString(16));
 
-    const includeSelf = !this.player.acknowledgeUpdatePacket(ts, x, y, rot, keys);
-    if (includeSelf) {
-      Logger.warning("Update packet not acknowledged");
-    }
+    const [ack, delta] = this.player.acknowledgeUpdatePacket(ts, x, y, rot, keys);
 
     this.broadcastPacket(
       new UpdatePacket(this.player),
-      includeSelf
+      !ack
     );
+
+    if (ack) {
+      this.player.tick(delta);
+    } else {
+      Logger.warning("Update packet not acknowledged");
+    }
   }
 
   private handleFirePacket(_packet: GamePacket) {
