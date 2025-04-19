@@ -5,11 +5,11 @@
 #include <multiplayer.h>
 #include <libc.h>
 
-extern u32 fb[FB_WIDTH * FB_HEIGHT];
-extern b8 pointer_locked;
+extern u32 __fb[FB_WIDTH * FB_HEIGHT];
+extern b8 __pointer_locked;
 
-#define FB_SIZE   sizeof(fb)
-#define FB_LEN    ARRLEN(fb)
+#define FB_SIZE   sizeof(__fb)
+#define FB_LEN    ARRLEN(__fb)
 
 enum client_state {
   STATE_MENU,
@@ -28,6 +28,48 @@ enum client_state {
 #define KEY_W 87
 #define KEY_P 80
 
+enum color {
+  COLOR_BLACK,
+  COLOR_GRAY,
+  COLOR_LIGHTGRAY,
+  COLOR_WHITE,
+  COLOR_DARKRED,
+  COLOR_RED,
+  COLOR_DARKGREEN,
+  COLOR_GREEN,
+  COLOR_DARKYELLOW,
+  COLOR_YELLOW,
+  COLOR_DARKBLUE,
+  COLOR_BLUE,
+  COLOR_DARKMAGENTA,
+  COLOR_MAGENTA,
+  COLOR_DARKCYAN,
+  COLOR_CYAN,
+  COLOR_MAX
+};
+
+extern const u32 __palette[COLOR_MAX];
+extern u32 __alpha_mask;
+
+static inline void set_alpha(u8 a) {
+  __alpha_mask = ((u32)a) << 24;
+}
+
+static inline u32 get_alpha_mask(void) {
+  return __alpha_mask;
+}
+
+static inline u32 get_color(u8 index) {
+  return __alpha_mask | __palette[index];
+}
+
+static inline u32 get_solid_color(u8 index) {
+  return 0xFF000000 | __palette[index];
+}
+
+#define COLOR(x)       get_color(COLOR_##x)
+#define SOLIDCOLOR(x)  get_solid_color(COLOR_##x)
+
 struct state_handlers {
   void (*on_tick)(f32);
   void (*on_enter)(enum client_state);
@@ -37,6 +79,26 @@ struct state_handlers {
   void (*on_mouse_up)(u32, u32, u32);
   void (*on_pointer_lock_changed)(void);
 };
+
+static inline void set_pixel(u32 x, u32 y, u32 c) {
+  __fb[x + y * FB_WIDTH] = c;
+}
+
+static inline void set_pixel_index(u32 i, u32 c) {
+  __fb[i] = c;
+}
+
+static inline u32 get_pixel(u32 x, u32 y) {
+  return __fb[x + y * FB_WIDTH];
+}
+
+static inline u32 get_pixel_index(u32 i) {
+  return __fb[i];
+}
+
+static inline b8 pointer_is_locked(void) {
+  return __pointer_locked;
+}
 
 void switch_to_state(enum client_state state);
 

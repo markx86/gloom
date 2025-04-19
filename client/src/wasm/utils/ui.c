@@ -24,7 +24,7 @@ void draw_rect(u32 x, u32 y, u32 w, u32 h, u32 color) {
 
   for (; h-- > 0; ++y) {
     for (w1 = 0; w1 < w; ++w1)
-      fb[(x + w1) + y * FB_WIDTH] = color;
+      set_pixel(x + w1, y, color);
   }
 }
 
@@ -104,7 +104,7 @@ static void write_text_with_color(u32* x, u32* y, u32 scale, u32 color, const ch
           px = (*x + w1);
           py = (*y + h1);
           if (px < FB_WIDTH && py < FB_HEIGHT)
-            fb[px + py * FB_WIDTH] = color;
+            set_pixel(px, py, color);
         }
       }
     }

@@ -61,7 +61,7 @@ struct serv_pkt_hello {
   struct serv_pkt_hdr hdr;
   u8 n_sprites;
   u8 player_id;
-  f32 game_timer;
+  f32 game_time;
   u32 map_w, map_h;
   u8 data[0];
 } PACKED;
@@ -185,7 +185,7 @@ void send_update(void) {
   if (conn_state != CONN_UPDATING)
     return;
   init_game_pkt(&pkt, GPKT_UPDATE);
-  pkt.ts = game_time;
+  pkt.ts = get_game_time();
   pkt.pos = player.pos;
   pkt.rot = player.rot;
   pkt.keys = keys.all_keys;
@@ -289,7 +289,7 @@ static void serv_hello_handler(void* buf, u32 len) {
   map.tiles = malloc(map_size);
 
   player_id = pkt->player_id;
-  game_time = pkt->game_timer;
+  set_game_time(pkt->game_time);
 
   s = (struct sprite_init*)pkt->data;
   m = pkt->data + sizeof(*s) * n_sprites;

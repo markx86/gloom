@@ -43,7 +43,7 @@ static void on_enter(enum client_state prev_state) {
 
   UNUSED(prev_state);
 
-  if (pointer_locked)
+  if (pointer_is_locked())
     pointer_release();
 
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
@@ -53,7 +53,7 @@ static void on_enter(enum client_state prev_state) {
     set_alpha(0x7F);
   else {
     for (i = 0; i < FB_LEN; ++i)
-      fb[i] = (fb[i] & 0xFFFFFF) | 0x7F000000;
+      set_pixel_index(i, (get_pixel_index(i) & 0xFFFFFF) | 0x7F000000);
     title();
   }
 

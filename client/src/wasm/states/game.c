@@ -3,7 +3,7 @@
 static b8 do_send_update;
 
 static void on_enter(enum client_state prev_state) {
-  if (!pointer_locked)
+  if (!pointer_is_locked())
     pointer_lock();
 
   if (prev_state != STATE_PAUSE)
@@ -15,17 +15,17 @@ static void on_enter(enum client_state prev_state) {
 }
 
 static void on_tick(f32 delta) {
-  gloom_tick(delta);
   if (do_send_update) {
     send_update();
     do_send_update = false;
   }
+  gloom_tick(delta);
 }
 
 static void on_key(u32 code, char ch, b8 pressed) {
   u32 prev_keys;
 
-  if (!pointer_locked)
+  if (!pointer_is_locked())
     return;
 
   prev_keys = keys.all_keys;
@@ -57,7 +57,7 @@ static void on_key(u32 code, char ch, b8 pressed) {
 }
 
 static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
-  if (!pointer_locked)
+  if (!pointer_is_locked())
     return;
 
   off_player_rot(dx * PLAYER_ROT_SPEED);
@@ -74,11 +74,12 @@ static void on_mouse_down(u32 x, u32 y, u32 button) {
   UNUSED(x);
   UNUSED(y);
 
-  if (!pointer_locked) {
+  if (!pointer_is_locked()) {
     pointer_lock();
     return;
-  } else
-    fire_bullet();
+  }
+
+  fire_bullet();
 }
 
 const struct state_handlers game_state = {

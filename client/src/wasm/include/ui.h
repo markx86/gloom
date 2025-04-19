@@ -61,7 +61,7 @@ void draw_string_with_color(u32 x, u32 y, const char* text, u32 color);
 static inline void clear_screen_with_color(u32 color) {
   u32 i;
   for (i = 0; i < FB_LEN; ++i)
-    fb[i] = color;
+    set_pixel_index(i, color);
 }
 
 static inline void clear_screen(void) { clear_screen_with_color(__bg_color); }

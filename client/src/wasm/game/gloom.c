@@ -8,16 +8,15 @@
 #define CROSSHAIR_SIZE      16
 #define CROSSHAIR_THICKNESS 2
 
-#define PLAYER_MAX_HEALTH 100
-
 #define BULLET_SCREEN_OFF 128
-#define BULLET_DAMAGE     25
 
 struct player player;
 struct map map;
 struct sprites sprites;
 struct camera camera;
 union keys keys;
+
+static f32 z_buf[FB_WIDTH];
 
 static const vec2i sprite_dims[] = {
   [SPRITE_PLAYER] = { .x = PLAYER_SPRITE_W, .y = PLAYER_SPRITE_H },
@@ -29,37 +28,7 @@ static const u8 sprite_colors[] = {
   [SPRITE_BULLET] = COLOR_RED
 };
 
-u32 __alpha_mask;
-f32 game_time;
-
-const u32 __palette[] = {
-  [COLOR_BLACK]       = 0x000000,
-  [COLOR_GRAY]        = 0x7E7E7E,
-  [COLOR_LIGHTGRAY]   = 0xBEBEBE,
-  [COLOR_WHITE]       = 0xFFFFFF,
-  [COLOR_DARKRED]     = 0x00007E,
-  [COLOR_RED]         = 0x0000FE,
-  [COLOR_DARKGREEN]   = 0x007E04,
-  [COLOR_GREEN]       = 0x04FF06,
-  [COLOR_DARKYELLOW]  = 0x007E7E,
-  [COLOR_YELLOW]      = 0x04FFFF,
-  [COLOR_DARKBLUE]    = 0x7E0000,
-  [COLOR_BLUE]        = 0xFF0000,
-  [COLOR_DARKMAGENTA] = 0x7E007E,
-  [COLOR_MAGENTA]     = 0xFF00FE,
-  [COLOR_DARKCYAN]    = 0x7E7E04,
-  [COLOR_CYAN]        = 0xFFFF06,
-};
-
-f32 z_buf[FB_WIDTH];
-
-void reset_player_health(void) {
-  player.health = PLAYER_MAX_HEALTH;
-}
-
-void damage_player(void) {
-  player.health -= BULLET_DAMAGE;
-}
+f32 __game_time;
 
 // NOTE: @new_fov must be in radians
 void set_camera_fov(f32 new_fov) {
@@ -278,14 +247,14 @@ static void draw_column(u8 cell_id, i32 x, const struct hit* hit) {
   // fill column
   y = 0;
   for (; y < line_y; ++y)
-    fb[x + y * FB_WIDTH] = COLOR(BLUE);
+    set_pixel(x, y, COLOR(BLUE));
   if (cell_id) {
     line_y += line_height;
     for (; y < line_y; ++y)
-      fb[x + y * FB_WIDTH] = line_color;
+      set_pixel(x, y, line_color);
   }
   for (; y < FB_HEIGHT; ++y)
-    fb[x + y * FB_WIDTH] = COLOR(BLACK);
+    set_pixel(x, y, COLOR(BLACK));
 }
 
 static inline i32 get_y_end(struct sprite* s, u32 screen_h) {
@@ -318,7 +287,7 @@ static void draw_sprite(struct sprite* s) {
     if (z_buf[x] < s->depth2)
       continue;
     for (y = MAX(0, y_start); y < y_end && y < FB_HEIGHT; y++)
-      fb[x + y * FB_WIDTH] = color;
+      set_pixel(x, y, color);
   }
 }
 
@@ -427,13 +396,13 @@ static inline u32 invert_color(u32 color) {
   comps.b = 0xFF - comps.b;
   comps.a = 0;
 
-  return comps.u | __alpha_mask;
+  return comps.u | get_alpha_mask();
 }
 
 static inline void render_crosshair(void) {
   u32 i, j;
   u32 x, y;
-  u32* px;
+  u32 px;
   b8 draw_x, draw_y;
   vec2u coords = {
     .x = (FB_WIDTH  - CROSSHAIR_SIZE) >> 1,
@@ -450,8 +419,9 @@ static inline void render_crosshair(void) {
       if (draw_x || draw_y) {
         x = coords.x + i;
         y = coords.y + j;
-        px = &fb[y * FB_WIDTH + x];
-        *px = invert_color(*px);
+        px = get_pixel(x, y);
+        px = invert_color(px);
+        set_pixel(x, y, px);
       }
     }
   }
@@ -485,7 +455,7 @@ void gloom_init(f32 camera_fov, u32 camera_dof) {
 }
 
 void gloom_tick(f32 delta) {
-  game_time += delta;
+  __game_time += delta;
   update(delta);
   render();
 }

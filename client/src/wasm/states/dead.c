@@ -21,7 +21,7 @@ static struct component back_btn = {
 static void on_enter(enum client_state prev_state) {
   UNUSED(prev_state);
 
-  if (pointer_locked)
+  if (pointer_is_locked())
     pointer_release();
 
   set_alpha(0x7F);
