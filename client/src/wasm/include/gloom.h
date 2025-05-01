@@ -102,22 +102,6 @@ extern f32 __game_time;
 #define PLAYER_MAX_HEALTH 100
 #define BULLET_DAMAGE     25
 
-static inline struct sprite* alloc_sprite(void) {
-  return (sprites.n < MAX_SPRITES) ? &sprites.s[sprites.n++] : NULL;
-}
-
-static inline void reset_player_health(void) {
-  player.health = PLAYER_MAX_HEALTH;
-}
-
-static inline void damage_player(void) {
-  player.health -= BULLET_DAMAGE;
-}
-
-static inline void set_game_time(f32 new_time) {
-  __game_time = new_time;
-}
-
 static inline f32 get_game_time(void) {
   return __game_time;
 }
@@ -125,10 +109,10 @@ static inline f32 get_game_time(void) {
 void set_camera_fov(f32 new_fov);
 void set_player_rot(f32 new_rot);
 
-void damage_player(void);
-
 void gloom_init(f32 camera_fov, u32 camera_dof);
 void gloom_tick(f32 delta);
+void gloom_update(f32 delta);
+void gloom_render(void);
 
 static inline void off_player_rot(f32 delta) {
   f32 new_rot = player.rot + delta;

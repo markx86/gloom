@@ -7,8 +7,6 @@
 struct sprite* tracked_sprite;
 
 static void on_back_clicked(void) {
-  leave_game();
-  tracked_sprite = NULL;
   switch_to_state(STATE_MENU);
 }
 
@@ -18,9 +16,7 @@ static struct component back_btn = {
   .on_click = on_back_clicked
 };
 
-static void on_enter(enum client_state prev_state) {
-  UNUSED(prev_state);
-
+static void on_enter(void) {
   if (pointer_is_locked())
     pointer_release();
 

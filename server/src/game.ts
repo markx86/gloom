@@ -1,8 +1,9 @@
 import { BroadcastGroup } from "./broadcast";
 import Logger from "./logger";
-import { CreatePacket, DestroyPacket } from "./packet";
+import { CreatePacket, DestroyPacket, WaitPacket } from "./packet";
 
 const MAX_PLAYERS = 4;
+const MIN_PLAYERS = 2;
 const MAX_SPRITES = 256;
 const SPRITE_RADIUS = 0.15;
 const PLAYER_RUN_SPEED = 3.5;
@@ -11,11 +12,19 @@ const PLAYER_RELOAD_TIME = 0.25;
 const BULLET_INITIAL_SPEED = 10;
 const BULLET_DAMAGE = 25;
 const COLL_DOF = 8
+const WAIT_TIME = 10;
 const POS_DIFF_THRESHOLD = 0.5;
 
 enum GameSpriteType {
   PLAYER,
   BULLET
+}
+
+enum GameState {
+  WAITING,
+  READY,
+  PLAYING,
+  OVER
 }
 
 function traceRay(x: number, y: number, dirX: number, dirY: number, map: GameMap) {
@@ -210,12 +219,13 @@ export class PlayerSprite extends GameSprite {
   }
 
   public acknowledgeUpdatePacket(ts: number, x: number, y: number, rotation: number, keys: number): [boolean, number] {
+    Logger.info("now: %f - ts: %f", this.game.getTime(), ts);
     const delta = this.game.getTime() - ts;
 
     const [_, predictedX, predictedY] = this.moveAndCollide(-delta);
     const dist = Math.sqrt(Math.pow(predictedX - x, 2) + Math.pow(predictedY - y, 2));
     Logger.info("Distance from prediction: %d", dist)
-    const ack = dist <= POS_DIFF_THRESHOLD;
+    const ack = delta > 0 && dist <= POS_DIFF_THRESHOLD;
 
     // FIXME: limit angle between updates
   
@@ -333,7 +343,9 @@ export class Game {
   readonly broadcastGroup: BroadcastGroup;
   private numOfPlayers: number;
   private time: number;
+  private waitTime: number;
   private deadSprites: Set<number>;
+  private state: GameState;
 
   private static games = new Map<number, Game>();
 
@@ -343,8 +355,9 @@ export class Game {
     this.sprites = new Array<GameSprite>();
     this.deadSprites = new Set<number>();
     this.numOfPlayers = 0;
-    this.time = 0;
+    this.time = this.waitTime = 0;
     this.broadcastGroup = BroadcastGroup.get(id);
+    this.state = GameState.WAITING;
   }
 
   public static create(id: number, map: GameMap) {
@@ -360,14 +373,56 @@ export class Game {
     return game;
   }
 
+  public isWaiting(): boolean {
+    return this.state == GameState.WAITING;
+  }
+  
   public static tickAll(delta: number) {
     Game.games.forEach(game => game.tick(delta));
   }
 
   private tick(delta: number) {
-    this.time += delta;
-    // Logger.info("Game time: %d (delta %d)", this.time, delta);
-    this.sprites.forEach(sprite => sprite.tick(delta)); // tick the game world
+    switch (this.state) {
+      case GameState.WAITING: {
+        if (this.numOfPlayers >= MIN_PLAYERS) {
+          this.waitTime = WAIT_TIME;
+          this.state = GameState.READY;
+          this.broadcastGroup.send(new WaitPacket(this));
+        }
+        break;
+      }
+
+      case GameState.READY: {
+        if (this.numOfPlayers < MIN_PLAYERS) {
+          this.state = GameState.WAITING;
+        }
+        else if (this.waitTime <= 0) {
+          this.time = delta;
+          this.waitTime = 0;
+          this.state = GameState.PLAYING;
+        }
+        else {
+          this.waitTime -= delta;
+          break;
+        }
+        this.broadcastGroup.send(new WaitPacket(this));
+        break;
+      }
+
+      case GameState.PLAYING: {
+        this.time += delta;
+        if (this.numOfPlayers <= 1) {
+          this.state = GameState.OVER;
+          break;
+        }
+        this.sprites.forEach(sprite => sprite.tick(delta)); // tick the game world
+        break;
+      }
+
+      case GameState.OVER: {
+        break;
+      }
+    }
     this.cleanupSprites();
   }
 
@@ -435,5 +490,9 @@ export class Game {
 
   public getTime(): number {
     return this.time;
+  }
+
+  public getWaitTime(): number {
+    return this.waitTime;
   }
 }

@@ -4,9 +4,7 @@
 #define FOREGROUND_COLOR SOLIDCOLOR(YELLOW)
 #define BACKGROUND_COLOR SOLIDCOLOR(BLUE)
 
-static enum client_state back_state;
-
-static void on_back_clicked(void) { switch_to_state(back_state); }
+static void on_back_clicked(void) { switch_to_state(STATE_MENU); }
 
 #define BACK_BUTTON      0
 #define SOUND_CHECKBOX   1
@@ -22,7 +20,7 @@ static struct component comps[] = {
   [MOUSESENS_SLIDER] = { .type = UICOMP_SLIDER,   .text = "> mouse sensitivity", .value = 0.5f },
 };
 
-static void on_enter(enum client_state prev_state) {
+static void on_enter(void) {
   u32 i;
   struct component* c;
 
@@ -39,8 +37,6 @@ static void on_enter(enum client_state prev_state) {
     if (c->type != UICOMP_BUTTON)
       c->pad = FB_WIDTH - (48 << 1) - STRING_WIDTH(c->text);
   }
-
-  back_state = prev_state;
 }
 
 static void on_tick(f32 delta) {
@@ -49,7 +45,7 @@ static void on_tick(f32 delta) {
   UNUSED(delta);
 
   for (i = 1; i < ARRLEN(comps); ++i)
-    draw_component(48, 32 + TITLE_HEIGHT + 24 * (i-1), comps + i);
+    draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * (i-1), comps + i);
 
   draw_component(48, FB_HEIGHT - 32 - STRING_HEIGHT, &comps[0]);
 }

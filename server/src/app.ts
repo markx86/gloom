@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { RawData, WebSocketServer } from "ws";
+import { WebSocketServer } from "ws";
 import { Game, GameMap } from "./game"
 import { Client } from "./client";
 import Logger from "./logger";

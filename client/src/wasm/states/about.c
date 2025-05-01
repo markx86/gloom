@@ -1,8 +1,8 @@
 #include <client.h>
 #include <ui.h>
 
-#define FOREGROUND_COLOR SOLIDCOLOR(WHITE)
-#define BACKGROUND_COLOR SOLIDCOLOR(RED)
+#define FOREGROUND_COLOR SOLIDCOLOR(GREEN)
+#define BACKGROUND_COLOR SOLIDCOLOR(DARKMAGENTA)
 
 static void on_back_clicked(void) {
   switch_to_state(STATE_MENU);
@@ -12,9 +12,7 @@ static struct component comps[] = {
   { .type = UICOMP_BUTTON, .text = "> back", .on_click = on_back_clicked }
 };
 
-static void on_enter(enum client_state prev_state) {
-  UNUSED(prev_state);
-
+static void on_enter(void) {
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
 
   clear_screen();

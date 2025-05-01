@@ -12,8 +12,10 @@ extern b8 __pointer_locked;
 #define FB_LEN    ARRLEN(__fb)
 
 enum client_state {
+  STATE_ERROR,
   STATE_MENU,
   STATE_LOADING,
+  STATE_WAITING,
   STATE_GAME,
   STATE_PAUSE,
   STATE_OPTIONS,
@@ -72,7 +74,7 @@ static inline u32 get_solid_color(u8 index) {
 
 struct state_handlers {
   void (*on_tick)(f32);
-  void (*on_enter)(enum client_state);
+  void (*on_enter)(void);
   void (*on_key)(u32, char, b8);
   void (*on_mouse_moved)(u32, u32, i32, i32);
   void (*on_mouse_down)(u32, u32, u32);

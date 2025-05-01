@@ -224,7 +224,7 @@ static inline void update_sprites(f32 delta) {
   UNUSED(delta);
 }
 
-static inline void update(f32 delta) {
+void gloom_update(f32 delta) {
   update_player_position(delta);
   update_sprites(delta);
 }
@@ -439,7 +439,7 @@ static inline void render_hud(void) {
             health_bar_c);
 }
 
-static inline void render(void) {
+void gloom_render(void) {
   render_scene();
   render_sprites();
   render_crosshair();
@@ -447,15 +447,16 @@ static inline void render(void) {
 }
 
 void gloom_init(f32 camera_fov, u32 camera_dof) {
-  set_alpha(0xFF);
   set_camera_fov(camera_fov);
   set_player_rot(0);
   camera.dof = camera_dof;
   player.health = PLAYER_MAX_HEALTH;
+  __game_time = 0.0f;
 }
 
 void gloom_tick(f32 delta) {
   __game_time += delta;
-  update(delta);
-  render();
+  // printf("game_time = %f\n", __game_time);
+  gloom_update(delta);
+  gloom_render();
 }

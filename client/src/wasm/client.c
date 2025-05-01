@@ -26,8 +26,10 @@ const u32 __palette[] = {
 
 static enum client_state state;
 static const struct state_handlers* handlers[STATE_MAX] = {
+  [STATE_ERROR]   = &error_state,
   [STATE_MENU]    = &menu_state,
   [STATE_LOADING] = &loading_state,
+  [STATE_WAITING] = &waiting_state,
   [STATE_GAME]    = &game_state,
   [STATE_PAUSE]   = &pause_state,
   [STATE_OPTIONS] = &options_state,
@@ -58,16 +60,15 @@ void mouse_moved(u32 x, u32 y, i32 dx, i32 dy) { HANDLE(on_mouse_moved, x, y, dx
 void tick(f32 delta) { HANDLE(on_tick, delta); }
 
 void switch_to_state(enum client_state new_state) {
-  enum client_state prev_state = state;
   if (state < STATE_MAX) {
+    printf("switching client state from %d to %d\n", state, new_state);
     state = new_state;
-    HANDLE(on_enter, prev_state);
+    HANDLE(on_enter);
   }
 }
 
 void init(b8 ws_connected, u32 player_token) {
-  set_online(ws_connected);
-  set_player_token(player_token);
+  multiplayer_init(player_token);
   register_fb(__fb, FB_WIDTH, FB_HEIGHT, FB_SIZE);
-  switch_to_state(STATE_MENU);
+  switch_to_state(ws_connected ? STATE_MENU : STATE_ERROR);
 }

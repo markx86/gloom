@@ -1,7 +1,7 @@
 import Logger from "./logger";
 import { WebSocket } from "ws";
 import { Game, PlayerHolder, PlayerSprite } from "./game";
-import { GamePacketType, ServerPacket, HelloPacket, UpdatePacket, DestroyPacket, GamePacket } from "./packet";
+import { GamePacketType, ServerPacket, HelloPacket, UpdatePacket, DestroyPacket, GamePacket, WaitPacket } from "./packet";
 import { Peer } from "./broadcast";
 
 const MAX_PACKET_DROP = 10;
@@ -72,7 +72,8 @@ export class Client extends Peer implements PlayerHolder {
     Logger.info("Client (%s) joined game (%s) with ID %d", this.token.toString(16), this.player.game.id.toString(16), this.player.id);
 
     this.registerToBroadcastGroup(game.id);
-    this.sendPacket(new HelloPacket(this.player.id, game));
+    this.sendPacket(new HelloPacket(this.player));
+    this.sendPacket(new WaitPacket(game));
   }
 
   private handleLeavePacket(_packet: GamePacket) {
@@ -102,6 +103,7 @@ export class Client extends Peer implements PlayerHolder {
     Logger.info("pos = (%f, %f), rot = %f, keys = %s", x, y, rot, keys.toString(16));
 
     const [ack, delta] = this.player.acknowledgeUpdatePacket(ts, x, y, rot, keys);
+    Logger.info("delta = %f, ack = %s", delta, ack);
 
     this.broadcastPacket(
       new UpdatePacket(this.player),

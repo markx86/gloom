@@ -2,15 +2,11 @@
 
 static b8 do_send_update;
 
-static void on_enter(enum client_state prev_state) {
+static void on_enter(void) {
   if (!pointer_is_locked())
     pointer_lock();
 
-  if (prev_state != STATE_PAUSE)
-    gloom_init(DEG2RAD(CAMERA_FOV), CAMERA_DOF);
-  else
-    set_alpha(0xFF);
-
+  set_alpha(0xFF);
   do_send_update = false;
 }
 

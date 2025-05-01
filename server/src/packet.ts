@@ -1,4 +1,4 @@
-import { BulletSprite, Game, GameSprite } from "./game";
+import { BulletSprite, Game, GameSprite, PlayerSprite } from "./game";
 
 export enum GamePacketType {
   JOIN,
@@ -13,7 +13,6 @@ export enum ServerPacketType {
   UPDATE,
   CREATE,
   DESTROY,
-  // FIXME: implement this packets
   WAIT,
   MAX
 }
@@ -159,19 +158,17 @@ const SIZEOF_STRUCT_SPRITE_UPDATE =
   + 4 * 2; // velocity
 
 export class HelloPacket extends ServerPacket {
-  // NOTE: spriteId must be *LESS* than 256
-  public constructor(playerId: number, game: Game) {
+  public constructor(player: PlayerSprite) {
+    const game = player.game;
     const size =
         1                                                // number of sprites
       + 1                                                // this sprite id
-      + 4                                                // game timer
       + 4 * 2                                            // map size (width and height)
       + game.map.getSizeInBytes()                        // size of map data
       + game.sprites.length * SIZEOF_STRUCT_SPRITE_INIT; // size of sprite data
     super(ServerPacketType.HELLO, size)
     this.pushU8(game.sprites.length);
-    this.pushU8(playerId);
-    this.pushF32(game.getTime());
+    this.pushU8(player.id);
     this.pushVec2U(game.map.width, game.map.height);
     game.sprites.forEach(sprite => this.pushSpriteInit(sprite));
     this.pushBytes(game.map.getCompressedData());
@@ -196,5 +193,13 @@ export class DestroyPacket extends ServerPacket {
   public constructor(sprite: GameSprite, actor: GameSprite | undefined = undefined) {
     super(ServerPacketType.DESTROY, 4);
     this.pushSpriteDescriptor(sprite, actor);
+  }
+}
+
+export class WaitPacket extends ServerPacket {
+  public constructor(game: Game) {
+      super(ServerPacketType.WAIT, 4);
+      const timeAndWaiting = Math.floor(game.getWaitTime()) | ((game.isWaiting() ? 1 : 0) << 31)
+      this.pushU32(timeAndWaiting);
   }
 }

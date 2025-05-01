@@ -24,11 +24,12 @@ static void on_tick(f32 delta) {
     draw_component(48, 32 + TITLE_HEIGHT + 24 * i, comps + i);
 }
 
-static void on_enter(enum client_state prev_state) {
-  UNUSED(prev_state);
-
+static void on_enter(void) {
   if (pointer_is_locked())
     pointer_release();
+
+  if (in_game())
+    leave_game();
 
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
   clear_screen();

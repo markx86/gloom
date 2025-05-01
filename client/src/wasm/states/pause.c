@@ -9,7 +9,6 @@ static void on_resume_clicked(void) {
 }
 
 static void on_quit_clicked(void) {
-  leave_game();
   switch_to_state(STATE_MENU);
 }
 
@@ -19,10 +18,10 @@ static struct component buttons[] = {
 };
 
 static void title(void) {
-  const char* title = "paused";
+  const char title[] = "paused";
   draw_rect(
     32, 32 + (FONT_HEIGHT >> 1),
-    TITLE_WIDTH(title), TITLE_HEIGHT - FONT_HEIGHT,
+    TITLE_WIDTH_IMM(title), TITLE_HEIGHT - FONT_HEIGHT,
     BACKGROUND_COLOR);
   draw_title(32, 32, title);
 }
@@ -30,32 +29,21 @@ static void title(void) {
 static void on_tick(f32 delta) {
   u32 i;
 
-  if (is_in_multiplayer_game())
-    gloom_tick(delta);
+  gloom_tick(delta);
 
   title();
   for (i = 0; i < ARRLEN(buttons); ++i)
-    draw_component(48, 32 + TITLE_HEIGHT + 24 * i, buttons + i);
+    draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * i, buttons + i);
 }
 
-static void on_enter(enum client_state prev_state) {
-  u32 i;
-
-  UNUSED(prev_state);
-
+static void on_enter(void) {
   if (pointer_is_locked())
     pointer_release();
 
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
 
   // darken the screen by decreasing the alpha channel
-  if (is_in_multiplayer_game())
-    set_alpha(0x7F);
-  else {
-    for (i = 0; i < FB_LEN; ++i)
-      set_pixel_index(i, (get_pixel_index(i) & 0xFFFFFF) | 0x7F000000);
-    title();
-  }
+  set_alpha(0x7F);
 
   component_on_enter(buttons, ARRLEN(buttons));
 }

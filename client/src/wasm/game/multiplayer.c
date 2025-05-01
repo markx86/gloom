@@ -61,7 +61,6 @@ struct serv_pkt_hello {
   struct serv_pkt_hdr hdr;
   u8 n_sprites;
   u8 player_id;
-  f32 game_time;
   u32 map_w, map_h;
   u8 data[0];
 } PACKED;
@@ -99,6 +98,8 @@ struct serv_pkt_destroy {
 
 struct serv_pkt_wait {
   struct serv_pkt_hdr hdr;
+  u32 seconds : 31;
+  u32 wait   : 1;
 } PACKED;
 
 struct serv_pkt_death {
@@ -107,37 +108,13 @@ struct serv_pkt_death {
 
 static u8 player_id;
 static u32 player_token, client_seq, server_seq;
-static enum connection_state conn_state = CONN_UNKNOWN;
+enum connection_state __conn_state;
 
 // NOTE: pkt_buf is accessed from JS, when changing the size remember to also
 //       change it in app.js
 char pkt_buf[0x1000];
 
 typedef void (*serv_pkt_handler_t)(void*, u32);
-
-void set_online(b8 yes) {
-  if (conn_state == CONN_UNKNOWN)
-    conn_state = yes ? CONN_CONNECTED : CONN_DISCONNECTED;
-}
-
-b8 is_disconnected(void) {
-  return conn_state <= CONN_DISCONNECTED;
-}
-
-b8 is_in_multiplayer_game(void) {
-  return conn_state == CONN_UPDATING;
-}
-
-enum connection_state get_connection_state(void) {
-  return conn_state;
-}
-
-void set_connection_state(enum connection_state state) {
-  if (conn_state != state) {
-    printf("forcing connection state from %d to %d\n", conn_state, state);
-    conn_state = state;
-  }
-}
 
 static void init_game_pkt(void* hdrp, enum game_pkt_type type) {
   struct game_pkt_hdr* hdr = hdrp;
@@ -146,56 +123,47 @@ static void init_game_pkt(void* hdrp, enum game_pkt_type type) {
   hdr->player_token = player_token;
 }
 
-void set_player_token(u32 token) {
+static void send_packet_checked(void* pkt, u32 size) {
+  if (send_packet(pkt, size) != (i32)size)
+    set_connection_state(CONN_DISCONNECTED);
+}
+
+void multiplayer_init(u32 token) {
   player_token = token;
   // reset game packet sequence
   client_seq = server_seq = 0;
+  set_connection_state(CONN_CONNECTED);
 }
 
-b8 join_game(u32 game_id) {
+void join_game(u32 game_id) {
   struct game_pkt_join pkt;
-  i32 rc;
-
-  if (conn_state != CONN_CONNECTED)
-    return false;
-
   init_game_pkt(&pkt, GPKT_JOIN);
   pkt.game_id = game_id;
-
-  rc = send_packet(&pkt, sizeof(pkt));
-  if (rc == sizeof(pkt)) {
-    conn_state = CONN_JOINING;
-    return true;
-  } else
-    return false;
+  set_connection_state(CONN_JOINING);
+  send_packet_checked(&pkt, sizeof(pkt));
 }
 
-b8 leave_game(void) {
+void leave_game(void) {
   struct game_pkt_leave pkt;
-  i32 rc;
-  conn_state = CONN_CONNECTED;
   init_game_pkt(&pkt, GPKT_LEAVE);
-  rc = send_packet(&pkt, sizeof(pkt));
+  set_connection_state(CONN_CONNECTED);
+  send_packet_checked(&pkt, sizeof(pkt));
   free_all(); // free map data
-  return rc == sizeof(pkt);
 }
 
 void send_update(void) {
   struct game_pkt_update pkt;
-  if (conn_state != CONN_UPDATING)
-    return;
   init_game_pkt(&pkt, GPKT_UPDATE);
   pkt.ts = get_game_time();
+  printf("sending update @ %f\n", pkt.ts);
   pkt.pos = player.pos;
   pkt.rot = player.rot;
   pkt.keys = keys.all_keys;
-  send_packet(&pkt, sizeof(pkt));
+  send_packet_checked(&pkt, sizeof(pkt));
 }
 
 void fire_bullet(void) {
   struct game_pkt_fire pkt;
-  if (conn_state != CONN_UPDATING)
-    return;
   init_game_pkt(&pkt, GPKT_FIRE);
   send_packet(&pkt, sizeof(pkt));
 }
@@ -207,10 +175,25 @@ static void pkt_size_error(const char* pkt_type, u32 got, u32 expected) {
 
 static void pkt_type_error(const char* pkt_type) {
   eprintf("received %s packet, but the connection state is wrong (now in %d)\n",
-          pkt_type, conn_state);
+          pkt_type, get_connection_state());
 }
 
-static struct sprite* get_sprite_by_id(u8 id, b8 can_alloc) {
+static void apply_sprite_transform(struct sprite* s,
+                                   struct sprite_transform* t) {
+  f32 inv_vel = inv_sqrt(t->vel.x * t->vel.x + t->vel.y * t->vel.y);
+  s->rot = t->rot;
+  s->pos = t->pos;
+  s->dir.x = t->vel.x * inv_vel;
+  s->dir.y = t->vel.y * inv_vel;
+  s->vel = 1.0f / inv_vel;
+  s->disabled = false; // reset disabled flag
+}
+
+static inline struct sprite* alloc_sprite(void) {
+  return (sprites.n < MAX_SPRITES) ? &sprites.s[sprites.n++] : NULL;
+}
+
+static struct sprite* get_sprite(u8 id, b8 can_alloc) {
   struct sprite* s;
   u32 i = 0;
   for (i = 0; i < sprites.n; ++i) {
@@ -225,15 +208,14 @@ static struct sprite* get_sprite_by_id(u8 id, b8 can_alloc) {
   return NULL;
 }
 
-static void apply_sprite_transform(struct sprite* s,
-                                   struct sprite_transform* t) {
-  f32 inv_vel = inv_sqrt(t->vel.x * t->vel.x + t->vel.y * t->vel.y);
-  s->rot = t->rot;
-  s->pos = t->pos;
-  s->dir.x = t->vel.x * inv_vel;
-  s->dir.y = t->vel.y * inv_vel;
-  s->vel = 1.0f / inv_vel;
-  s->disabled = false; // reset disabled flag
+static void destroy_sprite(u8 id) {
+  u32 i;
+  struct sprite* s = get_sprite(id, false);
+  if (!s)
+    return;
+  for (i = (u32)(s - sprites.s) + 1; i < sprites.n; ++i)
+    sprites.s[i - 1] = sprites.s[i];
+  --sprites.n;
 }
 
 static void init_sprite(struct sprite_init* init) {
@@ -241,21 +223,11 @@ static void init_sprite(struct sprite_init* init) {
   printf("initializing sprite: %u\n", init->desc.id);
   if (init->desc.type >= SPRITE_MAX)
     return;
-  if ((s = get_sprite_by_id(init->desc.id, true))) {
+  if ((s = get_sprite(init->desc.id, true))) {
     memset(s, 0, sizeof(*s));
     s->desc = init->desc;
     apply_sprite_transform(s, &init->transform);
   }
-}
-
-static void destroy_sprite(u8 id) {
-  u32 i;
-  struct sprite* s = get_sprite_by_id(id, false);
-  if (!s)
-    return;
-  for (i = (u32)(s - sprites.s) + 1; i < sprites.n; ++i)
-    sprites.s[i - 1] = sprites.s[i];
-  --sprites.n;
 }
 
 static void serv_hello_handler(void* buf, u32 len) {
@@ -265,7 +237,7 @@ static void serv_hello_handler(void* buf, u32 len) {
   struct sprite_init* s;
   struct serv_pkt_hello* pkt = buf;
 
-  if (conn_state != CONN_JOINING) {
+  if (get_connection_state() != CONN_JOINING) {
     pkt_type_error("hello");
     return;
   }
@@ -289,7 +261,6 @@ static void serv_hello_handler(void* buf, u32 len) {
   map.tiles = malloc(map_size);
 
   player_id = pkt->player_id;
-  set_game_time(pkt->game_time);
 
   s = (struct sprite_init*)pkt->data;
   m = pkt->data + sizeof(*s) * n_sprites;
@@ -324,7 +295,7 @@ static void serv_hello_handler(void* buf, u32 len) {
     }
   }
 
-  conn_state = CONN_UPDATING;
+  set_connection_state(CONN_WAITING);
 }
 
 static void serv_update_handler(void* buf, u32 len) {
@@ -332,7 +303,7 @@ static void serv_update_handler(void* buf, u32 len) {
   struct sprite* s;
   struct serv_pkt_update* pkt = buf;
 
-  if (conn_state != CONN_UPDATING) {
+  if (get_connection_state() != CONN_UPDATING) {
     pkt_type_error("update");
     return;
   }
@@ -346,14 +317,21 @@ static void serv_update_handler(void* buf, u32 len) {
   if (u->id == player_id) {
     player.pos = u->transform.pos;
     set_player_rot(u->transform.rot);
-  } else if ((s = get_sprite_by_id(u->id, false)))
+  } else if ((s = get_sprite(u->id, false)))
     apply_sprite_transform(s, &u->transform);
 }
 
 static void serv_create_handler(void* buf, u32 len) {
   struct serv_pkt_create* pkt = buf;
+
+  if (get_connection_state() != CONN_UPDATING &&
+      get_connection_state() != CONN_WAITING) {
+    pkt_type_error("create");
+    return;
+  }
+
   if (sizeof(*pkt) != len) {
-    pkt_size_error("join", len, sizeof(*pkt));
+    pkt_size_error("create", len, sizeof(*pkt));
     return;
   }
   init_sprite(&pkt->sprite);
@@ -361,13 +339,21 @@ static void serv_create_handler(void* buf, u32 len) {
 
 static void serv_destroy_handler(void* buf, u32 len) {
   struct serv_pkt_destroy* pkt = buf;
-  if (sizeof(*pkt) != len) {
-    pkt_size_error("bye", len, sizeof(*pkt));
+
+  if (get_connection_state() != CONN_UPDATING &&
+      get_connection_state() != CONN_WAITING) {
+    pkt_type_error("destroy");
     return;
   }
+
+  if (sizeof(*pkt) != len) {
+    pkt_size_error("destroy", len, sizeof(*pkt));
+    return;
+  }
+
   if (pkt->desc.id == player_id) {
     switch_to_state(STATE_DEAD);
-    tracked_sprite = get_sprite_by_id(pkt->desc.field, false);
+    tracked_sprite = get_sprite(pkt->desc.field, false);
     return;
   }
 
@@ -378,8 +364,30 @@ static void serv_destroy_handler(void* buf, u32 len) {
       // TODO: add player reward
       puts("player score!");
     else if (pkt->desc.field == player_id)
-      damage_player();
+      player.health -= BULLET_DAMAGE;
   }
+}
+
+static void serv_wait_handler(void* buf, u32 len) {
+  struct serv_pkt_wait* pkt = buf;
+
+  if (get_connection_state() != CONN_WAITING) {
+    pkt_type_error("wait");
+    return;
+  }
+
+  if (sizeof(*pkt) != len) {
+    pkt_size_error("wait", len, sizeof(*pkt));
+    return;
+  }
+
+  // printf("got wait packet! pkt->wait = %d, pkt->seconds = %d\n", pkt->wait, pkt->seconds);
+  if (!pkt->wait && pkt->seconds == 0) {
+    set_connection_state(CONN_UPDATING);
+    switch_to_state(STATE_GAME);
+  }
+  else
+    wait_time = pkt->wait ? -1.0f : (f32)pkt->seconds;
 }
 
 static const serv_pkt_handler_t serv_pkt_handlers[SPKT_MAX] = {
@@ -387,15 +395,11 @@ static const serv_pkt_handler_t serv_pkt_handlers[SPKT_MAX] = {
   [SPKT_UPDATE]  = serv_update_handler,
   [SPKT_CREATE]  = serv_create_handler,
   [SPKT_DESTROY] = serv_destroy_handler,
-  // FIXME: implement this packet handlers
-  [SPKT_WAIT]    = NULL,
+  [SPKT_WAIT]    = serv_wait_handler,
 };
 
 void multiplayer_on_recv(u32 len) {
   struct serv_pkt_hdr* hdr;
-
-  if (is_disconnected())
-    return;
 
   if (len > sizeof(pkt_buf)) {
     eprintf("packet too big! (max. packet size is %u bytes, but got %u)\n",

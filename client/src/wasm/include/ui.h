@@ -38,8 +38,9 @@ struct component {
 
 extern u32 __fg_color, __bg_color;
 
-#define TITLE_HEIGHT     (FONT_HEIGHT * 2 * 3)
-#define TITLE_WIDTH(s)   ((strlen(s) + 4) * FONT_WIDTH * 2)
+#define TITLE_HEIGHT       (FONT_HEIGHT * 2 * 3)
+#define TITLE_WIDTH(s)     ((strlen(s) + 4) * FONT_WIDTH * 2)
+#define TITLE_WIDTH_IMM(s) ((sizeof(s)-1 + 4) * FONT_WIDTH * 2)
 
 #define STRING_HEIGHT       (FONT_HEIGHT)
 #define STRING_WIDTH(s)     (strlen(s) * FONT_WIDTH)

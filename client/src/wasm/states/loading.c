@@ -17,7 +17,7 @@ static enum connection_state last_conn_state;
 
 static void add_message(const char* message) {
   draw_string(48, message_y, message);
-  message_y += 24;
+  message_y += STRING_HEIGHT + 8;
 }
 
 static void on_tick(f32 delta) {
@@ -27,7 +27,7 @@ static void on_tick(f32 delta) {
     // the connection state has not changed in the last 10s, assume something
     // went wrong (this is not the cleanest way to do this, but bad design
     // forced my hand!)
-    set_connection_state(CONN_UNKNOWN);
+    set_connection_state(CONN_DISCONNECTED);
 
   draw_component(48, FB_HEIGHT - 32 - STRING_HEIGHT, &back_button);
 
@@ -43,12 +43,15 @@ static void on_tick(f32 delta) {
   switch (conn_state) {
     case CONN_CONNECTED:
       add_message("> sending join request");
-      if (!join_game(0xcafebabe))
-        conn_state = CONN_UNKNOWN;
+      join_game(0xcafebabe);
       break;
 
     case CONN_JOINING:
       add_message("> joining game");
+      break;
+
+    case CONN_WAITING:
+      switch_to_state(STATE_WAITING);
       break;
 
     case CONN_UPDATING:
@@ -56,25 +59,20 @@ static void on_tick(f32 delta) {
       break;
 
     // invalid state, display error
-    case CONN_UNKNOWN:
     case CONN_DISCONNECTED:
-      ui_set_colors(ERROR_COLOR, BACKGROUND_COLOR);
-      add_message("> an error has occurred");
-      ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
+      switch_to_state(STATE_ERROR);
       break;
   }
 }
 
-static void on_enter(enum client_state prev_state) {
-  UNUSED(prev_state);
-
+static void on_enter(void) {
   // if the client is not connected to the server, go back to main menu
   if (is_disconnected()) {
-    switch_to_state(STATE_MENU);
+    switch_to_state(STATE_ERROR);
     return;
   }
 
-  last_conn_state = CONN_UNKNOWN;
+  last_conn_state = CONN_DISCONNECTED;
   time_in_state = 0.0f;
   message_y = 32 + TITLE_HEIGHT;
 
