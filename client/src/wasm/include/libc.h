@@ -51,6 +51,7 @@ static inline void eputs(const char* s) {
 #define va_end(l)      __builtin_va_end(l)
 #define va_arg(l, t)   __builtin_va_arg(l, t)
 
+void vsnprintf(char* buf, u32 len, const char* fmt, va_list ap);
 void vfdprintf(int fd, const char* fmt, va_list ap);
 
 static inline void printf(const char* fmt, ...) {
@@ -64,6 +65,13 @@ static inline void eprintf(const char* fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   vfdprintf(2, fmt, ap);
+  va_end(ap);
+}
+
+static inline void snprintf(char* buf, u32 len, const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(buf, len, fmt, ap);
   va_end(ap);
 }
 

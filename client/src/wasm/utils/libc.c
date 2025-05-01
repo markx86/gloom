@@ -11,20 +11,23 @@ static u32 heap_size = 0;
 // calling out to JS everytime we need to write a character
 struct printf_buf {
   u32 end;
+  u32 len;
   i32 fd;
-  char buf[BUFSZ];
+  char* buf;
 };
 
 static inline void buf_putc(struct printf_buf* pb, char c) {
-  if (pb->end >= BUFSZ) {
-    write(pb->fd, pb->buf, BUFSZ);
+  if (pb->end >= pb->len) {
+    if (pb->fd < 0)
+      return;
+    write(pb->fd, pb->buf, pb->len);
     pb->end = 0;
   }
   pb->buf[pb->end++] = c;
 }
 
 static inline void buf_flush(struct printf_buf* pb) {
-  if (pb->end > 0)
+  if (pb->end > 0 && pb->fd > 0)
     write(pb->fd, pb->buf, pb->end);
 }
 
@@ -124,16 +127,12 @@ PRINTFHANDLER(f, f32 v) {
   buf_putr(pb, tmp, l);
 }
 
-// simple printf implementation
-void vfdprintf(int fd, const char* fmt, va_list ap) {
-  struct printf_buf pb;
+static void process_fmt(struct printf_buf* pb, const char* fmt, va_list ap) {
   char c;
 
-  pb.end = 0;
-  pb.fd = fd;
   while ((c = *(fmt++))) {
     if (c != '%') {
-      buf_putc(&pb, c);
+      buf_putc(pb, c);
       continue;
     }
 
@@ -141,33 +140,54 @@ void vfdprintf(int fd, const char* fmt, va_list ap) {
     switch (c) {
       case 'i':
       case 'd':
-        buf_putd(&pb, va_arg(ap, i32));
+        buf_putd(pb, va_arg(ap, i32));
         break;
       case 'u':
-        buf_putu(&pb, va_arg(ap, u32));
+        buf_putu(pb, va_arg(ap, u32));
         break;
       case 'x':
-        buf_putx(&pb, va_arg(ap, u32));
+        buf_putx(pb, va_arg(ap, u32));
         break;
       case 's':
-        buf_puts(&pb, va_arg(ap, const char*));
+        buf_puts(pb, va_arg(ap, const char*));
         break;
       case 'f':
-        buf_putf(&pb, (f32)va_arg(ap, double));
+        buf_putf(pb, (f32)va_arg(ap, double));
         break;
       case 'c':
-        buf_putc(&pb, (char)va_arg(ap, i32));
+        buf_putc(pb, (char)va_arg(ap, i32));
         break;
       default:
         // ignore unknown specs
-        buf_putc(&pb, '%');
+        buf_putc(pb, '%');
         // !!FALL THROUGH!!
       case '%':
-        buf_putc(&pb, c);
+        buf_putc(pb, c);
         break;
     }
   }
+}
 
+void vsnprintf(char* buf, u32 len, const char* fmt, va_list ap) {
+  struct printf_buf pb;
+  pb.end = 0;
+  pb.fd = -1;
+  pb.len = len;
+  pb.buf = buf;
+  process_fmt(&pb, fmt, ap);
+  if (pb.end >= pb.len)
+    --pb.end;
+  pb.buf[pb.end] = '\0';
+}
+
+void vfdprintf(int fd, const char* fmt, va_list ap) {
+  char buf[BUFSZ];
+  struct printf_buf pb;
+  pb.end = 0;
+  pb.fd = fd;
+  pb.len = sizeof(buf);
+  pb.buf = buf;
+  process_fmt(&pb, fmt, ap);
   buf_flush(&pb);
 }
 
