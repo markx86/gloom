@@ -5,6 +5,7 @@
 #define FOREGROUND_COLOR SOLIDCOLOR(LIGHTGRAY)
 
 f32 wait_time;
+static f32 timer_start;
 
 static void on_back_clicked(void) {
   switch_to_state(STATE_MENU);
@@ -26,16 +27,22 @@ static inline void title(void) {
 }
 
 static void on_tick(f32 delta) {
-  char time_left[32];
+  char time_str[32];
   const char* text;
+  f32 time_left;
   u32 y;
 
   UNUSED(delta);
 
-  if (isposf(wait_time)) {
-    snprintf(time_left, sizeof(time_left), "> starting in %ds", (i32)wait_time);
-    text = time_left;
-  } else
+  time_left = wait_time - (time() - timer_start);
+
+  if (isposf(time_left)) {
+    snprintf(time_str, sizeof(time_str), "> starting in %ds", roundf(time_left));
+    text = time_str;
+  }
+  else if (isposf(wait_time))
+    text = "> starting...";
+  else
     text = "> waiting for players...";
   gloom_render();
 
@@ -45,12 +52,6 @@ static void on_tick(f32 delta) {
   draw_string(48, y, text);
   y += STRING_HEIGHT + 8;
   draw_component(48, y, &back_btn);
-
-  if (wait_time > 0.0f) {
-    wait_time -= delta;
-    if (wait_time < 0.0f)
-      wait_time = 0.0f;
-  }
 }
 
 static void on_enter(void) {
@@ -58,6 +59,7 @@ static void on_enter(void) {
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
   component_on_enter(&back_btn, 1);
   gloom_init(DEG2RAD(CAMERA_FOV), CAMERA_DOF);
+  timer_start = time();
 }
 
 static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {

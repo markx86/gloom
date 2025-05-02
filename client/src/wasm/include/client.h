@@ -72,6 +72,14 @@ static inline u32 get_solid_color(u8 index) {
 #define COLOR(x)       get_color(COLOR_##x)
 #define SOLIDCOLOR(x)  get_solid_color(COLOR_##x)
 
+#define CALLSTATEHANDLER(name, ...)                                   \
+  do {                                                                \
+    if (__client_state < STATE_MAX && handlers[__client_state]->name) \
+      handlers[__client_state]->name(__VA_ARGS__);                    \
+  } while (0)
+
+extern enum client_state __client_state;
+
 struct state_handlers {
   void (*on_tick)(f32);
   void (*on_enter)(void);
@@ -102,6 +110,10 @@ static inline b8 pointer_is_locked(void) {
   return __pointer_locked;
 }
 
-void switch_to_state(enum client_state state);
+static inline enum client_state get_client_state(void) {
+  return __client_state;
+}
+
+void switch_to_state(enum client_state new_state);
 
 #endif

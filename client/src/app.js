@@ -99,6 +99,13 @@
     }
   }
 
+  let originTime = Date.now();
+
+  // f32 time(void);
+  function time() {
+    return (Date.now() - originTime) / 1e3;
+  }
+
   const importObject = {
     env: {
       write,
@@ -106,7 +113,8 @@
       pointer_release,
       request_mem,
       register_fb,
-      send_packet
+      send_packet,
+      time
     },
   };
 
@@ -183,7 +191,7 @@
   ws.addEventListener("message", e => {
     if (e.data instanceof ArrayBuffer) {
       const pkt = new Uint8Array(e.data);
-      new Uint8Array(memory.buffer, instance.exports.pkt_buf, 0x1000).set(pkt);
+      new Uint8Array(memory.buffer, instance.exports.__pkt_buf, 0x1000).set(pkt);
       instance.exports.multiplayer_on_recv(pkt.byteLength);
     }
   });

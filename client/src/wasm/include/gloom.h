@@ -91,7 +91,6 @@ extern struct camera camera;
 extern struct sprites sprites;
 extern struct map map;
 extern union keys keys;
-extern f32 __game_time;
 
 #define PLAYER_SPRITE_W 128
 #define PLAYER_SPRITE_H 400
@@ -101,10 +100,6 @@ extern f32 __game_time;
 
 #define PLAYER_MAX_HEALTH 100
 #define BULLET_DAMAGE     25
-
-static inline f32 get_game_time(void) {
-  return __game_time;
-}
 
 void set_camera_fov(f32 new_fov);
 void set_player_rot(f32 new_rot);

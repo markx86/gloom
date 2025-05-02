@@ -108,11 +108,12 @@ struct serv_pkt_death {
 
 static u8 player_id;
 static u32 player_token, client_seq, server_seq;
-enum connection_state __conn_state;
+static f32 game_start;
 
 // NOTE: pkt_buf is accessed from JS, when changing the size remember to also
 //       change it in app.js
-char pkt_buf[0x1000];
+char __pkt_buf[0x1000];
+enum connection_state __conn_state;
 
 typedef void (*serv_pkt_handler_t)(void*, u32);
 
@@ -154,8 +155,7 @@ void leave_game(void) {
 void send_update(void) {
   struct game_pkt_update pkt;
   init_game_pkt(&pkt, GPKT_UPDATE);
-  pkt.ts = get_game_time();
-  printf("sending update @ %f\n", pkt.ts);
+  pkt.ts = time() - game_start;
   pkt.pos = player.pos;
   pkt.rot = player.rot;
   pkt.keys = keys.all_keys;
@@ -337,6 +337,13 @@ static void serv_create_handler(void* buf, u32 len) {
   init_sprite(&pkt->sprite);
 }
 
+static u32 count_player_sprites(void) {
+  u32 i, n = 0;
+  for (i = 0; i < sprites.n; ++i)
+    n += (sprites.s[i].desc.type == SPRITE_PLAYER);
+  return n;
+}
+
 static void serv_destroy_handler(void* buf, u32 len) {
   struct serv_pkt_destroy* pkt = buf;
 
@@ -366,6 +373,13 @@ static void serv_destroy_handler(void* buf, u32 len) {
     else if (pkt->desc.field == player_id)
       player.health -= BULLET_DAMAGE;
   }
+
+  if (pkt->desc.type == SPRITE_PLAYER &&
+      get_client_state() == STATE_GAME &&
+      count_player_sprites() == 0) {
+    // Game over
+    puts("Game over! You won!");
+  }
 }
 
 static void serv_wait_handler(void* buf, u32 len) {
@@ -385,6 +399,7 @@ static void serv_wait_handler(void* buf, u32 len) {
   if (!pkt->wait && pkt->seconds == 0) {
     set_connection_state(CONN_UPDATING);
     switch_to_state(STATE_GAME);
+    game_start = time();
   }
   else
     wait_time = pkt->wait ? -1.0f : (f32)pkt->seconds;
@@ -401,13 +416,13 @@ static const serv_pkt_handler_t serv_pkt_handlers[SPKT_MAX] = {
 void multiplayer_on_recv(u32 len) {
   struct serv_pkt_hdr* hdr;
 
-  if (len > sizeof(pkt_buf)) {
+  if (len > sizeof(__pkt_buf)) {
     eprintf("packet too big! (max. packet size is %u bytes, but got %u)\n",
-            sizeof(pkt_buf), len);
+            sizeof(__pkt_buf), len);
     return;
   }
 
-  hdr = (struct serv_pkt_hdr*)pkt_buf;
+  hdr = (struct serv_pkt_hdr*)__pkt_buf;
   if (!hdr)
     return; // no message received or recv error
   if (len < sizeof(*hdr)) {

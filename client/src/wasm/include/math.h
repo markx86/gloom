@@ -11,6 +11,11 @@
 
 f32 inv_sqrt(f32 n);
 
+static inline i32 roundf(f32 x) {
+  const i32 i = (i32)x;
+  return (x - (f32)i < 0.5) ? i : i+1;
+}
+
 static inline i32 isposf(f32 x) {
   u32 v = *(u32*)&x;
   return !(v & (1U << 31));

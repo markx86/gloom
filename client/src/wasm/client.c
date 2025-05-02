@@ -24,7 +24,6 @@ const u32 __palette[] = {
   [COLOR_CYAN]        = 0xFFFF06,
 };
 
-static enum client_state state;
 static const struct state_handlers* handlers[STATE_MAX] = {
   [STATE_ERROR]   = &error_state,
   [STATE_MENU]    = &menu_state,
@@ -37,11 +36,15 @@ static const struct state_handlers* handlers[STATE_MAX] = {
   [STATE_DEAD]    = &dead_state
 };
 
-#define HANDLE(name, ...)                           \
-  do {                                              \
-    if (state < STATE_MAX && handlers[state]->name) \
-      handlers[state]->name(__VA_ARGS__);           \
-  } while (0)
+enum client_state __client_state;
+
+void switch_to_state(enum client_state new_state) {
+  if (get_client_state() < STATE_MAX) {
+    printf("switching client state from %d to %d\n", __client_state, new_state);
+    __client_state = new_state;
+    CALLSTATEHANDLER(on_enter);
+  }
+}
 
 void set_pointer_locked(b8 locked) {
   __pointer_locked = locked;
@@ -49,23 +52,15 @@ void set_pointer_locked(b8 locked) {
     keys.all_keys = 0;
   // dirty hack to pause on lost focus because I refuse to add another
   // handler just for pointer lock changes
-  if (state == STATE_GAME && !locked)
+  if (get_client_state() == STATE_GAME && !locked)
     switch_to_state(STATE_PAUSE);
 }
 
-void key_event(u32 code, char ch, b8 pressed) { HANDLE(on_key, code, ch, pressed); }
-void mouse_down(u32 x, u32 y, u32 button) { HANDLE(on_mouse_down, x, y, button); }
-void mouse_up(u32 x, u32 y, u32 button) { HANDLE(on_mouse_up, x, y, button); }
-void mouse_moved(u32 x, u32 y, i32 dx, i32 dy) { HANDLE(on_mouse_moved, x, y, dx, dy); }
-void tick(f32 delta) { HANDLE(on_tick, delta); }
-
-void switch_to_state(enum client_state new_state) {
-  if (state < STATE_MAX) {
-    printf("switching client state from %d to %d\n", state, new_state);
-    state = new_state;
-    HANDLE(on_enter);
-  }
-}
+void key_event(u32 code, char ch, b8 pressed) { CALLSTATEHANDLER(on_key, code, ch, pressed); }
+void mouse_down(u32 x, u32 y, u32 button) { CALLSTATEHANDLER(on_mouse_down, x, y, button); }
+void mouse_up(u32 x, u32 y, u32 button) { CALLSTATEHANDLER(on_mouse_up, x, y, button); }
+void mouse_moved(u32 x, u32 y, i32 dx, i32 dy) { CALLSTATEHANDLER(on_mouse_moved, x, y, dx, dy); }
+void tick(f32 delta) { CALLSTATEHANDLER(on_tick, delta); }
 
 void init(b8 ws_connected, u32 player_token) {
   multiplayer_init(player_token);

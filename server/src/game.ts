@@ -14,6 +14,7 @@ const BULLET_DAMAGE = 25;
 const COLL_DOF = 8
 const WAIT_TIME = 10;
 const POS_DIFF_THRESHOLD = 0.5;
+const TIME_SKEW_THRESHOLD = -0.01;
 
 enum GameSpriteType {
   PLAYER,
@@ -223,9 +224,11 @@ export class PlayerSprite extends GameSprite {
     const delta = this.game.getTime() - ts;
 
     const [_, predictedX, predictedY] = this.moveAndCollide(-delta);
-    const dist = Math.sqrt(Math.pow(predictedX - x, 2) + Math.pow(predictedY - y, 2));
+    const dx = predictedX - x;
+    const dy = predictedY - y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
     Logger.info("Distance from prediction: %d", dist)
-    const ack = delta > 0 && dist <= POS_DIFF_THRESHOLD;
+    const ack = delta > TIME_SKEW_THRESHOLD && dist <= POS_DIFF_THRESHOLD;
 
     // FIXME: limit angle between updates
   
@@ -342,7 +345,7 @@ export class Game {
   readonly sprites: Array<GameSprite>;
   readonly broadcastGroup: BroadcastGroup;
   private numOfPlayers: number;
-  private time: number;
+  private startTime: number;
   private waitTime: number;
   private deadSprites: Set<number>;
   private state: GameState;
@@ -355,7 +358,7 @@ export class Game {
     this.sprites = new Array<GameSprite>();
     this.deadSprites = new Set<number>();
     this.numOfPlayers = 0;
-    this.time = this.waitTime = 0;
+    this.startTime = this.waitTime = 0;
     this.broadcastGroup = BroadcastGroup.get(id);
     this.state = GameState.WAITING;
   }
@@ -397,7 +400,7 @@ export class Game {
           this.state = GameState.WAITING;
         }
         else if (this.waitTime <= 0) {
-          this.time = delta;
+          this.startTime = Date.now() / 1e3;
           this.waitTime = 0;
           this.state = GameState.PLAYING;
         }
@@ -410,7 +413,6 @@ export class Game {
       }
 
       case GameState.PLAYING: {
-        this.time += delta;
         if (this.numOfPlayers <= 1) {
           this.state = GameState.OVER;
           break;
@@ -489,7 +491,7 @@ export class Game {
   }
 
   public getTime(): number {
-    return this.time;
+    return (Date.now() / 1e3) - this.startTime;
   }
 
   public getWaitTime(): number {

@@ -28,8 +28,6 @@ static const u8 sprite_colors[] = {
   [SPRITE_BULLET] = COLOR_RED
 };
 
-f32 __game_time;
-
 // NOTE: @new_fov must be in radians
 void set_camera_fov(f32 new_fov) {
   camera.fov = new_fov;
@@ -451,12 +449,9 @@ void gloom_init(f32 camera_fov, u32 camera_dof) {
   set_player_rot(0);
   camera.dof = camera_dof;
   player.health = PLAYER_MAX_HEALTH;
-  __game_time = 0.0f;
 }
 
 void gloom_tick(f32 delta) {
-  __game_time += delta;
-  // printf("game_time = %f\n", __game_time);
   gloom_update(delta);
   gloom_render();
 }
