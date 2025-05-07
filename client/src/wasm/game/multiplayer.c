@@ -359,7 +359,7 @@ static void serv_destroy_handler(void* buf, u32 len) {
   }
 
   if (pkt->desc.id == player_id) {
-    switch_to_state(STATE_DEAD);
+    switch_to_state(STATE_OVER);
     tracked_sprite = get_sprite(pkt->desc.field, false);
     return;
   }
@@ -377,8 +377,7 @@ static void serv_destroy_handler(void* buf, u32 len) {
   if (pkt->desc.type == SPRITE_PLAYER &&
       get_client_state() == STATE_GAME &&
       count_player_sprites() == 0) {
-    // Game over
-    puts("Game over! You won!");
+    switch_to_state(STATE_OVER);
   }
 }
 

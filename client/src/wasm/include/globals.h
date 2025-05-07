@@ -13,7 +13,7 @@ extern const struct state_handlers
   pause_state,
   options_state,
   about_state,
-  dead_state;
+  over_state;
 
 extern struct sprite* tracked_sprite;
 extern f32 wait_time;

@@ -33,7 +33,7 @@ static const struct state_handlers* handlers[STATE_MAX] = {
   [STATE_PAUSE]   = &pause_state,
   [STATE_OPTIONS] = &options_state,
   [STATE_ABOUT]   = &about_state,
-  [STATE_DEAD]    = &dead_state
+  [STATE_OVER]    = &over_state
 };
 
 enum client_state __client_state;
