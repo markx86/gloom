@@ -20,6 +20,10 @@ static inline u32 strlen(const char* s) {
   return l;
 }
 
+static inline void strcpy(char* dst, const char* src) {
+  strncpy(dst, src, strlen(src));
+}
+
 static inline void memset(void* p, u8 b, u32 l) {
   u8* sp;
   u32 bb, l4 = l >> 2, *bp = p;
