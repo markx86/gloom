@@ -394,7 +394,6 @@ static void serv_wait_handler(void* buf, u32 len) {
     return;
   }
 
-  // printf("got wait packet! pkt->wait = %d, pkt->seconds = %d\n", pkt->wait, pkt->seconds);
   if (!pkt->wait && pkt->seconds == 0) {
     set_connection_state(CONN_UPDATING);
     switch_to_state(STATE_GAME);

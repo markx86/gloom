@@ -14,7 +14,7 @@ const BULLET_DAMAGE = 25;
 const COLL_DOF = 8
 const WAIT_TIME = 10;
 const POS_DIFF_THRESHOLD = 0.5;
-const TIME_SKEW_THRESHOLD = -0.01;
+const TIME_SKEW_THRESHOLD = -0.1;
 
 enum GameSpriteType {
   PLAYER,
@@ -223,9 +223,9 @@ export class PlayerSprite extends GameSprite {
     Logger.info("now: %f - ts: %f", this.game.getTime(), ts);
     const delta = this.game.getTime() - ts;
 
-    const [_, predictedX, predictedY] = this.moveAndCollide(-delta);
-    const dx = predictedX - x;
-    const dy = predictedY - y;
+    const [_, predictedX, predictedY] = this.moveAndCollide(delta, x, y);
+    const dx = this.x - predictedX;
+    const dy = this.y - predictedY;
     const dist = Math.sqrt(dx * dx + dy * dy);
     Logger.info("Distance from prediction: %d", dist)
     const ack = delta > TIME_SKEW_THRESHOLD && dist <= POS_DIFF_THRESHOLD;

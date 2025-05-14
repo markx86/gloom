@@ -99,7 +99,7 @@
     }
   }
 
-  let originTime = Date.now();
+  const originTime = Date.now();
 
   // f32 time(void);
   function time() {

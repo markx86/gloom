@@ -42,8 +42,10 @@ static void on_tick(f32 delta) {
   }
   else if (isposf(wait_time))
     text = "> starting...";
-  else
+  else {
     text = "> waiting for players...";
+    timer_start = time();
+  }
   gloom_render();
 
   title();
