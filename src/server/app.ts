@@ -5,12 +5,37 @@ import { Game, GameMap } from "./game"
 import { Client } from "./client";
 import Logger from "./logger";
 
-const HANDSHAKE_MAGIC = 0xBADC0FFE
+import express from "express";
+import path from "path";
 
-const wss = new WebSocketServer({
-  port: 8492,
-  perMessageDeflate: false,
-});
+/*
+ * #############################
+ * # HTTP SERVER RELATED STUFF #
+ * #############################
+ */
+ 
+const app = express();
+const port = 8080;
+const staticRoot = { root: "static" };
+
+function getPagePath(name: string): string {
+  return path.join("html", `${name}.html`);
+}
+
+// This is just a nicer static middleware for HTML pages
+app.get("/", (_, res) => res.sendFile(getPagePath("index"), staticRoot));
+app.get("/:page", (req, res) => res.sendFile(getPagePath(req.params.page), staticRoot));
+
+app.use("/static", express.static("static"))
+
+app.listen(port);
+
+
+/*
+ * #############################
+ * # GAME SERVER RELATED STUFF #
+ * #############################
+ */
 
 const testMap = new GameMap(8, 8, [
   1, 1, 1, 1, 1, 1, 1, 1,
@@ -24,6 +49,13 @@ const testMap = new GameMap(8, 8, [
 ]);
 
 Game.create(0xCAFEBABE, testMap);
+
+const HANDSHAKE_MAGIC = 0xBADC0FFE
+
+const wss = new WebSocketServer({
+  port: 8492,
+  perMessageDeflate: false,
+});
 
 wss.on("connection", ws => {
   Logger.info("Player connected");

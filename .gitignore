@@ -1,10 +1,7 @@
 **/.cache/
 **/__pycache__/
-**/node_modules/
-**/*-lock.json
-**/*.wasm*
+node_modules/
+package-lock.json
+dist/
+**/*.wasm
 **/compile_commands.json
-**/*.o
-server/dist/
-client/dist/
-client/src/wasm/gen/*
