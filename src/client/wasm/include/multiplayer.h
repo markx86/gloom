@@ -19,7 +19,7 @@ static inline b8 is_disconnected(void) {
 }
 
 static inline b8 in_game(void) {
-  return __conn_state == CONN_UPDATING;
+  return __conn_state >= CONN_WAITING;
 }
 
 static inline enum connection_state get_connection_state(void) {
