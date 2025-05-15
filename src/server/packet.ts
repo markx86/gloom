@@ -199,7 +199,8 @@ export class DestroyPacket extends ServerPacket {
 export class WaitPacket extends ServerPacket {
   public constructor(game: Game) {
       super(ServerPacketType.WAIT, 4);
-      const timeAndWaiting = Math.floor(game.getWaitTime()) | ((game.isWaiting() ? 1 : 0) << 31)
+      const timeLeft = Math.floor(game.getWaitTime()) & 0x7FFFFFFF;
+      const timeAndWaiting = timeLeft | ((game.isWaiting() ? 1 : 0) << 31)
       this.pushU32(timeAndWaiting);
   }
 }

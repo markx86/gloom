@@ -13,6 +13,7 @@ const BULLET_INITIAL_SPEED = 10;
 const BULLET_DAMAGE = 25;
 const COLL_DOF = 8
 const WAIT_TIME = 10;
+const OVER_TIME = 10;
 const POS_DIFF_THRESHOLD = 0.5;
 const TIME_SKEW_THRESHOLD = -0.1;
 
@@ -26,6 +27,10 @@ enum GameState {
   READY,
   PLAYING,
   OVER
+}
+
+function nowTime(): number {
+  return Date.now() / 1e3;
 }
 
 function traceRay(x: number, y: number, dirX: number, dirY: number, map: GameMap) {
@@ -367,6 +372,10 @@ export class Game {
     Game.games.set(id, new Game(id, map));
   }
 
+  public static destroy(game: Game) {
+    Game.games.delete(game.id);
+  }
+
   public static getByID(id: number): Game | null {
     const game = Game.games.get(id);
     if (!game) {
@@ -400,7 +409,7 @@ export class Game {
           this.state = GameState.WAITING;
         }
         else if (this.waitTime <= 0) {
-          this.startTime = Date.now() / 1e3;
+          this.startTime = nowTime();
           this.waitTime = 0;
           this.state = GameState.PLAYING;
         }
@@ -414,6 +423,7 @@ export class Game {
 
       case GameState.PLAYING: {
         if (this.numOfPlayers <= 1) {
+          this.waitTime = OVER_TIME;
           this.state = GameState.OVER;
           break;
         }
@@ -422,6 +432,12 @@ export class Game {
       }
 
       case GameState.OVER: {
+        if (this.numOfPlayers == 0 || this.waitTime <= 0) {
+          Logger.info("Destroying game with ID: %s", this.id.toString(16));
+          Game.destroy(this);
+        } else {
+          this.waitTime -= delta;
+        }
         break;
       }
     }
@@ -491,7 +507,7 @@ export class Game {
   }
 
   public getTime(): number {
-    return (Date.now() / 1e3) - this.startTime;
+    return nowTime() - this.startTime;
   }
 
   public getWaitTime(): number {
