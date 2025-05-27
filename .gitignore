@@ -2,6 +2,8 @@
 **/__pycache__/
 node_modules/
 package-lock.json
-dist/
+build/
+**/*.db
 **/*.wasm
+**/*.min.js*
 **/compile_commands.json

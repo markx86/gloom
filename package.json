@@ -5,17 +5,20 @@
   "license": "GPLv3",
   "dependencies": {
     "@types/express": "^5.0.1",
+    "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
+    "sqlite3": "^5.1.7",
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.8",
     "@types/ws": "^8.5.14",
     "esbuild": "^0.25.0"
   },
   "scripts": {
     "_buildServer": "./scripts/build-server.sh",
     "_buildClient": "./scripts/build-client.sh",
-    "build": "mkdir -p ./dist && npm run _buildClient && npm run _buildServer",
-    "serve": "npm run build && ./dist/server.js"
+    "build": "mkdir -p ./build && npm run _buildClient && npm run _buildServer",
+    "serve": "npm run build && ./build/server.js"
   }
 }
