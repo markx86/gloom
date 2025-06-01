@@ -7,6 +7,7 @@ export const USERNAME_MIN_LEN = 3;
 export const PASSWORD_MAX_LEN = 64;
 export const PASSWORD_MIN_LEN = 8;
 export const SESSION_ID_LEN = 32;
+export const GAME_ID_LEN = 8;
 
 const SALT_LEN = 8;
 
@@ -117,6 +118,8 @@ export function checkUserCrendentials(username: string, password: string, callba
         const salt = row.salt;
         const passwordHash = computePasswordHash(password, salt);
         callback(Buffer.compare(storedHash, passwordHash) === 0);
+      } else {
+        callback(false);
       }
     }
   );

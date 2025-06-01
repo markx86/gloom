@@ -7,7 +7,7 @@ import { Peer } from "./broadcast";
 const MAX_PACKET_DROP = 10;
 
 export class Client extends Peer implements PlayerHolder {
-  readonly token: number;
+  private token: number;
   private player: PlayerSprite | null;
   private ws: WebSocket;
   private clientSequence: number;
@@ -15,6 +15,10 @@ export class Client extends Peer implements PlayerHolder {
 
   public unsetPlayer(): void {
     this.player = null;
+  }
+
+  public getToken(): number {
+    return this.token;
   }
 
   public sendPacket(pkt: ServerPacket) {
@@ -57,13 +61,15 @@ export class Client extends Peer implements PlayerHolder {
     const gameId = packet.popU32();
     Logger.info("Got request to join game with ID: %s", gameId.toString(16));
 
-    const game = Game.getByID(gameId);
+    const game = Game.getById(gameId);
     if (!game) {
+      Logger.error("No game with that ID dumbass");
       return;
     }
 
     const player = game.newPlayer(this);
     if (!player) {
+      Logger.error("No player with that token dumbass");
       return;
     }
 
@@ -128,6 +134,7 @@ export class Client extends Peer implements PlayerHolder {
   }
 
   private handlePacket(type: GamePacketType, sequence: number, playerToken: number, packet: GamePacket) {
+    Logger.info("packet: %s", type);
     if (!this.checkPacket(type, sequence, playerToken)) {
       return;
     }

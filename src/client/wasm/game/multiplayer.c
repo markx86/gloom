@@ -107,7 +107,8 @@ struct serv_pkt_death {
 } PACKED;
 
 static u8 player_id;
-static u32 player_token, client_seq, server_seq;
+static u32 game_id, player_token;
+static u32 client_seq, server_seq;
 static f32 game_start;
 
 // NOTE: pkt_buf is accessed from JS, when changing the size remember to also
@@ -129,14 +130,15 @@ static void send_packet_checked(void* pkt, u32 size) {
     set_connection_state(CONN_DISCONNECTED);
 }
 
-void multiplayer_init(u32 token) {
+void multiplayer_init(u32 gid, u32 token) {
+  game_id = gid;
   player_token = token;
   // reset game packet sequence
   client_seq = server_seq = 0;
   set_connection_state(CONN_CONNECTED);
 }
 
-void join_game(u32 game_id) {
+void join_game(void) {
   struct game_pkt_join pkt;
   init_game_pkt(&pkt, GPKT_JOIN);
   pkt.game_id = game_id;

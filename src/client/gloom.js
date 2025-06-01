@@ -8,6 +8,7 @@ export async function loadGloom() {
   let canvasContainer = null, canvas = null, ctx = null;
   let fbArray = null, fb = null;
   let originTime = 0;
+  let ws = null;
   
   function updateViewportSize() {
     const aspectRatio = fb == null ? (canvasDefaultWidth / canvasDefaultHeight) : (fb.width / fb.height);
@@ -148,7 +149,7 @@ export async function loadGloom() {
         break;
       }
       case "mousemove": {
-        instance.exports.mouse_move(e.offsetX, e.offsetY, e.movementX, e.movementY);
+        instance.exports.mouse_moved(e.offsetX, e.offsetY, e.movementX, e.movementY);
         break;
       }
       case "mouseleave": {
@@ -200,6 +201,7 @@ export async function loadGloom() {
     canvas.style.transformOrigin = "top left";
     // TODO maybe use 'crisp-edges' instead of 'pixelated' on Firefox
     canvas.style.imageRendering = "pixelated";
+    canvas.style.background = "black";
 
     toggleListeners(true);
   }
@@ -209,9 +211,9 @@ export async function loadGloom() {
   const memory = instance.exports.memory;
     
 
-  window.launchGloom = token => {
+  const launchGloom = (gameId, playerToken, onCloseHandler) => {
     setupGame();
-    const ws = new WebSocket(url);
+    ws = new WebSocket(url);
 
     function exitGame() {
       toggleListeners(false);
@@ -219,21 +221,24 @@ export async function loadGloom() {
       ws.close();
     }
 
-    let prevTimestamp;  
+    let prevTimestamp;
 
     function tick(timestamp) {
       const delta = (timestamp - prevTimestamp) / 1000;
-      if (instance.exports.tick(delta) === true) {
+      if (instance.exports.tick(delta) !== 0) {
         ctx.putImageData(fb, 0, 0);
         prevTimestamp = timestamp;
         window.requestAnimationFrame(tick);
       } else {
         exitGame();
+        if (onCloseHandler != null) {
+          onCloseHandler();
+        }
       }
     }
 
     // init game
-    function startGame(online, token) {
+    function startGame(online) {
       ws.removeEventListener("error", wsErrorHandler);
       ws.removeEventListener("open", wsOpenHandler);
       if (online) {
@@ -241,12 +246,12 @@ export async function loadGloom() {
         {
           data = new ArrayBuffer(8);
           view = new DataView(data);
-          view.setUint32(0, token, true);
+          view.setUint32(0, playerToken, true);
           view.setUint32(4, 0xBADC0FFE, true); // Handshake magic
           ws.send(data);
         }
       }
-      instance.exports.init(online, token);
+      instance.exports.init(online, gameId, playerToken);
       window.requestAnimationFrame((timestamp) => {
         updateViewportSize();
         prevTimestamp = timestamp;
@@ -254,8 +259,8 @@ export async function loadGloom() {
       });
     }
   
-    const wsErrorHandler = () => startGame(false, token);
-    const wsOpenHandler = () => startGame(true, token);
+    const wsErrorHandler = () => startGame(false);
+    const wsOpenHandler = () => startGame(true);
   
     ws.binaryType = "arraybuffer";
     ws.addEventListener("message", e => {
@@ -267,7 +272,7 @@ export async function loadGloom() {
     });
     ws.addEventListener("error", wsErrorHandler);
     ws.addEventListener("open", wsOpenHandler);
-    ws.addEventListener("error", console.log);
-    ws.addEventListener("open", console.log);
   }
+
+  return [launchGloom, instance.exports.exit];
 }

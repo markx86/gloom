@@ -13,6 +13,7 @@ import {
 } from "./database.ts";
 import express from "express";
 import cookieParser from "cookie-parser";
+import { Game, GameMap } from "./game.ts";
 
 const HTTP_PORT = 8080;
 
@@ -34,7 +35,7 @@ app.use("/api", (req, res, next) => {
   // get session cookie
   const sessionCookie = req.signedCookies.session;
   if (sessionCookie == null || typeof(sessionCookie) !== "string") {
-    res.status(403).send();
+    res.status(401).send();
     return;
   }
 
@@ -43,7 +44,7 @@ app.use("/api", (req, res, next) => {
   try {
     getUsernameBySessionId(sessionId, (username) => {
       if (username == null) {
-        res.status(403).send();
+        res.status(401).send();
       } else {
         res.locals.username = username;
         res.locals.sessionId = sessionId;
@@ -105,7 +106,7 @@ app.post("/api/register", (req, res) => {
   let rc: number;
 
   const data = req.body;
-  if (data == null || data.username == null || data.password == null) {
+  if (data == null || typeof(data.username) !== "string" || typeof(data.password) !== "string") {
     res.status(400).send({ message: "Invalid request body!" });
     return;
   }
@@ -155,7 +156,7 @@ app.post("/api/register", (req, res) => {
 
 app.post("/api/login", (req, res) => {
   const data = req.body;
-  if (data == null || data.username == null || data.password == null) {
+  if (data == null || typeof(data.username) !== "string" || typeof(data.password) !== "string") {
     res.status(400).send({ message: "Invalid request body!" });
     return;
   }
@@ -163,14 +164,14 @@ app.post("/api/login", (req, res) => {
   // basic username validation
   const username = data.username;
   if (checkUsernameLength(username) !== 0) {
-    res.status(403).send();
+    res.status(401).send();
     return;
   }
 
   // basic password validation
   const password = data.password;
   if (checkPasswordLength(password) !== 0) {
-    res.status(403).send();
+    res.status(401).send();
     return;
   }
 
@@ -187,7 +188,7 @@ app.post("/api/login", (req, res) => {
         setSessionCookie(res, sessionId);
         res.status(200).send();
       } else {
-        res.status(403).send();
+        res.status(401).send();
       }
     });
   } catch (e) {
@@ -203,7 +204,9 @@ app.get("/api/logout", (_, res) => {
   res.status(200).send();
 });
 
-app.get("/api/refresh-session", (_, res) => {
+app.get("/api/session/validate", (_, res) => { res.status(200).send(); });
+
+app.get("/api/session/refresh", (_, res) => {
   // if got here that means the session cookie is valid
   try {
     Logger.info("Refreshing session for user: %s", res.locals.username);
@@ -216,6 +219,76 @@ app.get("/api/refresh-session", (_, res) => {
   } catch (e) {
     Logger.error(e.message);
     res.status(500).send();
+  }
+});
+
+app.get("/api/game/id", (_, res) => {
+  const username = res.locals.username;
+  const game = Game.getByCreator(username);
+  if (game == null) {
+    res.status(404).send();
+  } else {
+    res.status(200).send({ gameId: game.id });
+  }
+});
+
+const testMap = new GameMap(16, 16, [
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+  1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1,
+  1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1,
+  1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1,
+  1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1,
+  1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+  1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1,
+  1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1,
+  1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1,
+  1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1,
+  1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+  1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+]);
+
+app.get("/api/game/create", (_, res) => {
+  const creator = res.locals.username;
+  if (Game.getByCreator(creator) != null) {
+    res.status(403).send({
+      message: "You already have a game running.",
+    });
+    return;
+  }
+  
+  const gameId = Game.create(creator, testMap);
+  if (gameId == null) {
+    res.status(503).send({
+      message: "The server is overloaded. Please try again later."
+    });
+  } else {
+    res.status(200).send({ gameId });
+  }
+});
+
+app.post("/api/game/join", (req, res) => {
+  const data = req.body;
+  if (data == null || typeof(data.gameId) !== "number") {
+    res.status(400).send({ message: "Invalid request body." });
+    return;
+  }
+
+  const gameId = data.gameId;
+  const game = Game.getById(gameId);
+  if (game == null) {
+    res.status(404).send({ message: "No game found." });
+    return;
+  }
+
+  const playerToken = game.allocatePlayer(res.locals.username);
+  if (playerToken == null) {
+    res.status(403).send({ message: "You are already in the game." });
+  } else {
+    res.status(200).send({ playerToken });
   }
 });
 

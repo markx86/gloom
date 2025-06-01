@@ -1,10 +1,12 @@
-import { BroadcastGroup } from "./broadcast";
 import Logger from "./logger";
+import { BroadcastGroup } from "./broadcast";
 import { CreatePacket, DestroyPacket, WaitPacket } from "./packet";
+import { randomInt } from "node:crypto";
 
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 4;
 const MAX_SPRITES = 256;
+const MAX_GAMES = 256;
 
 const SPRITE_RADIUS = 0.15;
 
@@ -17,6 +19,7 @@ const BULLET_INITIAL_SPEED = 10;
 
 const COLL_DOF = 8
 
+const IDLE_TIME = 300;
 const WAIT_TIME = 10;
 const OVER_TIME = 10;
 
@@ -179,13 +182,15 @@ export abstract class GameSprite {
 }
 
 export interface PlayerHolder {
+  getToken(): number;
   unsetPlayer(): void;
 }
 
 export class PlayerSprite extends GameSprite {
+  readonly holder: PlayerHolder;
+
   private health: number;
   private reloadTime: number;
-  private holder: PlayerHolder;
 
   public constructor(holder: PlayerHolder, game: Game, id: number,
                      x: number, y: number, r: number = 0) {
@@ -352,9 +357,12 @@ export class GameMap {
 
 export class Game {
   readonly id: number;
+  readonly creator: string;
   readonly map: GameMap;
   readonly sprites: Array<GameSprite>;
   readonly broadcastGroup: BroadcastGroup;
+
+  private playerTokens: Map<number, string>;
   private numOfPlayers: number;
   private startTime: number;
   private waitTime: number;
@@ -363,32 +371,52 @@ export class Game {
 
   private static games = new Map<number, Game>();
 
-  public constructor(id: number, map: GameMap) {
+  public constructor(id: number, creator: string, map: GameMap) {
     this.id = id;
+    this.creator = creator;
     this.map = map;
+
     this.sprites = new Array<GameSprite>();
     this.deadSprites = new Set<number>();
+    this.playerTokens = new Map<number, string>();
     this.numOfPlayers = 0;
-    this.startTime = this.waitTime = 0;
+    this.startTime = 0;
+    this.waitTime = IDLE_TIME;
     this.broadcastGroup = BroadcastGroup.get(id);
     this.state = GameState.WAITING;
   }
 
-  public static create(id: number, map: GameMap) {
-    Game.games.set(id, new Game(id, map));
+  public static create(creator: string, map: GameMap): number | undefined {
+    if (Game.games.size < MAX_GAMES) {
+      let id: number | undefined;
+      while (id == null || id in Game.games) {
+        id = randomInt(2 ** 32);
+      }
+      Game.games.set(id, new Game(id, creator, map));
+      return id;
+    }
   }
 
   public static destroy(game: Game) {
     Game.games.delete(game.id);
   }
 
-  public static getByID(id: number): Game | null {
+  public static getById(id: number): Game | null {
     const game = Game.games.get(id);
     if (!game) {
       Logger.error("No game exists with ID %s", id.toString(16));
       return null;
     }
     return game;
+  }
+
+  public static getByCreator(creator: string): Game | null {
+    for (const game of Game.games.values()) {
+      if (game.creator === creator) {
+        return game;
+      }
+    }
+    return null;
   }
 
   public isWaiting(): boolean {
@@ -406,20 +434,23 @@ export class Game {
           this.waitTime = WAIT_TIME;
           this.state = GameState.READY;
           this.broadcastGroup.send(new WaitPacket(this));
+        } else if (this.waitTime <= 0) {
+          this.state = GameState.OVER;
+        } else {
+          this.waitTime -= delta;
         }
         break;
       }
 
       case GameState.READY: {
         if (this.numOfPlayers < MIN_PLAYERS) {
+          this.waitTime = IDLE_TIME;
           this.state = GameState.WAITING;
-        }
-        else if (this.waitTime <= 0) {
+        } else if (this.waitTime <= 0) {
           this.startTime = nowTime();
           this.waitTime = 0;
           this.state = GameState.PLAYING;
-        }
-        else {
+        } else {
           this.waitTime -= delta;
           break;
         }
@@ -450,12 +481,12 @@ export class Game {
     this.cleanupSprites();
   }
 
-  public getSpriteByID(id: number): GameSprite | undefined {
+  public getSpriteById(id: number): GameSprite | undefined {
     return this.sprites.filter(sprite => sprite.id === id).pop();
   }
 
   // NOTE: entity IDs start from 1 and go up to 255
-  private nextEntityID(): number {
+  private nextEntityId(): number {
     let id = 0;
     const sortedIds = this.sprites
       .flatMap(sprite => sprite.id)
@@ -473,22 +504,36 @@ export class Game {
   public newPlayer(holder: PlayerHolder): PlayerSprite | undefined {
     if (this.numOfPlayers++ >= MAX_PLAYERS) {
       Logger.warning("Max players reached in game %s", this.id.toString(16));
-      return undefined;
+    } else if (this.playerTokens.has(holder.getToken())) {
+      return this.addSprite(new PlayerSprite(holder, this, this.nextEntityId(), 1.5, 1.5));
     }
-    return this.addSprite(new PlayerSprite(holder, this, this.nextEntityID(), 1.5, 1.5));
   }
 
   public newBullet(player: PlayerSprite): BulletSprite | undefined {
-    return this.addSprite(new BulletSprite(player, this.nextEntityID()));
+    return this.addSprite(new BulletSprite(player, this.nextEntityId()));
+  }
+
+  public allocatePlayer(username: string): number | undefined {
+    for (const uname of this.playerTokens.values()) {
+      if (uname === username) {
+        return;
+      }
+    }
+    let token: number | undefined;
+    while (token == null || token in this.playerTokens) {
+      token = randomInt(2 ** 32);
+    }
+    this.playerTokens.set(token, username);
+    Logger.info("Allocated player with token %s", token.toString(16));
+    return token;
   }
 
   private addSprite<T extends GameSprite>(sprite: T): T | undefined {
-    if (this.sprites.length >= MAX_SPRITES) {
-      return undefined;
+    if (this.sprites.length < MAX_SPRITES) {
+      this.sprites.push(sprite);
+      this.broadcastGroup.send(new CreatePacket(sprite));
+      return sprite;
     }
-    this.sprites.push(sprite);
-    this.broadcastGroup.send(new CreatePacket(sprite));
-    return sprite;
   }
 
   private cleanupSprites() {
@@ -499,6 +544,7 @@ export class Game {
   public removePlayer(player: PlayerSprite, actor: PlayerSprite | undefined = undefined) {
     if (this.removeSprite(player, actor)) {
       --this.numOfPlayers;
+      this.playerTokens.delete(player.holder.getToken());
     }
   }
 

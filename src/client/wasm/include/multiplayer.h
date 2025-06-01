@@ -33,9 +33,9 @@ static inline void set_connection_state(enum connection_state state) {
   }
 }
 
-void multiplayer_init(u32 token);
+void multiplayer_init(u32 gid, u32 token);
 
-void join_game(u32 game_id);
+void join_game(void);
 void leave_game(void);
 void send_update(void);
 void fire_bullet(void);

@@ -1,7 +1,13 @@
 import * as api from "./api.js";
 import * as gloom from "./gloom.js";
-import { showErrorWindow, showInfoWindow, showWarningWindow, createWindow, getWindow, helpLink, windowIcon } from "./windowing.js";
 import "./reactive.js";
+import {
+  showErrorWindow, showInfoWindow, showWarningWindow,
+  createWindow, getWindowControls,
+  helpLink, windowIcon, separator
+} from "./windowing.js";
+
+let myGameId;
 
 $root($("#root"));
 
@@ -12,15 +18,19 @@ function updateRootNodeSize() {
 updateRootNodeSize();
 window.addEventListener("resize", updateRootNodeSize);
 
-gloom.loadGloom();
+let gloomLauncher, gloomExit;
+
+gloom.loadGloom().then(([launcher, exit]) => {
+  gloomLauncher = launcher;
+  gloomExit = exit;
+});
 
 const gotoHelp = () => $goto("/login/help");
+const gotoHome = () => $goto("/");
+const quitGame = () => (gloomExit == null ? gotoHome() : gloomExit());
 
 async function doLogin(event) {
-  const wnd = getWindow(event.target);
-  $assert(wnd != null, "button is not attached to a window");
-  const wndDisable = () => wnd.setDisabled(true);
-  const wndEnable = () => wnd.setDisabled(false);
+  const [wndEnable, wndDisable] = getWindowControls(event.target);
 
   const username_field = $("#field-username");
   const password_field = $("#field-password");
@@ -39,22 +49,23 @@ async function doLogin(event) {
     return;
   }
 
-  const response = await api.post("/login", {
-    username: username,
-    password: password
-  });
-  if (response.status === 200) {
-    $goto("/");
-  } else {
-    showErrorWindow("Invalid username or password. Please check your credentials and try again.", wndEnable);
+  try {
+    const response = await api.post("/login", {
+      username: username,
+      password: password
+    });
+    if (response.status === 200) {
+      $goto("/");
+    } else {
+      showErrorWindow("Invalid username or password. Please check your credentials and try again.", wndEnable);
+    }
+  } catch {
+    showWarningWindow("An unknown error occurred while trying to process your registration request. Please try again later.", wndEnable);
   }
 }
 
 async function doRegister(event) {
-  const wnd = getWindow(event.target);
-  $assert(wnd != null, "button is not attached to a window");
-  const wndDisable = () => wnd.setDisabled(true);
-  const wndEnable = () => wnd.setDisabled(false);
+  const [wndEnable, wndDisable] = getWindowControls(event.target);
 
   const username_field = $("#field-username");
   const password_field = $("#field-password");
@@ -78,48 +89,135 @@ async function doRegister(event) {
     return;
   }
 
-  const response = await api.post("/register", {
-    username: username,
-    password: password
-  });
+  try {
+    const response = await api.post("/register", {
+      username: username,
+      password: password
+    });
 
-  switch (response.status) {
-    case 200: {
-      showInfoWindow(
-        "Registration successful! Use your crendentials to log-in.",
-        () => $goto("/login")
-      );
-      break;
+    switch (response.status) {
+      case 200: {
+        showInfoWindow(
+          "Registration successful! Use your crendentials to log-in.",
+          () => $goto("/login")
+        );
+        break;
+      }
+      case 400: { showErrorWindow((await response.json()).message, wndEnable); break; }
+      default:  { showWarningWindow("Something went wrong! Please try again later.", wndEnable); break; }
     }
-    case 400: { showErrorWindow((await response.json()).message, wndEnable); break; }
-    default:  { showWarningWindow("Something went wrong! Please try again later.", wndEnable); break; }
+  } catch {
+    showWarningWindow("An unknown error occurred while trying to log you in. Please try again later.", wndEnable);
   }
 }
 
-async function doLogout(event) {
-  const button = event.target;
-  const wnd = getWindow(button);
-  $assert(wnd != null, "button is not attached to a window");
-  button.$disable();
-  wnd.setDisabled(true);
-  api.get("/logout").then(_ => {
+function doLogout(event) {
+  const [_, wndDisable] = getWindowControls(event.target);
+  wndDisable();
+  api.get("/logout").finally(_ => {
     // on success we redirect to the login page
     // an error (403) means the user does not have a valid session anyway, so redirect to login again
     $goto("/login");
   });
 }
 
-function refreshSession(onSuccessRoute, onFailureRoute) {
-  api.get("/refresh-session").then(res => {
-    if (res.status === 200) {
-      onSuccessRoute != null ? $goto(onSuccessRoute) : null;
-    } else {
-      onFailureRoute != null ? $goto(onFailureRoute) : null;
+function refreshGameId() {
+  api.get("/game/id")
+    .then(res => {
+      if (res.status === 200) {
+        return res.json();
+      } else if (res.status === 404) {
+        $("#game-id").textContent = "No running game";
+        $("#btn-create").$enable();
+      } else {
+        $("#game-id").textContent = "Could not fetch game ID";
+      }
+      return null;
+    })
+    .then(data => {
+      if (typeof(data?.gameId) === "number") {
+        setGameId(data.gameId);
+      }
+    })
+    .catch(_ => $("#game-id").textContent = "Could not fetch game ID");
+}
+
+function setGameId(gameId) {
+  if (gameId !== myGameId) {
+    const gameIdString = (gameId.toString(16)).toUpperCase();
+    $("#game-id").textContent = gameIdString;
+    $("#field-game-id").placeholder = `Enter game ID (default: ${gameIdString})`;
+    $("#btn-create").$disable();
+    myGameId = gameId;
+  }
+}
+
+function getGameId() {
+  const gameIdString = $("#field-game-id")?.value;
+  if (gameIdString == null || gameIdString.length === 0) {
+    return myGameId;
+  } else if (gameIdString.length === 8) {
+    const gameId = parseInt(gameIdString, 16);
+    if (isFinite(gameId) && !isNaN(gameId)) {
+      return gameId;
     }
-  });
+  }
+  return undefined;
+}
+
+async function doCreateGame(event) {
+  const button = event.target;
+  button.$disable();
+  try {
+  const response = await api.get("/game/create");
+    if (response.status === 500) {
+      showWarningWindow("Something went wrong while creating your game. Please try again later", button.$enable);
+      return;
+    }
+    const data = await response.json();
+    if (response.status !== 200) {
+      const showWindow = response.status > 500 ? showWarningWindow : showErrorWindow;
+      showWindow(data.message, button.$enable);
+    } else {
+      setGameId(data.gameId);
+      // keep the create button disabled
+      button.$disable();
+    }
+  } catch {
+    showWarningWindow("An unknown error occurred while trying to create your game. Please try again later", button.$enable);
+  }
+}
+
+async function doJoinGame(event, intervalId) {
+  const [wndEnable, wndDisable] = getWindowControls(event.target);
+  wndDisable();
+  const gameId = getGameId();
+  if (gameId == null) {
+    showErrorWindow("Please insert a valid game ID first.", wndEnable);
+    return;
+  }
+
+  try {
+    const response = await api.post("/game/join", { gameId });
+    const data = await response.json();
+    if (response.status === 200) {
+      clearInterval(intervalId);
+      $goto("/game", gameId, data.playerToken);
+    } else {
+      showErrorWindow(data.message, wndEnable);
+    }
+  } catch {
+    showWarningWindow("An unknown error occurred while trying to join the game. Please try again later.", wndEnable);
+  }
 }
 
 const login = () => {
+  api.get("/session/validate")
+    .then(res => {
+      if (res.status === 200) {
+        $goto("/");
+      }
+    });
   return createWindow(
     {
       title: "Welcome to Gloom",
@@ -153,21 +251,23 @@ const login = () => {
   );
 };
 
-const loginHelp = () => createWindow(
-  {
-    title: "Login help",
-    buttons: { close: () => $goto("/login") }
-  },
-  $div(
-    windowIcon("/static/img/help.png", "32px", "32px"),
+const loginHelp = () => {
+  return createWindow(
+    {
+      title: "Login help",
+      buttons: { close: () => $goto("/login") }
+    },
     $div(
-      helpLink("I want to create an account", "/signup"),
-      $br(), $br(),
-      helpLink("I already have an account, let me in!", "/login"),
-    ).$style("padding", "0px 8px")
-  ).$style("display", "flex")
-   .$style("padding", "8px 12px 20px 12px")
-);
+      windowIcon("/static/img/help.png", "32px", "32px"),
+      $div(
+        helpLink("I want to create an account", "/signup"),
+        $br(), $br(),
+        helpLink("I already have an account, let me in!", "/login"),
+      ).$style("padding", "0px 8px")
+    ).$style("display", "flex")
+     .$style("padding", "8px 12px 20px 12px")
+  );
+};
 
 const signup = () => {
   return createWindow(
@@ -204,12 +304,7 @@ const signup = () => {
          .$style("margin-left", "4px")
       ).$style("display", "flex")
        .$style("padding", "8px 12px 12px 12px"),
-      $hr().$style("width", "95%")
-           .$style("margin", "0% 2.5%")
-           .$style("border", "none")
-           .$style("height", "1px")
-           .$style("opacity", "0.5")
-           .$style("background", "linear-gradient( to right, red 20%, yellow 20%, yellow 36%, green 36%, green 60%, blue 60%, blue 100% )"),
+      separator().$style("width", "95%"),
       $div(
         $button("Cancel").$onclick(gotoHelp),
         $button("Register").$onclick(doRegister)
@@ -222,24 +317,82 @@ const signup = () => {
 };
 
 const home = () => {
+  myGameId = undefined;
+  refreshGameId();
+  const intervalId = setInterval(refreshGameId, 5000); // refresh game id every 5 seconds
   return createWindow(
     {
       title: "Home of Gloom",
+      width: "300px",
       buttons: {
-        close: doLogout
+        close: (event) => {
+          clearInterval(intervalId);
+          doLogout(event);
+        }
       }
     },
     $div(
-      "todo"
+      $div(
+        $label("Your game").$for("game-id")
+                           .$style("font-weight", "bold")
+                           .$style("margin-bottom", "8px"),
+        $div(
+          $p("Fetching game ID...").$id("game-id")
+                                   .$style("margin", "0px")
+                                   .$style("flex-grow", "1"),
+          $button("Create").$id("btn-create")
+                           .$style("margin-left", "12px")
+                           .$onclick(doCreateGame)
+                           .$disable()
+        ).$style("display", "flex")
+         .$style("align-items", "center")
+      ),
+      separator().$style("margin", "12px 0px")
+                 .$style("width", "100%"),
+      $div(
+        $label("Join a game").$for("field-game-id").$style("font-weight", "bold"),
+        $div(
+          $input().$id("field-game-id")
+                  .$type("text")
+                  .$attribute("placeholder", "Enter a game ID")
+                  .$style("flex-grow", "1"),
+          $button("Join").$style("margin", "0px 0px 0px 8px")
+                         .$onclick((event) => doJoinGame(event, intervalId))
+        ).$style("display", "flex")
+         .$style("align-items", "center")
+      ).$class("field-row-stacked")
+    ).$style("padding", "12px")
+  );
+};
+
+const game = (gameId, playerToken) => {
+  $assert(typeof(gameId) === "number" && typeof(playerToken) === "number");
+
+  (new Promise(resolve => resolve()))
+    .then(() => gloomLauncher(gameId, playerToken, gotoHome));
+
+  return createWindow(
+    {
+      title: "GLOOM.EXE",
+      buttons: {
+        close: quitGame
+      }
+    },
+    $div(
+      $canvas().$id("viewport")
     )
   );
 };
 
-$router({
-  "/": home,
-  "/login": login,
-  "/login/help": loginHelp,
-  "/signup": signup
+api.get("/session/refresh").then(res => {
+  const initialRoute = res.status === 200 ? $route() : "/login";
+  $router({
+    $first: initialRoute,
+    $default: "/login",
+    "/": home,
+    "/login": login,
+    "/login/help": loginHelp,
+    "/signup": signup,
+    "/game": game
+  }, () => $goto("/"));
 });
-
-refreshSession("/", "/login");

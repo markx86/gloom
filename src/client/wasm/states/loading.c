@@ -43,7 +43,7 @@ static void on_tick(f32 delta) {
   switch (conn_state) {
     case CONN_CONNECTED:
       add_message("> sending join request");
-      join_game(0xcafebabe);
+      join_game();
       break;
 
     case CONN_JOINING:

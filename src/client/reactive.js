@@ -4,6 +4,14 @@ window.$assert = function (condition, message = undefined) {
   }
 };
 
+const $_routerArgs = new Map();
+
+function $_getArgsForRoute(location) {
+  const args = $_routerArgs.get(location);
+  $_routerArgs.delete(location);
+  return args;
+}
+
 function $_callOnDestroy(tag) {
   for (const child of tag.children) {
     $_callOnDestroy(child);
@@ -114,9 +122,19 @@ window.$img = function (src, width, height) {
                     .$style("height", height ?? "");
 };
 
-window.$goto = function (route) {
+window.$goto = function (route, ...args) {
   $assert(typeof(route) === "string", "route must be a string");
-  document.location.hash = route.replace('/', '#').replace(/\//, '-');
+  if (args.length > 0) {
+    $_routerArgs.set(route, args);
+  }
+  document.location.hash = route.replace('/', '$').replace(/\//, '-');
+};
+
+window.$route = function () {
+  return document.location.hash
+      .replace('#', '')
+      .replace('$', '/') // replace root character
+      .replace(/-/, '/'); // replace separator character
 };
 
 [
@@ -136,27 +154,49 @@ window.$root = function (node) {
   }
 }
 
-window.$router = function (routes) {
+window.$router = function (routes, errorCallback) {
   const result = $root();
   $assert(result != null, "no root node found!");
+  const errorHandler = errorCallback ?? console.error;
 
-  function route() {
-    let location = document.location.hash.replace('#', '/').replace(/-/, '/');
+  function _route() {
+    const location = $route();
     if (location.length === 0) {
-      location = "/";
-    }
-    $assert(location.charAt(0) === '/', "route must start with a /");
-    $assert(location in routes, `unknown route ${location}`);
-    $assert(routes[location] instanceof Function, "routes must be functions");
-    const content = routes[location]();
-    if (content != null) {
-      result.replaceChildren(content);
+      $goto(routes.$default ?? "/");
+    } else {
+      $assert(location.charAt(0) === '/', "route must start with a /");
+      $assert(location in routes, `unknown route ${location}`);
+      $assert(routes[location] instanceof Function, "routes must be functions");
+
+      const args = $_getArgsForRoute(location);
+      const routeFn = routes[location];
+      $assert(
+        (routeFn.length === 0 && args == null) ||
+        (args != null && routeFn.length === args.length),
+        `invalid parameters passed to route ${location}`
+      );
+
+      const content = args == null ? routeFn() : routeFn(...args);
+      if (content != null) {
+        result.replaceChildren(content);
+      }
     }
   }
 
+  function route() {
+    try {
+      _route();
+    } catch (e) {
+      errorHandler(e);
+    }
+  }
+
+  if (routes.$first != null) {
+    $goto(routes.$first)
+  }
   route();
   window.addEventListener("hashchange", route);
-  result.refresh = route;
+  result.$refresh = route;
 
   return result;
 };

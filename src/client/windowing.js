@@ -29,6 +29,14 @@ export function getWindow(component) {
   return undefined;
 }
 
+export function getWindowControls(target) {
+  const wnd = getWindow(target);
+  $assert(wnd != null, "target is not attached to a window");
+  const wndDisable = () => wnd.setDisabled(true);
+  const wndEnable = () => wnd.setDisabled(false);
+  return [wndEnable, wndDisable];
+}
+
 export function icon(path, width, height) {
   return $img(path, width, height)
     .$style("image-rendering", "pixelated");
@@ -43,11 +51,20 @@ export function helpLink(message, link) {
   $assert(typeof(message) === "string", "message must be a string");
   $assert(typeof(link) === "string", "link must be a string");
   $assert(link.charAt(0) === '/', "link must start with a /");
-  const href = link.substring(1).replace(/\//, '-');
+  const href = link.replace('/', '$').replace(/\//, '-');
   return $a(
     icon("/static/img/arrow.png", "16px", "16px").$style("margin", "0px 4px"),
     message
   ).$attribute("href", `#${href}`);
+}
+
+export function separator() {
+  return $hr()
+    .$style("margin", "0% 2.5%")
+    .$style("border", "none")
+    .$style("height", "1px")
+    .$style("opacity", "0.5")
+    .$style("background", "linear-gradient( to right, red 20%, yellow 20%, yellow 36%, green 36%, green 60%, blue 60%, blue 100% )");
 }
 
 export function closeWindow(event) {
@@ -127,4 +144,3 @@ export function showWarningWindow(message, onclose) {
 export function showInfoWindow(message, onclose) {
   showMessageWindow(message, MSGWND_INFO, onclose);
 }
-

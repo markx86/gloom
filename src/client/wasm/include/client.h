@@ -48,14 +48,9 @@ extern const u32 __palette[COLOR_MAX];
 extern u32 __alpha_mask;
 extern u32 __fb[FB_WIDTH * FB_HEIGHT];
 extern b8 __pointer_locked;
-extern b8 __should_tick;
 
 #define FB_SIZE   sizeof(__fb)
 #define FB_LEN    ARRLEN(__fb)
-
-static inline void exit(void) {
-  __should_tick = false;
-}
 
 static inline void set_alpha(u8 a) {
   __alpha_mask = ((u32)a) << 24;
@@ -119,5 +114,6 @@ static inline enum client_state get_client_state(void) {
 }
 
 void switch_to_state(enum client_state new_state);
+void exit(void);
 
 #endif

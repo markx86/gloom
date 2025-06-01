@@ -4,7 +4,7 @@
 u32 __fb[FB_WIDTH * FB_HEIGHT];
 u32 __alpha_mask;
 b8 __pointer_locked;
-b8 __should_tick;
+b8 should_tick;
 
 const u32 __palette[] = {
   [COLOR_BLACK]       = 0x000000,
@@ -61,12 +61,16 @@ void key_event(u32 code, char ch, b8 pressed) { CALLSTATEHANDLER(on_key, code, c
 void mouse_down(u32 x, u32 y, u32 button) { CALLSTATEHANDLER(on_mouse_down, x, y, button); }
 void mouse_up(u32 x, u32 y, u32 button) { CALLSTATEHANDLER(on_mouse_up, x, y, button); }
 void mouse_moved(u32 x, u32 y, i32 dx, i32 dy) { CALLSTATEHANDLER(on_mouse_moved, x, y, dx, dy); }
-b8 tick(f32 delta) { CALLSTATEHANDLER(on_tick, delta); return __should_tick; }
+b8 tick(f32 delta) { CALLSTATEHANDLER(on_tick, delta); return should_tick; }
 
-void init(b8 ws_connected, u32 player_token) {
-  __should_tick = true;
+void init(b8 ws_connected, u32 game_id, u32 player_token) {
   __pointer_locked = false;
-  multiplayer_init(player_token);
+  should_tick = true;
+  multiplayer_init(game_id, player_token);
   register_fb(__fb, FB_WIDTH, FB_HEIGHT, FB_SIZE);
   switch_to_state(ws_connected ? STATE_MENU : STATE_ERROR);
+}
+
+void exit(void) {
+  should_tick = false;
 }
