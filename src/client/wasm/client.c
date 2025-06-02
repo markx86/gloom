@@ -1,10 +1,11 @@
 #include <client.h>
 #include <globals.h>
 
+b8 should_tick;
+
 u32 __fb[FB_WIDTH * FB_HEIGHT];
 u32 __alpha_mask;
 b8 __pointer_locked;
-b8 should_tick;
 
 const u32 __palette[] = {
   [COLOR_BLACK]       = 0x000000,

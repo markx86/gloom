@@ -1,7 +1,7 @@
 import Logger from "./logger";
 import { WebSocket } from "ws";
 import { Game, PlayerHolder, PlayerSprite } from "./game";
-import { GamePacketType, ServerPacket, HelloPacket, UpdatePacket, DestroyPacket, GamePacket, WaitPacket } from "./packet";
+import { GamePacketType, ServerPacket, HelloPacket, UpdatePacket, DestroyPacket, GamePacket, WaitPacket, TerminatePacket } from "./packet";
 import { Peer } from "./broadcast";
 
 const MAX_PACKET_DROP = 10;
@@ -52,25 +52,25 @@ export class Client extends Peer implements PlayerHolder {
     return true;
   }
 
-  private handleJoinPacket(packet: GamePacket) {
-    if (this.player) {
+  private _handleJoinPacket(packet: GamePacket): boolean {
+    if (this.player != null) {
       Logger.error("Player sent hello packet, after it had already sent one!");
-      return;
+      return false;
     }
 
     const gameId = packet.popU32();
     Logger.info("Got request to join game with ID: %s", gameId.toString(16));
 
     const game = Game.getById(gameId);
-    if (!game) {
-      Logger.error("No game with that ID dumbass");
-      return;
+    if (game == null) {
+      Logger.error("No game with that ID");
+      return false;
     }
 
     const player = game.newPlayer(this);
-    if (!player) {
-      Logger.error("No player with that token dumbass");
-      return;
+    if (player == null) {
+      Logger.error("No player with that token");
+      return false;
     }
 
     this.player = player;
@@ -80,6 +80,14 @@ export class Client extends Peer implements PlayerHolder {
     this.registerToBroadcastGroup(game.id);
     this.sendPacket(new HelloPacket(this.player));
     this.sendPacket(new WaitPacket(game));
+
+    return true;
+  }
+
+  private handleJoinPacket(packet: GamePacket) {
+    if (!this._handleJoinPacket(packet)) {
+      this.sendPacket(new TerminatePacket());
+    }
   }
 
   private handleLeavePacket(_packet: GamePacket) {
@@ -96,7 +104,7 @@ export class Client extends Peer implements PlayerHolder {
 
   private handleUpdatePacket(packet: GamePacket) {
     Logger.info("Got update packet");
-    if (!this.player) {
+    if (this.player == null) {
       // NOTE: unreachable
       return;
     }
@@ -125,7 +133,7 @@ export class Client extends Peer implements PlayerHolder {
 
   private handleFirePacket(_packet: GamePacket) {
     Logger.info("Got fire packet");
-    if (!this.player) {
+    if (this.player == null) {
       // NOTE: unreachable
       return;
     }

@@ -14,13 +14,14 @@ const SALT_LEN = 8;
 const DATABASE_PATH = process.env.DATABASE ?? ":memory:";
 
 const db = new Database(DATABASE_PATH);
-// close the db on exit
-const closeDb = () => {
+
+export const closeDb = () => {
   Logger.info("Closing database...");
   db.close(() => {})
 };
-process.on("exit", closeDb);
-process.on("uncaughtException", closeDb);
+
+// Log unhandled exceptions
+db.on("error", Logger.error);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (

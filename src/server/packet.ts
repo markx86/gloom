@@ -14,6 +14,7 @@ export enum ServerPacketType {
   CREATE,
   DESTROY,
   WAIT,
+  TERMINATE,
   MAX
 }
 
@@ -203,4 +204,8 @@ export class WaitPacket extends ServerPacket {
       const timeAndWaiting = timeLeft | ((game.isWaiting() ? 1 : 0) << 31)
       this.pushU32(timeAndWaiting);
   }
+}
+
+export class TerminatePacket extends ServerPacket {
+  public constructor() { super(ServerPacketType.TERMINATE); }
 }

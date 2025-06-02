@@ -1,6 +1,6 @@
 import Logger from "./logger";
 import { BroadcastGroup } from "./broadcast";
-import { CreatePacket, DestroyPacket, WaitPacket } from "./packet";
+import { CreatePacket, DestroyPacket, TerminatePacket, WaitPacket } from "./packet";
 import { randomInt } from "node:crypto";
 
 const MIN_PLAYERS = 2;
@@ -398,7 +398,12 @@ export class Game {
   }
 
   public static destroy(game: Game) {
+    game.broadcastGroup.send(new TerminatePacket());
     Game.games.delete(game.id);
+  }
+
+  public static destroyAll() {
+    Game.games.forEach((game, _) => Game.destroy(game));
   }
 
   public static getById(id: number): Game | null {

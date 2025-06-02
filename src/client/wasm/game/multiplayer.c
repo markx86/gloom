@@ -22,26 +22,26 @@ struct game_pkt_hdr {
   u32 player_token;
 } PACKED;
 
-struct game_pkt_join {
-  struct game_pkt_hdr hdr;
+#define DEFINE_GPKT(name, body) \
+  struct game_pkt_##name {      \
+    struct game_pkt_hdr hdr;    \
+    struct body PACKED;         \
+  } PACKED
+
+DEFINE_GPKT(join, {
   u32 game_id;
-} PACKED;
+});
 
-struct game_pkt_leave {
-  struct game_pkt_hdr hdr;
-} PACKED;
+DEFINE_GPKT(leave, {});
 
-struct game_pkt_update {
-  struct game_pkt_hdr hdr;
+DEFINE_GPKT(update, {
   f32 ts;
   vec2f pos;
   f32 rot;
   u32 keys;
-} PACKED;
+});
 
-struct game_pkt_fire {
-  struct game_pkt_hdr hdr;
-} PACKED;
+DEFINE_GPKT(fire, {});
 
 enum serv_pkt_type {
   SPKT_HELLO,
@@ -49,20 +49,13 @@ enum serv_pkt_type {
   SPKT_CREATE,
   SPKT_DESTROY,
   SPKT_WAIT,
+  SPKT_TERMINATE,
   SPKT_MAX
 };
 
 struct serv_pkt_hdr {
   u32 seq  : 29;
   u32 type : 3;
-} PACKED;
-
-struct serv_pkt_hello {
-  struct serv_pkt_hdr hdr;
-  u8 n_sprites;
-  u8 player_id;
-  u32 map_w, map_h;
-  u8 data[0];
 } PACKED;
 
 struct sprite_transform {
@@ -81,30 +74,40 @@ struct sprite_update {
   struct sprite_transform transform;
 } PACKED;
 
-struct serv_pkt_update {
-  struct serv_pkt_hdr hdr;
+#define DEFINE_SPKT(name, body) \
+  struct serv_pkt_##name {      \
+    struct serv_pkt_hdr hdr;    \
+    struct body PACKED;         \
+  } PACKED
+
+DEFINE_SPKT(hello, {
+  u8 n_sprites;
+  u8 player_id;
+  u32 map_w;
+  u32 map_h;
+  u8 data[0];
+});
+
+DEFINE_SPKT(update, {
   struct sprite_update update;
-} PACKED;
+});
 
-struct serv_pkt_create {
-  struct serv_pkt_hdr hdr;
+DEFINE_SPKT(create, {
   struct sprite_init sprite;
-} PACKED;
+});
 
-struct serv_pkt_destroy {
-  struct serv_pkt_hdr hdr;
+DEFINE_SPKT(destroy, {
   struct sprite_desc desc;
-} PACKED;
+});
 
-struct serv_pkt_wait {
-  struct serv_pkt_hdr hdr;
+DEFINE_SPKT(wait, {
   u32 seconds : 31;
-  u32 wait   : 1;
-} PACKED;
+  u32 wait    : 1;
+});
 
-struct serv_pkt_death {
-  struct serv_pkt_hdr hdr;
-} PACKED;
+DEFINE_SPKT(death, {});
+
+DEFINE_SPKT(terminate, {});
 
 static u8 player_id;
 static u32 game_id, player_token;
@@ -405,12 +408,30 @@ static void serv_wait_handler(void* buf, u32 len) {
     wait_time = pkt->wait ? -1.0f : (f32)pkt->seconds;
 }
 
+static void serv_terminate_handler(void* buf, u32 len) {
+  struct serv_pkt_terminate* pkt = buf;
+
+  if (get_connection_state() != CONN_WAITING) {
+    pkt_type_error("terminate");
+    return;
+  }
+
+  if (sizeof(*pkt) != len) {
+    pkt_size_error("terminate", len, sizeof(*pkt));
+    return;
+  }
+
+  set_connection_state(CONN_DISCONNECTED);
+  switch_to_state(STATE_ERROR);
+}
+
 static const serv_pkt_handler_t serv_pkt_handlers[SPKT_MAX] = {
   [SPKT_HELLO]   = serv_hello_handler,
   [SPKT_UPDATE]  = serv_update_handler,
   [SPKT_CREATE]  = serv_create_handler,
   [SPKT_DESTROY] = serv_destroy_handler,
   [SPKT_WAIT]    = serv_wait_handler,
+  [SPKT_TERMINATE] = serv_terminate_handler
 };
 
 void multiplayer_on_recv(u32 len) {
