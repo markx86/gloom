@@ -10,6 +10,8 @@ import {
 let myGameId;
 
 $root($("#root"));
+// disable scroll bars
+document.body.style.overflow = "hidden";
 
 function updateRootNodeSize() {
   $root().style.width = `${window.innerWidth}px`;
@@ -189,7 +191,13 @@ async function doCreateGame(event) {
 }
 
 async function doJoinGame(event, intervalId) {
-  const [wndEnable, wndDisable] = getWindowControls(event.target);
+  const createButton = $("#btn-create");
+  const createButtonDisabled = createButton.$attribute("disabled") != null;
+  const [_wndEnable, wndDisable] = getWindowControls(event.target);
+  const wndEnable = () => {
+    _wndEnable();
+    if (createButtonDisabled) { createButton.$disable(); }
+  };
   wndDisable();
   const gameId = getGameId();
   if (gameId == null) {
