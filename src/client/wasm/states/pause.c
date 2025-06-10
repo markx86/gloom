@@ -9,7 +9,11 @@ static void on_resume_clicked(void) {
 }
 
 static void on_quit_clicked(void) {
+#ifdef UNFINISHED_FEATURES
   switch_to_state(STATE_MENU);
+#else
+  exit();
+#endif
 }
 
 static struct component buttons[] = {

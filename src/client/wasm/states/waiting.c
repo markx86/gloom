@@ -8,7 +8,11 @@ f32 wait_time;
 static f32 timer_start;
 
 static void on_back_clicked(void) {
+#ifdef UNFINISHED_FEATURES
   switch_to_state(STATE_MENU);
+#else
+  exit();
+#endif
 }
 
 static struct component back_btn = {

@@ -5,7 +5,13 @@
 #define BACKGROUND_COLOR SOLIDCOLOR(BLACK)
 #define ERROR_COLOR      SOLIDCOLOR(RED)
 
-static void on_back_clicked(void) { switch_to_state(STATE_MENU); }
+static void on_back_clicked(void) {
+#ifdef UNFINISHED_FEATURES
+  switch_to_state(STATE_MENU);
+#else
+  exit();
+#endif
+}
 
 static struct component back_button = {
   .type = UICOMP_BUTTON, .text = "> back", .on_click = on_back_clicked
