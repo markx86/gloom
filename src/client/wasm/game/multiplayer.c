@@ -2,6 +2,7 @@
 #include <gloom.h>
 #include <client.h>
 #include <globals.h>
+#include <ui.h>
 
 #define PACKED       __attribute__((packed))
 #define WS_PORT      8492
@@ -113,6 +114,17 @@ static u8 player_id;
 static u32 game_id, player_token;
 static u32 client_seq, server_seq;
 static f32 game_start;
+
+void display_game_id(void) {
+  char gids[32];
+  u32 x, w;
+  const u32 y = FB_HEIGHT - STRING_HEIGHT - 32;
+  snprintf(gids, sizeof(gids), "GAME ID: %x", game_id);
+  w = STRING_WIDTH(gids);
+  x = FB_WIDTH - 32 - w;
+  draw_rect(x - 2, y - 2, w + 4, STRING_HEIGHT + 2, SOLIDCOLOR(DARKRED));
+  draw_string_with_color(x, y, gids, SOLIDCOLOR(LIGHTGRAY));
+}
 
 // NOTE: pkt_buf is accessed from JS, when changing the size remember to also
 //       change it in app.js

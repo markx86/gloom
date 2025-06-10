@@ -58,6 +58,8 @@ static void on_tick(f32 delta) {
   draw_string(48, y, text);
   y += STRING_HEIGHT + 8;
   draw_component(48, y, &back_btn);
+
+  display_game_id();
 }
 
 static void on_enter(void) {

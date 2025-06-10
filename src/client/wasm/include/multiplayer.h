@@ -33,6 +33,8 @@ static inline void set_connection_state(enum connection_state state) {
   }
 }
 
+void display_game_id(void);
+
 void multiplayer_init(u32 gid, u32 token);
 
 void join_game(void);

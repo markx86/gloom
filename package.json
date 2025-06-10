@@ -18,6 +18,7 @@
   "scripts": {
     "_buildServer": "./scripts/build-server.sh",
     "_buildClient": "./scripts/build-client.sh",
+    "_buildUnfinished": "./scripts/build-client.sh -DUNFINISHED_FEATURES",
     "build": "mkdir -p ./build && npm run _buildClient && npm run _buildServer",
     "serve": "npm run build && ./build/server.js"
   }

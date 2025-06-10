@@ -68,7 +68,7 @@ PRINTFHANDLER(u, u32 n) {
     return;
   }
 
-  l = convert_u32_to_str(n, tmp, ARRLEN(tmp));
+  l = convert_u32_to_str(n, tmp, sizeof(tmp));
   buf_putr(pb, tmp, l);
 }
 
@@ -90,12 +90,15 @@ PRINTFHANDLER(x, u32 n) {
     return;
   }
 
-  while (n > 0 && l < ARRLEN(tmp)) {
+  while (n > 0 && l < sizeof(tmp)) {
     c = n & 0xF;
     c += (c < 0xA) ? '0' : ('A' - 0xA);
     tmp[l++] = c;
     n >>= 4;
   }
+  // pad integers with 8 zeros (not spec compliant, but idgaf)
+  while (l < 8)
+    tmp[l++] = '0';
 
   buf_putr(pb, tmp, l);
 }
@@ -121,7 +124,7 @@ PRINTFHANDLER(f, f32 v) {
   buf_putu(pb, w);
   buf_putc(pb, '.');
 
-  l = convert_u32_to_str(d, tmp, ARRLEN(tmp));
+  l = convert_u32_to_str(d, tmp, sizeof(tmp));
   while (l < 8)
     tmp[l++] = '0';
   buf_putr(pb, tmp, l);

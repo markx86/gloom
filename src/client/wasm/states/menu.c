@@ -36,6 +36,8 @@ static void on_enter(void) {
   clear_screen();
   draw_title(32, 32, "gloom");
   component_on_enter(comps, ARRLEN(comps));
+
+  display_game_id();
 }
 
 static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {

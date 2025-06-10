@@ -38,6 +38,8 @@ static void on_tick(f32 delta) {
   title();
   for (i = 0; i < ARRLEN(buttons); ++i)
     draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * i, buttons + i);
+
+  display_game_id();
 }
 
 static void on_enter(void) {
