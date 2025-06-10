@@ -27,6 +27,20 @@ gloom.loadGloom().then(([launcher, exit]) => {
   gloomExit = exit;
 });
 
+function validateInput(event) {
+  const inputBox = event.target;
+  const data = event.data;
+  const value = inputBox.value;
+  if (data != null) {
+    if (!(/^[a-fA-F0-9]+$/.test(data))) {
+      const caret = inputBox.selectionStart;
+      inputBox.value = value.substring(0, caret - data.length) + value.substring(caret);
+    } else {
+      inputBox.value = value.substring(0, 8);
+    }
+  }
+}
+
 const gotoHelp = () => $goto("/login/help");
 const gotoHome = () => $goto("/");
 const quitGame = () => (gloomExit == null ? gotoHome() : gloomExit());
@@ -363,7 +377,8 @@ const home = () => {
           $input().$id("field-game-id")
                   .$type("text")
                   .$attribute("placeholder", "Enter a game ID")
-                  .$style("flex-grow", "1"),
+                  .$style("flex-grow", "1")
+                  .$on("input", validateInput),
           $button("Join").$style("margin", "0px 0px 0px 8px")
                          .$onclick((event) => doJoinGame(event, intervalId))
         ).$style("display", "flex")
@@ -388,7 +403,9 @@ const game = (gameId, playerToken) => {
     },
     $div(
       $canvas().$id("viewport")
-    )
+    ).$style("box-shadow", "inset -1px -1px #fff, inset 1px 1px grey, inset -2px -2px #dfdfdf, inset 2px 2px #0a0a0a")
+     .$style("padding", "2px")
+     .$style("margin", "2px")
   );
 };
 

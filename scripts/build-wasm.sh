@@ -6,6 +6,8 @@ set -e
 cd $(dirname $(realpath $0))/../
 
 outpath="$1"
+shift
+extra_flags="$@"
 outfile=$(basename $outpath)
 wasmdir="./src/client/wasm"
 gendir="/tmp/gloom-gen"

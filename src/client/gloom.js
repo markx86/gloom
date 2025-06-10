@@ -2,7 +2,6 @@ export async function loadGloom() {
   const textDecoder = new TextDecoder("utf-8");
   const canvasDefaultWidth = 640;
   const canvasDefaultHeight = 480;
-  const containerPadding = 3;
   const url = `ws://${window.location.hostname}:8492`;
 
   let canvasContainer = null, canvas = null, ctx = null;
@@ -193,8 +192,6 @@ export async function loadGloom() {
     $assert(canvasContainer != null, "no canvas container");
     
     ctx = canvas.getContext("2d");
-    
-    canvasContainer.style.padding = `${containerPadding}px`;
     
     canvas.width = canvasDefaultWidth;
     canvas.height = canvasDefaultHeight;

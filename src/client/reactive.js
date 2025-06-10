@@ -85,15 +85,23 @@ function $_setFunctions(tag) {
     this.style[key] = value;
     return this;
   };
+  tag.$on = function (event, callback, options) {
+    $assert(typeof(event) === "string", "event name must be a string");
+    $assert(callback instanceof Function, "callback must be a function");
+    $assert(options === undefined || typeof(options) === "object" || typeof(options) === "boolean", "options must be either a boolean or an object");
+    this.addEventListener(event, callback, options);
+    return this;
+  }
+  tag.$add = function (...children) {
+    children.forEach(child => tag.appendChild(typeof(child) === "string" ? document.createTextNode(child) : child));
+    return this;
+  }
   tag.$destroy = function () {
     $_callOnDestroy(this);
     if (this.isConnected) {
       this.remove();
     }
   };
-  tag.$add = function (...children) {
-    children.forEach(child => tag.appendChild(typeof(child) === "string" ? document.createTextNode(child) : child));
-  }
 }
 
 window.$tag = function (name, ...children) {
