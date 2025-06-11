@@ -148,6 +148,7 @@ function refreshGameId() {
       } else {
         $("#game-id").textContent = "Could not fetch game ID";
       }
+      $("#field-game-id").placeholder = "Enter game ID";
       return null;
     })
     .then(data => {
@@ -158,9 +159,19 @@ function refreshGameId() {
     .catch(_ => $("#game-id").textContent = "Could not fetch game ID");
 }
 
+function zeroPadL(s, w) {
+  if (s.length >= w) {
+    return s;
+  }
+  while (s.length < w) {
+    s = "0" + s;
+  }
+  return s;
+}
+
 function setGameId(gameId) {
   if (gameId !== myGameId) {
-    const gameIdString = (gameId.toString(16)).toUpperCase();
+    const gameIdString = zeroPadL(gameId.toString(16), 8).toUpperCase();
     $("#game-id").textContent = gameIdString;
     $("#field-game-id").placeholder = `Enter game ID (default: ${gameIdString})`;
     $("#btn-create").$disable();
