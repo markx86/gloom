@@ -2,9 +2,9 @@
 
 import struct
 from os import path
-from writeutil import write_file, SCRIPT_DIR
+from writeutil import write_file, RESOURCE_DIR
 
-with open(path.join(SCRIPT_DIR, "zap-vga16.psf"), "rb") as f:
+with open(path.join(RESOURCE_DIR, "zap-vga16.psf"), "rb") as f:
     raw = f.read()
 
 header, char_data = (raw[:4], raw[4:])
@@ -29,7 +29,7 @@ static const char font[{num_chars}][FONT_HEIGHT] = {{
 """
 
 for i in range(num_chars):
-    c_data = char_data[(i * char_size):((i+1) * char_size)]
+    c_data = char_data[(i * char_size) : ((i + 1) * char_size)]
     font_h += f"  [{i}] = {{\n"
     for b in c_data:
         font_h += f"    0b{b:08b},\n"

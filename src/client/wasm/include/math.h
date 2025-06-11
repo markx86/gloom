@@ -29,13 +29,13 @@ static inline f32 lerp(f32 weight, f32 v1, f32 v2) {
   return (1.0f - weight) * v1 + weight * v2;
 }
 
-static inline f32 modf(f32 val, f32 mod) {
-  return (val - (i32)(val / mod) * mod);
-}
-
 static inline f32 absf(f32 f) {
   u32 a = (*(u32*)&f) & ~(1U << 31);
   return *(f32*)&a;
+}
+
+static inline f32 modf(f32 val, f32 mod) {
+  return val - (i32)(val / mod) * mod;
 }
 
 static inline u32 abs(i32 v) {

@@ -218,10 +218,8 @@ static struct sprite* get_sprite(u8 id, b8 can_alloc) {
     if (s->desc.id == id)
       return s;
   }
-  if (can_alloc && (s = alloc_sprite())) {
-    s->desc.id = id;
+  if (can_alloc && (s = alloc_sprite()))
     return s;
-  }
   return NULL;
 }
 
@@ -244,6 +242,10 @@ static void init_sprite(struct sprite_init* init) {
     memset(s, 0, sizeof(*s));
     s->desc = init->desc;
     apply_sprite_transform(s, &init->transform);
+    // if a bullet was fired, play the correct animation for that sprite
+    if (s->desc.type == SPRITE_BULLET &&
+        (s = get_sprite(init->desc.owner, false)))
+      s->anim_frame = 6.0f;
   }
 }
 
@@ -392,7 +394,6 @@ static void serv_destroy_handler(void* buf, u32 len) {
   }
 
   if (pkt->desc.type == SPRITE_PLAYER &&
-      get_client_state() == STATE_GAME &&
       count_player_sprites() == 0) {
     switch_to_state(STATE_OVER);
   }

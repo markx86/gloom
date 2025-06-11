@@ -519,6 +519,9 @@ export class Game {
   }
 
   public allocatePlayer(username: string): number | undefined {
+    if (this.state !== GameState.WAITING || this.state !== GameState.WAITING) {
+      return;
+    }
     for (const uname of this.playerTokens.values()) {
       if (uname === username) {
         return;

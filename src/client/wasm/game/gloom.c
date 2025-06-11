@@ -2,6 +2,8 @@
 #include <globals.h>
 #include <ui.h>
 
+#include <player-sprites.c>
+
 // reduced DOF for computing collision rays
 #define COLL_DOF 8
 
@@ -9,6 +11,10 @@
 #define CROSSHAIR_THICKNESS 2
 
 #define BULLET_SCREEN_OFF 128
+
+#define PLAYER_SPRITE_W (PLAYER_TILE_W * 5)
+#define PLAYER_SPRITE_H (PLAYER_TILE_H * 5)
+#define PLAYER_ANIM_FPS 6
 
 struct player player;
 struct map map;
@@ -21,11 +27,6 @@ static f32 z_buf[FB_WIDTH];
 static const vec2i sprite_dims[] = {
   [SPRITE_PLAYER] = { .x = PLAYER_SPRITE_W, .y = PLAYER_SPRITE_H },
   [SPRITE_BULLET] = { .x = BULLET_SPRITE_W, .y = BULLET_SPRITE_H }
-};
-
-static const u8 sprite_colors[] = {
-  [SPRITE_PLAYER] = COLOR_YELLOW,
-  [SPRITE_BULLET] = COLOR_RED
 };
 
 // NOTE: @new_fov must be in radians
@@ -192,6 +193,21 @@ static inline void update_sprites(f32 delta) {
     // disable bullet sprites on collision with a wall
     if (s->desc.type == SPRITE_BULLET)
       s->disabled = !s->disabled && collided;
+    else /* s->desc.type == SPRITE_PLAYER */ {
+      // do player sprites stuff
+      if (s->anim_frame > 4.0f) {
+        // if anim_frame > 4, the firing frame is being shown
+        s->anim_frame -= delta * PLAYER_ANIM_FPS;
+        if (s->anim_frame < 4.0f)
+          s->anim_frame = 4.0f;
+      }
+      else if (s->vel > 0.1f)
+        // player is moving, animate
+        s->anim_frame = modf(s->anim_frame + delta * PLAYER_ANIM_FPS, 4.0f);
+      else
+        // player is standing, set the correct animation frame
+        s->anim_frame = 4.0f;
+    }
 
     // if the sprite is disabled or the sprite is not a player,
     // do not do collision checks with other sprites.
@@ -267,25 +283,73 @@ static inline i32 get_y_end(struct sprite* s, u32 screen_h) {
   }
 }
 
+static inline const u8* get_player_tile(u32 x, u32 y) {
+  return &player_spritesheet[((y * PLAYER_NTILES_W) + x) * (PLAYER_TILE_W * PLAYER_TILE_H)];
+}
+
 static void draw_sprite(struct sprite* s) {
-  u32 screen_h, color;
+  u32 screen_h, color, a;
+  u32 uvw, uvh, uvx, uvy;
   i32 x_start, x_end, y_start, y_end;
-  i32 x, y;
+  i32 x, y, rot;
+  const u8 *tex;
+  b8 invert_x = false;
 
   screen_h = (f32)sprite_dims[s->desc.type].y * s->inv_depth;
-  color = get_color(sprite_colors[s->desc.type]);
 
   // determine screen coordinates of the sprite
   x_start = s->screen_x - s->screen_halfw;
   x_end = s->screen_x + s->screen_halfw;
   y_end = get_y_end(s, screen_h);
   y_start = y_end - screen_h;
-  // draw the sprite
-  for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
-    if (z_buf[x] < s->depth2)
-      continue;
-    for (y = MAX(0, y_start); y < y_end && y < FB_HEIGHT; y++)
-      set_pixel(x, y, color);
+
+  if (s->desc.type == SPRITE_PLAYER) {
+    uvw = MAX(x_end - x_start, 0);
+    uvh = MAX(y_end - y_start, 0);
+
+#define STEPS ((PLAYER_NTILES_H << 1) - 2)
+#define SLICE (TWO_PI / STEPS)
+
+    a = get_alpha_mask();
+
+    rot = (s->rot + SLICE / 2.0f - player.rot + PI) * STEPS / TWO_PI;
+    rot &= 7;
+    if (rot > 4) {
+      rot = 8 - rot;
+      invert_x = true;
+    }
+
+    tex = get_player_tile((u32)s->anim_frame, abs(rot));
+
+    // draw the sprite
+    for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
+      // discard stripe if there's a wall closer to the camera
+      if (z_buf[x] < s->depth2)
+        continue;
+      // compute x texture coordinate
+      uvx = (f32)((x - x_start) * PLAYER_TILE_W) / uvw;
+      // invert on the x axis if needed
+      if (invert_x)
+        uvx = PLAYER_TILE_W - uvx;
+      for (y = MAX(0, y_start); y < y_end && y < FB_HEIGHT; y++) {
+        uvy = (f32)((y - y_start) * PLAYER_TILE_H) / uvh;
+        color = tex[uvx + uvy * PLAYER_TILE_W];
+        if (color)
+          set_pixel(x, y, player_coltab[color] | a);
+      }
+    }
+  } else {
+    // FIXME get this from somewhere
+    color = 0xFF0000FF;
+
+    // draw the sprite
+    for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
+      // discard stripe if there's a wall closer to the camera
+      if (z_buf[x] < s->depth2)
+        continue;
+      for (y = MAX(0, y_start); y < y_end && y < FB_HEIGHT; y++)
+        set_pixel(x, y, color);
+    }
   }
 }
 
@@ -317,8 +381,7 @@ static inline void render_scene(void) {
 static inline void render_sprites(void) {
   vec2f proj, diff;
   u32 i, j, k, n;
-  struct sprite* s;
-  struct sprite* on_screen_sprites[MAX_SPRITES];
+  struct sprite *s, *on_screen_sprites[MAX_SPRITES];
 
   n = 0;
   for (i = 0; i < sprites.n; ++i) {

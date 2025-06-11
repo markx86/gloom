@@ -5,6 +5,7 @@ assert len(sys.argv) >= 2, f"USAGE: {sys.argv[1]} OUTPUT_DIR"
 
 SCRIPT_DIR = path.dirname(path.abspath(sys.argv[0]))
 OUTPUT_DIR = path.abspath(sys.argv[1])
+RESOURCE_DIR = path.join(SCRIPT_DIR, "..", "..", "res")
 
 makedirs(OUTPUT_DIR, exist_ok=True)
 

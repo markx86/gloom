@@ -58,6 +58,7 @@ struct sprite {
     f32 inv_depth;
     f32 depth2;
     b8 disabled;
+    f32 anim_frame;
   };
 };
 
@@ -91,9 +92,6 @@ extern struct camera camera;
 extern struct sprites sprites;
 extern struct map map;
 extern union keys keys;
-
-#define PLAYER_SPRITE_W 128
-#define PLAYER_SPRITE_H 400
 
 #define BULLET_SPRITE_W 32
 #define BULLET_SPRITE_H 32
