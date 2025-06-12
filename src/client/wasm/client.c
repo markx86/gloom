@@ -67,6 +67,7 @@ b8 tick(f32 delta) { CALLSTATEHANDLER(on_tick, delta); return should_tick; }
 void init(b8 ws_connected, u32 game_id, u32 player_token) {
   __pointer_locked = false;
   should_tick = true;
+  tracked_sprite = NULL;
   multiplayer_init(game_id, player_token);
   register_fb(__fb, FB_WIDTH, FB_HEIGHT, FB_SIZE);
 #ifdef UNFINISHED_FEATURES
