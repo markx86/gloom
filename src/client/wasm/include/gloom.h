@@ -14,7 +14,6 @@
 #define CAMERA_DOF 32
 
 #define MAX_SPRITES   255
-#define SPRITE_RADIUS 0.15f
 
 struct camera {
   u32 dof;
@@ -92,9 +91,6 @@ extern struct camera camera;
 extern struct sprites sprites;
 extern struct map map;
 extern union keys keys;
-
-#define BULLET_SPRITE_W 32
-#define BULLET_SPRITE_H 32
 
 #define PLAYER_MAX_HEALTH 100
 #define BULLET_DAMAGE     25

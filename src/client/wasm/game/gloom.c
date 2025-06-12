@@ -2,7 +2,7 @@
 #include <globals.h>
 #include <ui.h>
 
-#include <player-sprites.c>
+#include <sprites.c>
 
 // reduced DOF for computing collision rays
 #define COLL_DOF 8
@@ -11,10 +11,15 @@
 #define CROSSHAIR_THICKNESS 2
 
 #define BULLET_SCREEN_OFF 128
+#define PLAYER_ANIM_FPS 6
+
+#define BULLET_SPRITE_W (BULLET_TEXTURE_W * 2)
+#define BULLET_SPRITE_H (BULLET_TEXTURE_H * 2)
 
 #define PLAYER_SPRITE_W (PLAYER_TILE_W * 5)
 #define PLAYER_SPRITE_H (PLAYER_TILE_H * 5)
-#define PLAYER_ANIM_FPS 6
+
+// #define SPRITE_RADIUS 0.15f
 
 struct player player;
 struct map map;
@@ -27,6 +32,11 @@ static f32 z_buf[FB_WIDTH];
 static const vec2i sprite_dims[] = {
   [SPRITE_PLAYER] = { .x = PLAYER_SPRITE_W, .y = PLAYER_SPRITE_H },
   [SPRITE_BULLET] = { .x = BULLET_SPRITE_W, .y = BULLET_SPRITE_H }
+};
+
+static const f32 sprite_radius[] = {
+  [SPRITE_PLAYER] = 0.15f,
+  [SPRITE_BULLET] = 0.05f
 };
 
 // NOTE: @new_fov must be in radians
@@ -108,7 +118,7 @@ static u8 trace_ray(const vec2f* pos, const vec2f* ray_dir, u32 dof, struct hit*
   return cell_id;
 }
 
-static b8 move_and_collide(vec2f* pos, vec2f* dir, f32 space) {
+static b8 move_and_collide(vec2f* pos, vec2f* dir, f32 space, f32 radius) {
   struct hit hit;
   f32 v_dist, h_dist;
   vec2f v_dir, h_dir;
@@ -119,8 +129,8 @@ static b8 move_and_collide(vec2f* pos, vec2f* dir, f32 space) {
   v_dir.y = signf(dir->y);
   v_dist = absf(dir->y) * space;
   if (trace_ray(pos, &v_dir, COLL_DOF, &hit) &&
-      hit.dist < v_dist + SPRITE_RADIUS) {
-    v_dist = hit.dist - SPRITE_RADIUS;
+      hit.dist < v_dist + radius) {
+    v_dist = hit.dist - radius;
     collided = true;
   }
 
@@ -129,8 +139,8 @@ static b8 move_and_collide(vec2f* pos, vec2f* dir, f32 space) {
   h_dir.y = 0.0f;
   h_dist = absf(dir->x) * space;
   if (trace_ray(pos, &h_dir, COLL_DOF, &hit) &&
-      hit.dist < h_dist + SPRITE_RADIUS) {
-    h_dist = hit.dist - SPRITE_RADIUS;
+      hit.dist < h_dist + radius) {
+    h_dist = hit.dist - radius;
     collided = true;
   }
 
@@ -176,20 +186,24 @@ static inline void update_player_position(f32 delta) {
     }
   }
 
-  move_and_collide(&player.pos, &dir, delta * PLAYER_RUN_SPEED);
+  move_and_collide(&player.pos, &dir, delta * PLAYER_RUN_SPEED,
+                   sprite_radius[SPRITE_PLAYER]);
 }
 
 static inline void update_sprites(f32 delta) {
   b8 collided;
   u32 i, j;
-  f32 dist_from_other2;
+  f32 dist_from_other2, min_dist2;
+  f32 s_radius;
   vec2f diff;
   struct sprite *s, *other;
 
   for (i = 0; i < sprites.n; ++i) {
     s = sprites.s + i;
 
-    collided = move_and_collide(&s->pos, &s->dir, s->vel * delta);
+    s_radius = sprite_radius[s->desc.type];
+
+    collided = move_and_collide(&s->pos, &s->dir, s->vel * delta, s_radius);
     // disable bullet sprites on collision with a wall
     if (s->desc.type == SPRITE_BULLET)
       s->disabled = !s->disabled && collided;
@@ -224,9 +238,13 @@ static inline void update_sprites(f32 delta) {
       // save the diff vector, because we'll also need it during rendering.
       diff = VEC2SUB(&other->pos, &s->pos);
 
+      // compute minimum distance between the two sprites
+      min_dist2 = s_radius + sprite_radius[other->desc.id];
+      min_dist2 *= min_dist2;
+
       // compute the distance from the player and check if the sprite collided
       dist_from_other2 = VEC2LENGTH2(&diff);
-      if (dist_from_other2 < SPRITE_RADIUS * SPRITE_RADIUS) {
+      if (dist_from_other2 < min_dist2) {
         if (other->desc.type == SPRITE_BULLET &&
             other->desc.owner != s->desc.id)
           // disable the bullet sprite if it collided with a player sprite.
@@ -289,10 +307,12 @@ static inline const u8* get_player_tile(u32 x, u32 y) {
 
 static void draw_sprite(struct sprite* s) {
   u32 screen_h, color, a;
+  u32 tex_w, tex_h;
   u32 uvw, uvh, uvx, uvy;
   i32 x_start, x_end, y_start, y_end;
   i32 x, y, rot;
-  const u8 *tex;
+  const u8* tex;
+  const u32* coltab;
   b8 invert_x = false;
 
   screen_h = (f32)sprite_dims[s->desc.type].y * s->inv_depth;
@@ -303,14 +323,12 @@ static void draw_sprite(struct sprite* s) {
   y_end = get_y_end(s, screen_h);
   y_start = y_end - screen_h;
 
-  if (s->desc.type == SPRITE_PLAYER) {
-    uvw = MAX(x_end - x_start, 0);
-    uvh = MAX(y_end - y_start, 0);
+  uvw = MAX(x_end - x_start, 0);
+  uvh = MAX(y_end - y_start, 0);
 
+  if (s->desc.type == SPRITE_PLAYER) {
 #define STEPS ((PLAYER_NTILES_H << 1) - 2)
 #define SLICE (TWO_PI / STEPS)
-
-    a = get_alpha_mask();
 
     rot = (s->rot + SLICE / 2.0f - player.rot + PI) * STEPS / TWO_PI;
     rot &= 7;
@@ -320,35 +338,35 @@ static void draw_sprite(struct sprite* s) {
     }
 
     tex = get_player_tile((u32)s->anim_frame, abs(rot));
+    coltab = player_coltab;
 
-    // draw the sprite
-    for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
-      // discard stripe if there's a wall closer to the camera
-      if (z_buf[x] < s->depth2)
-        continue;
-      // compute x texture coordinate
-      uvx = (f32)((x - x_start) * PLAYER_TILE_W) / uvw;
-      // invert on the x axis if needed
-      if (invert_x)
-        uvx = PLAYER_TILE_W - uvx;
-      for (y = MAX(0, y_start); y < y_end && y < FB_HEIGHT; y++) {
-        uvy = (f32)((y - y_start) * PLAYER_TILE_H) / uvh;
-        color = tex[uvx + uvy * PLAYER_TILE_W];
-        if (color)
-          set_pixel(x, y, player_coltab[color] | a);
-      }
-    }
+    tex_w = PLAYER_TILE_W;
+    tex_h = PLAYER_TILE_H;
   } else {
-    // FIXME get this from somewhere
-    color = 0xFF0000FF;
+    tex = bullet_texture;
+    coltab = bullet_coltab;
 
-    // draw the sprite
-    for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
-      // discard stripe if there's a wall closer to the camera
-      if (z_buf[x] < s->depth2)
-        continue;
-      for (y = MAX(0, y_start); y < y_end && y < FB_HEIGHT; y++)
-        set_pixel(x, y, color);
+    tex_w = BULLET_TEXTURE_W;
+    tex_h = BULLET_TEXTURE_H;
+  }
+
+  a = get_alpha_mask();
+
+  // draw the sprite
+  for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
+    // discard stripe if there's a wall closer to the camera
+    if (z_buf[x] < s->depth2)
+      continue;
+    // compute x texture coordinate
+    uvx = (f32)((x - x_start) * tex_w) / uvw;
+    // invert on the x axis if needed
+    if (invert_x)
+      uvx = tex_w - uvx;
+    for (y = MAX(0, y_start); y < y_end && y < FB_HEIGHT; y++) {
+      uvy = (f32)((y - y_start) * tex_h) / uvh;
+      color = tex[uvx + uvy * tex_w];
+      if (color)
+        set_pixel(x, y, coltab[color] | a);
     }
   }
 }

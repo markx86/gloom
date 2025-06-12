@@ -19,7 +19,7 @@ mkdir -p $gendir
 # generate cosine table
 ./scripts/tools/gen-cos-table.py $gendir
 # generate sprites.c file
-./scripts/tools/gen-spritesheet.py $gendir
+./scripts/tools/gen-sprites.py $gendir
 
 # glob .c files
 srcs=$(find $wasmdir -type f -name '*.c')
