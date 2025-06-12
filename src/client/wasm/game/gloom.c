@@ -36,7 +36,7 @@ static const vec2i sprite_dims[] = {
 
 static const f32 sprite_radius[] = {
   [SPRITE_PLAYER] = 0.15f,
-  [SPRITE_BULLET] = 0.05f
+  [SPRITE_BULLET] = 0.01f
 };
 
 // NOTE: @new_fov must be in radians
@@ -327,25 +327,28 @@ static void draw_sprite(struct sprite* s) {
   uvh = MAX(y_end - y_start, 0);
 
   if (s->desc.type == SPRITE_PLAYER) {
+    // set the player sprite data
 #define STEPS ((PLAYER_NTILES_H << 1) - 2)
 #define SLICE (TWO_PI / STEPS)
-
+    // determine the rotation of the sprite to use
     rot = (s->rot + SLICE / 2.0f - player.rot + PI) * STEPS / TWO_PI;
     rot &= 7;
     if (rot > 4) {
       rot = 8 - rot;
       invert_x = true;
     }
-
+    // get the pointer to the corresponding sprite texture
     tex = get_player_tile((u32)s->anim_frame, abs(rot));
+    // set the color table pointer
     coltab = player_coltab;
-
+    // set the texture width and height
     tex_w = PLAYER_TILE_W;
     tex_h = PLAYER_TILE_H;
-  } else {
+  } else /* s->desc.type == SPRITE_BULLET */ {
+    // set the bullet sprite data
     tex = bullet_texture;
     coltab = bullet_coltab;
-
+    // set bullet texture dimensions
     tex_w = BULLET_TEXTURE_W;
     tex_h = BULLET_TEXTURE_H;
   }

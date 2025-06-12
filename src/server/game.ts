@@ -8,7 +8,7 @@ const MAX_PLAYERS = 4;
 const MAX_SPRITES = 256;
 const MAX_GAMES = 256;
 
-const SPRITE_RADIUS = 0.15;
+// const SPRITE_RADIUS = 0.15;
 
 const PLAYER_HEALTH = 100;
 const PLAYER_RUN_SPEED = 3.5;
@@ -94,6 +94,7 @@ export abstract class GameSprite {
   readonly id: number;
   readonly type: GameSpriteType;
   readonly game: Game;
+  readonly radius: number;
   protected x: number;
   protected y: number;
   protected rotation: number;
@@ -101,12 +102,13 @@ export abstract class GameSprite {
   protected dirX: number;
   protected dirY: number;
 
-  public constructor(game: Game, id: number, type: GameSpriteType,
+  public constructor(game: Game, id: number, type: GameSpriteType, radius: number,
                      x: number, y: number, velocity: number, rotation: number = 0) {
     this.id = id;
     this.type = type;
     this.x = x;
     this.y = y;
+    this.radius = radius;
     this.rotation = rotation;
     this.velocity = velocity;
     this.dirX = Math.cos(rotation);
@@ -131,8 +133,8 @@ export abstract class GameSprite {
       x, y,
       0, signDirY,
       this.game.map);
-    if (vDistMax < vDist + SPRITE_RADIUS) {
-      vDist = vDistMax - SPRITE_RADIUS;
+    if (vDistMax < vDist + this.radius) {
+      vDist = vDistMax - this.radius;
       collided = true;
     }
 
@@ -140,8 +142,8 @@ export abstract class GameSprite {
       x, y,
       signDirX, 0,
       this.game.map);
-    if (hDistMax < hDist + SPRITE_RADIUS) {
-      hDist = hDistMax - SPRITE_RADIUS;
+    if (hDistMax < hDist + this.radius) {
+      hDist = hDistMax - this.radius;
       collided = true;
     }
 
@@ -194,7 +196,7 @@ export class PlayerSprite extends GameSprite {
 
   public constructor(holder: PlayerHolder, game: Game, id: number,
                      x: number, y: number, r: number = 0) {
-    super(game, id, GameSpriteType.PLAYER, x, y, 0, r);
+    super(game, id, GameSpriteType.PLAYER, 0.15, x, y, 0, r);
     this.holder = holder;
     this.health = PLAYER_HEALTH;
     this.reloadTime = 0;
@@ -229,7 +231,8 @@ export class PlayerSprite extends GameSprite {
       if (this === other) {
         return;
       }
-      if (this.distanceFrom(other) < SPRITE_RADIUS) {
+      const minDist = this.radius + other.radius;
+      if (this.distanceFrom(other) < minDist) {
         this.onSpriteCollision(other);
       }
     })
@@ -293,9 +296,9 @@ export class BulletSprite extends GameSprite {
 
   public constructor(player: PlayerSprite, id: number) {
     super(
-      player.game, id, GameSpriteType.BULLET,
+      player.game, id, GameSpriteType.BULLET, 0.01,
       player.getX(), player.getY(),
-      BULLET_INITIAL_SPEED, player.getR()
+      BULLET_INITIAL_SPEED, player.getR(),
     );
     this.owner = player;
   }
