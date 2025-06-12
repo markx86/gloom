@@ -8,8 +8,6 @@ const MAX_PLAYERS = 4;
 const MAX_SPRITES = 256;
 const MAX_GAMES = 256;
 
-// const SPRITE_RADIUS = 0.15;
-
 const PLAYER_HEALTH = 100;
 const PLAYER_RUN_SPEED = 3.5;
 const PLAYER_RELOAD_TIME = 0.25;

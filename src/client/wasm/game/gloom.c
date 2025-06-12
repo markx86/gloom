@@ -19,7 +19,8 @@
 #define PLAYER_SPRITE_W (PLAYER_TILE_W * 5)
 #define PLAYER_SPRITE_H (PLAYER_TILE_H * 5)
 
-// #define SPRITE_RADIUS 0.15f
+#define HEALTH_BAR_WIDTH 64
+#define HEALTH_BAR_LAG   0.85f
 
 struct player player;
 struct map map;
@@ -28,6 +29,7 @@ struct camera camera;
 union keys keys;
 
 static f32 z_buf[FB_WIDTH];
+static i32 display_health;
 
 static const vec2i sprite_dims[] = {
   [SPRITE_PLAYER] = { .x = PLAYER_SPRITE_W, .y = PLAYER_SPRITE_H },
@@ -511,14 +513,24 @@ static inline void render_crosshair(void) {
 
 static inline void render_hud(void) {
   u32 health_bar_w, health_bar_c;
+  u32 x;
   const char health_lbl[] = "H";
 
-  health_bar_w = ((f32)player.health / PLAYER_MAX_HEALTH) * 64.0f;
+  x = 8 + STRING_WIDTH_IMM(health_lbl) + 4;
+  if (display_health != player.health)
+    draw_rect(4, 4, x + HEALTH_BAR_WIDTH, 8 + STRING_HEIGHT, COLOR(WHITE));
+
   health_bar_c = COLOR(RED);
   draw_string_with_color(8, 8, health_lbl, health_bar_c);
-  draw_rect(8 + STRING_WIDTH_IMM(health_lbl) + 4, 8,
-            health_bar_w, STRING_HEIGHT - 1,
-            health_bar_c);
+
+  health_bar_w = (f32)(player.health * HEALTH_BAR_WIDTH) / PLAYER_MAX_HEALTH;
+  draw_rect(x, 8, health_bar_w, STRING_HEIGHT - 1, health_bar_c);
+
+  x += health_bar_w;
+  health_bar_w = (f32)((display_health - player.health) * HEALTH_BAR_WIDTH) / PLAYER_MAX_HEALTH;
+  draw_rect(x, 8, health_bar_w, STRING_HEIGHT - 1, COLOR(MAGENTA));
+
+  display_health = (display_health * HEALTH_BAR_LAG + player.health * (1.0f - HEALTH_BAR_LAG));
 }
 
 void gloom_render(void) {
@@ -532,7 +544,7 @@ void gloom_init(f32 camera_fov, u32 camera_dof) {
   set_camera_fov(camera_fov);
   set_player_rot(0);
   camera.dof = camera_dof;
-  player.health = PLAYER_MAX_HEALTH;
+  display_health = player.health = PLAYER_MAX_HEALTH;
 }
 
 void gloom_tick(f32 delta) {

@@ -424,18 +424,14 @@ static void serv_wait_handler(void* buf, u32 len) {
 static void serv_terminate_handler(void* buf, u32 len) {
   struct serv_pkt_terminate* pkt = buf;
 
-  if (get_connection_state() != CONN_WAITING) {
-    pkt_type_error("terminate");
-    return;
-  }
-
   if (sizeof(*pkt) != len) {
     pkt_size_error("terminate", len, sizeof(*pkt));
     return;
   }
 
   set_connection_state(CONN_DISCONNECTED);
-  switch_to_state(STATE_ERROR);
+  if (get_client_state() != STATE_OVER)
+    switch_to_state(STATE_ERROR);
 }
 
 static const serv_pkt_handler_t serv_pkt_handlers[SPKT_MAX] = {
