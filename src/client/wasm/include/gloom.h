@@ -10,9 +10,14 @@
 #define PLAYER_RUN_SPEED    3.5f
 #define PLAYER_ROT_SPEED    0.01f
 
-#define MAX_CAMERA_FOV 150.0f
+#define MAX_CAMERA_FOV 120.0f
+#define MIN_CAMERA_FOV 30.0f
+
 #define MAX_CAMERA_DOF 48
+#define MIN_CAMERA_DOF 8
+
 #define MAX_MOUSE_SENS 2.0f
+#define MIN_MOUSE_SENS 0.1f
 
 #define MAX_SPRITES   255
 

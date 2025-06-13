@@ -45,10 +45,14 @@ static void save_settings(void) {
                  comps[MOUSESENS_SLIDER].value);
 }
 
+static inline f32 slider_value(enum option_control ctrl, f32 min, f32 max) {
+  return min + (max - min) * comps[ctrl].value;
+}
+
 void apply_settings(void) {
-  camera.dof = MAX_CAMERA_DOF * comps[DRAWDIST_SLIDER].value;
-  set_camera_fov(DEG2RAD(MAX_CAMERA_FOV * comps[FOV_SLIDER].value));
-  mouse_sensitivity = MAX_MOUSE_SENS * comps[MOUSESENS_SLIDER].value;
+  camera.dof = slider_value(DRAWDIST_SLIDER, MIN_CAMERA_DOF, MAX_CAMERA_DOF);
+  set_camera_fov(DEG2RAD(slider_value(FOV_SLIDER, MAX_CAMERA_FOV, MIN_CAMERA_FOV)));
+  mouse_sensitivity = slider_value(MOUSESENS_SLIDER, MIN_MOUSE_SENS, MAX_MOUSE_SENS);
 }
 
 void load_settings(f32 drawdist, f32 fov, f32 mousesens) {
