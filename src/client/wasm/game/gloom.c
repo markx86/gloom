@@ -541,7 +541,9 @@ void gloom_render(void) {
 }
 
 void gloom_init(void) {
-  set_player_rot(0);
+  // may seem counter intuitive, you should look into
+  // the hello packet handler in multiplayer.c
+  set_player_rot(player.rot);
   display_health = player.health = PLAYER_MAX_HEALTH;
 }
 

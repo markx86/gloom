@@ -262,7 +262,7 @@ static void serv_hello_handler(void* buf, u32 len) {
   }
 
   // size check
-  map_size = (pkt->map_h * pkt->map_w) >> 2;
+  map_size = (pkt->map_h * pkt->map_w + 7) >> 3;
   n_sprites = pkt->n_sprites;
   sprites_size = n_sprites * sizeof(*s);
   pkt_size = sizeof(*pkt) + map_size + sprites_size;
@@ -291,9 +291,11 @@ static void serv_hello_handler(void* buf, u32 len) {
         break;
       if (s->desc.id != player_id)
         init_sprite(s);
-      else
+      else {
         // init data refers to the player
         player.pos = s->transform.pos;
+        player.rot = s->transform.rot;
+      }
       len -= sizeof(*s);
       ++s;
     }
@@ -303,9 +305,9 @@ static void serv_hello_handler(void* buf, u32 len) {
     x = y = 0;
     for (i = 0; i < len; ++i) {
       b = m[i];
-      for (j = 0; j < (8 >> 1); ++j) {
-        map.tiles[x + y * map.w] = b & 0b11;
-        b >>= 2;
+      for (j = 0; j < 8; ++j) {
+        map.tiles[x + y * map.w] = b & 1;
+        b >>= 1;
         if (++x == map.w) {
           x = 0;
           ++y;

@@ -325,12 +325,12 @@ export class GameMap {
   public getCompressedData(): Uint8Array {
     if (!this.compressed) {
       const compressed = this.tiles.reduce((running, tileValue, tileIndex) => {
-        tileValue &= 3;
-        const bitPos = (tileIndex & 3) << 1;
+        tileValue &= 1;
+        const bitPos = tileIndex & 7;
         if (bitPos === 0) {
           running.push(tileValue);
         } else {
-          running[tileIndex >> 2] |= tileValue << bitPos;
+          running[tileIndex >> 3] |= tileValue << bitPos;
         }
         return running;
       }, new Array<number>())
@@ -340,7 +340,7 @@ export class GameMap {
   }
 
   public getSizeInBytes(): number {
-    return ((this.tiles.length + 3) & ~3) >> 2;
+    return ((this.tiles.length + 7) & ~7) >> 3;
   }
 
   public testBlockAt(x: number, y: number) {
@@ -352,7 +352,16 @@ export class GameMap {
     if (y >= this.height || y < 0) {
       return true;
     }
-    return this.tiles[x + y * this.width] !== 0;
+    return (this.tiles[x + y * this.width] & 1) !== 0;
+  }
+
+  public getSpawnTransformForPlayer(index: number): [number, number, number] | undefined {
+    const spawnTile = this.tiles.filter((tile) => (tile & 0x0F) === 2 && ((tile & 0x30) >> 4) === index);
+    if (spawnTile.length === 1) {
+      const index = this.tiles.indexOf(spawnTile[0]);
+      const rot = ((spawnTile[0] & 0xC0) >> 6) * (Math.PI / 2);
+      return [(index % this.width) + 0.5, Math.floor(index / this.height) + 0.5, rot];
+    }
   }
 }
 
@@ -508,10 +517,19 @@ export class Game {
   }
 
   public newPlayer(holder: PlayerHolder): PlayerSprite | undefined {
+    const index = this.numOfPlayers;
     if (this.numOfPlayers++ >= MAX_PLAYERS) {
       Logger.warning("Max players reached in game %s", this.id.toString(16));
     } else if (this.playerTokens.has(holder.getToken())) {
-      return this.addSprite(new PlayerSprite(holder, this, this.nextEntityId(), 1.5, 1.5));
+      const transf = this.map.getSpawnTransformForPlayer(index);
+      if (transf != null) {
+        // const toCenterVec = [(this.map.width / 2) - pos[0], (this.map.height / 2) - pos[1]];
+        // const toCenterDist = Math.sqrt(Math.pow(toCenterVec[0], 2) + Math.pow(toCenterVec[1], 2));
+        // const toCenterDir = [toCenterVec[0] / toCenterDist, toCenterVec[1] / toCenterDist];
+        // const rot = Math.acos(toCenterVec[0] / toCenterDist);
+        return this.addSprite(new PlayerSprite(holder, this, this.nextEntityId(), transf[0], transf[1], transf[2]));
+      }
+      Logger.warning("No place to spawn player with index %d", index);
     }
   }
 
