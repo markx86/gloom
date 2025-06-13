@@ -107,6 +107,11 @@ export async function loadGloom() {
       return -1;
     }
   }
+
+  function store_settings(drawdist, fov, mousesens) {
+    const settings = { mousesens, drawdist, fov };
+    localStorage.setItem("settings", btoa(JSON.stringify(settings)));
+  }
   
   // f32 time(void);
   function time() {
@@ -121,6 +126,7 @@ export async function loadGloom() {
       request_mem,
       register_fb,
       send_packet,
+      store_settings,
       time
     },
   };
@@ -269,6 +275,12 @@ export async function loadGloom() {
     });
     ws.addEventListener("error", wsErrorHandler);
     ws.addEventListener("open", wsOpenHandler);
+  }
+
+  const b64Settings = localStorage.getItem("settings")
+  if (b64Settings != null) {
+    const settings = JSON.parse(atob(b64Settings));
+    instance.exports.load_settings(settings.drawdist, settings.fov, settings.mousesens);
   }
 
   return [launchGloom, instance.exports.exit];

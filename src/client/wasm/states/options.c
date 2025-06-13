@@ -1,24 +1,63 @@
 #include <client.h>
+#include <globals.h>
 #include <ui.h>
 
 #define FOREGROUND_COLOR SOLIDCOLOR(YELLOW)
 #define BACKGROUND_COLOR SOLIDCOLOR(BLUE)
 
-static void on_back_clicked(void) { switch_to_state(STATE_MENU); }
+static void save_settings(void);
 
-#define BACK_BUTTON      0
-#define SOUND_CHECKBOX   1
-#define VOLUME_SLIDER    2
-#define DRAWDIST_SLIDER  3
-#define MOUSESENS_SLIDER 4
+static void on_back_clicked(void) {
+  apply_settings();
+  save_settings();
+#ifdef UNFINISHED_FEATURES
+  switch_to_state(STATE_MENU);
+#else
+  switch_to_state(STATE_PAUSE);
+#endif
+}
+
+enum option_control {
+  BACK_BUTTON,
+#ifdef UNFINISHED_FEATURES
+  SOUND_CHECKBOX,
+  VOLUME_SLIDER,
+#endif
+  FOV_SLIDER,
+  DRAWDIST_SLIDER,
+  MOUSESENS_SLIDER
+};
 
 static struct component comps[] = {
   [BACK_BUTTON]      = { .type = UICOMP_BUTTON,   .text = "> back", .on_click = on_back_clicked },
+#ifdef UNFINISHED_FEATURES
   [SOUND_CHECKBOX]   = { .type = UICOMP_CHECKBOX, .text = "> sound", .ticked = true },
   [VOLUME_SLIDER]    = { .type = UICOMP_SLIDER,   .text = "> volume", .value = 1.0f },
-  [DRAWDIST_SLIDER]  = { .type = UICOMP_SLIDER,   .text = "> draw distance", .value = 0.5f },
+#endif
+  [DRAWDIST_SLIDER]  = { .type = UICOMP_SLIDER,   .text = "> draw distance", .value = 0.66f },
+  [FOV_SLIDER]       = { .type = UICOMP_SLIDER,   .text = "> field of view", .value = 0.5f },
   [MOUSESENS_SLIDER] = { .type = UICOMP_SLIDER,   .text = "> mouse sensitivity", .value = 0.5f },
 };
+
+static void save_settings(void) {
+  store_settings(comps[DRAWDIST_SLIDER].value,
+                 comps[FOV_SLIDER].value,
+                 comps[MOUSESENS_SLIDER].value);
+}
+
+void apply_settings(void) {
+  camera.dof = MAX_CAMERA_DOF * comps[DRAWDIST_SLIDER].value;
+  set_camera_fov(DEG2RAD(MAX_CAMERA_FOV * comps[FOV_SLIDER].value));
+  mouse_sensitivity = MAX_MOUSE_SENS * comps[MOUSESENS_SLIDER].value;
+}
+
+void load_settings(f32 drawdist, f32 fov, f32 mousesens) {
+  puts("loading settings...");
+  comps[DRAWDIST_SLIDER].value = drawdist;
+  comps[FOV_SLIDER].value = fov;
+  comps[MOUSESENS_SLIDER].value = mousesens;
+  apply_settings();
+}
 
 static void on_enter(void) {
   u32 i;
@@ -47,7 +86,7 @@ static void on_tick(f32 delta) {
   for (i = 1; i < ARRLEN(comps); ++i)
     draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * (i-1), comps + i);
 
-  draw_component(48, FB_HEIGHT - 32 - STRING_HEIGHT, &comps[0]);
+  draw_component(48, FB_HEIGHT - 32 - STRING_HEIGHT, &comps[BACK_BUTTON]);
 }
 
 static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {

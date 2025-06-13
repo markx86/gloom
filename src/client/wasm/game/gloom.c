@@ -540,10 +540,8 @@ void gloom_render(void) {
   render_hud();
 }
 
-void gloom_init(f32 camera_fov, u32 camera_dof) {
-  set_camera_fov(camera_fov);
+void gloom_init(void) {
   set_player_rot(0);
-  camera.dof = camera_dof;
   display_health = player.health = PLAYER_MAX_HEALTH;
 }
 

@@ -2,6 +2,7 @@
 #define __STATE_GLOBALS_H__
 
 #include <types.h>
+
 struct sprite;
 
 extern const struct state_handlers
@@ -17,5 +18,8 @@ extern const struct state_handlers
 
 extern struct sprite* tracked_sprite;
 extern f32 wait_time;
+extern f32 mouse_sensitivity;
+
+void apply_settings(void);
 
 #endif

@@ -10,8 +10,9 @@
 #define PLAYER_RUN_SPEED    3.5f
 #define PLAYER_ROT_SPEED    0.01f
 
-#define CAMERA_FOV 75.0f
-#define CAMERA_DOF 32
+#define MAX_CAMERA_FOV 150.0f
+#define MAX_CAMERA_DOF 48
+#define MAX_MOUSE_SENS 2.0f
 
 #define MAX_SPRITES   255
 
@@ -98,7 +99,7 @@ extern union keys keys;
 void set_camera_fov(f32 new_fov);
 void set_player_rot(f32 new_rot);
 
-void gloom_init(f32 camera_fov, u32 camera_dof);
+void gloom_init(void);
 void gloom_tick(f32 delta);
 void gloom_update(f32 delta);
 void gloom_render(void);

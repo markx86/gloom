@@ -66,7 +66,7 @@ static void on_enter(void) {
   set_alpha(0x7F);
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
   component_on_enter(&back_btn, 1);
-  gloom_init(DEG2RAD(CAMERA_FOV), CAMERA_DOF);
+  gloom_init();
   timer_start = time();
 }
 

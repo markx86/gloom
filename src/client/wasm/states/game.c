@@ -1,5 +1,7 @@
 #include <client.h>
 
+f32 mouse_sensitivity;
+
 static b8 do_send_update;
 
 static void on_enter(void) {
@@ -56,7 +58,7 @@ static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
   if (!pointer_is_locked())
     return;
 
-  off_player_rot(dx * PLAYER_ROT_SPEED);
+  off_player_rot(dx * mouse_sensitivity * PLAYER_ROT_SPEED);
 
   do_send_update = true;
 

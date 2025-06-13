@@ -9,6 +9,7 @@ extern void pointer_release(void);
 extern u32 request_mem(u32 sz);
 extern void register_fb(void* fb, u32 width, u32 height, u32 size);
 extern i32 send_packet(void* pkt, u32 len);
+extern void store_settings(f32 drawdist, f32 fov, f32 mousesens);
 extern f32 time(void);
 
 #endif

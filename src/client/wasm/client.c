@@ -68,6 +68,7 @@ void init(b8 ws_connected, u32 game_id, u32 player_token) {
   __pointer_locked = false;
   should_tick = true;
   tracked_sprite = NULL;
+  apply_settings();
   multiplayer_init(game_id, player_token);
   register_fb(__fb, FB_WIDTH, FB_HEIGHT, FB_SIZE);
 #ifdef UNFINISHED_FEATURES
