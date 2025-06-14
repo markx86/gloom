@@ -396,6 +396,7 @@ static void serv_destroy_handler(void* buf, u32 len) {
   }
 
   if (pkt->desc.type == SPRITE_PLAYER &&
+      get_client_state() != STATE_WAITING &&
       count_player_sprites() == 0) {
     switch_to_state(STATE_OVER);
   }
