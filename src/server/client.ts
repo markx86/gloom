@@ -69,7 +69,6 @@ export class Client extends Peer implements PlayerHolder {
 
     const player = game.newPlayer(this);
     if (player == null) {
-      Logger.error("No player with that token");
       return false;
     }
 
@@ -142,7 +141,6 @@ export class Client extends Peer implements PlayerHolder {
   }
 
   private handlePacket(type: GamePacketType, sequence: number, playerToken: number, packet: GamePacket) {
-    Logger.info("packet: %s", type);
     if (!this.checkPacket(type, sequence, playerToken)) {
       return;
     }

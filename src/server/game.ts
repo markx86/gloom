@@ -307,19 +307,33 @@ export class BulletSprite extends GameSprite {
   }
 }
 
+export class SpawnPosition {
+  readonly x: number;
+  readonly y: number;
+  readonly rot: number;
+
+  constructor(x: number, y: number, rot: number) {
+    this.x = x + 0.5;
+    this.y = y + 0.5;
+    this.rot = rot * Math.PI / 180.0;
+  }
+}
+
 export class GameMap {
+  private spawnPositions: Array<SpawnPosition>;
   private compressed: Uint8Array | undefined;
   private tiles: Uint8Array;
   readonly width: number;
   readonly height: number;
 
-  public constructor(width: number, height: number, tiles: ArrayLike<number>) {
+  public constructor(width: number, height: number, tiles: ArrayLike<number>, spawns: Array<SpawnPosition>) {
     if (width * height != tiles.length) {
       throw new Error(`Trying to create map of size ${width}x${height} with only ${tiles.length} tiles!`);
     }
     this.width = width;
     this.height = height;
     this.tiles = new Uint8Array(tiles);
+    this.spawnPositions = spawns;
   }
 
   public getCompressedData(): Uint8Array {
@@ -355,12 +369,10 @@ export class GameMap {
     return (this.tiles[x + y * this.width] & 1) !== 0;
   }
 
-  public getSpawnTransformForPlayer(index: number): [number, number, number] | undefined {
-    const spawnTile = this.tiles.filter((tile) => (tile & 0x0F) === 2 && ((tile & 0x30) >> 4) === index);
-    if (spawnTile.length === 1) {
-      const index = this.tiles.indexOf(spawnTile[0]);
-      const rot = ((spawnTile[0] & 0xC0) >> 6) * (Math.PI / 2);
-      return [(index % this.width) + 0.5, Math.floor(index / this.height) + 0.5, rot];
+  public getSpawnPositionForPlayer(id: number, numPlayers: number): SpawnPosition | undefined {
+    if (numPlayers < this.spawnPositions.length) {
+      const index = id % this.spawnPositions.length;
+      return this.spawnPositions[index];
     }
   }
 }
@@ -517,19 +529,17 @@ export class Game {
   }
 
   public newPlayer(holder: PlayerHolder): PlayerSprite | undefined {
-    const index = this.numOfPlayers;
     if (this.numOfPlayers++ >= MAX_PLAYERS) {
       Logger.warning("Max players reached in game %s", this.id.toString(16));
     } else if (this.playerTokens.has(holder.getToken())) {
-      const transf = this.map.getSpawnTransformForPlayer(index);
-      if (transf != null) {
-        // const toCenterVec = [(this.map.width / 2) - pos[0], (this.map.height / 2) - pos[1]];
-        // const toCenterDist = Math.sqrt(Math.pow(toCenterVec[0], 2) + Math.pow(toCenterVec[1], 2));
-        // const toCenterDir = [toCenterVec[0] / toCenterDist, toCenterVec[1] / toCenterDist];
-        // const rot = Math.acos(toCenterVec[0] / toCenterDist);
-        return this.addSprite(new PlayerSprite(holder, this, this.nextEntityId(), transf[0], transf[1], transf[2]));
+      const id = this.nextEntityId();
+      const pos = this.map.getSpawnPositionForPlayer(id, this.numOfPlayers);
+      if (pos != null) {
+        return this.addSprite(new PlayerSprite(holder, this, id, pos.x, pos.y, pos.rot));
       }
-      Logger.warning("No place to spawn player with index %d", index);
+      Logger.warning("No place to spawn player with token %s", holder.getToken());
+    } else {
+      Logger.error("No player with that token");
     }
   }
 

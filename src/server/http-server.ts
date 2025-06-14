@@ -11,9 +11,10 @@ import {
   invalidateSession,
   refreshSession
 } from "./database.ts";
+import { Game } from "./game.ts";
+import Maps from "./maps.ts"
 import express from "express";
 import cookieParser from "cookie-parser";
-import { Game, GameMap } from "./game.ts";
 
 const HTTP_PORT = 8080;
 
@@ -232,25 +233,6 @@ app.get("/api/game/id", (_, res) => {
   }
 });
 
-const testMap = new GameMap(16, 16, [
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x92, 1,
-  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1,
-  1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-  1, 0x32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xA2, 1,
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-]);
-
 app.get("/api/game/create", (_, res) => {
   const creator = res.locals.username;
   if (Game.getByCreator(creator) != null) {
@@ -260,7 +242,7 @@ app.get("/api/game/create", (_, res) => {
     return;
   }
   
-  const gameId = Game.create(creator, testMap);
+  const gameId = Game.create(creator, Maps.random());
   if (gameId == null) {
     res.status(503).send({
       message: "The server is overloaded. Please try again later."
