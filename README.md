@@ -8,10 +8,10 @@
 - **Player textures**: _DOOM & DOOM II_ by id Software
 - **Bullet texture**: _Enemy Bullets_ by Wahib Yousaf ([link](https://gameguru101.artstation.com/projects/Lev02P))
 - **In game font**: _ZAP_ by John Zaitseff ([link](https://www.zap.org.au/projects/console-fonts-zap))
-- **UI style**: _98.css_ by Jordan Scales (@jdan) ([link](https://jdan.github.io/98.css)) 
+- **UI style**: _98.css_ by Jordan Scales ([**@jdan**](https://github.com/jdan)) ([link](https://jdan.github.io/98.css)) 
 - **UI font**: _Microsoft Sans-Serif_ by Microsoft
 
-And last, but not least, _`grecha.js`_ by Alexey Kutepov (@rexim) ([link](https://github.com/tsoding/grecha.js)), which
+And last, but not least, _`grecha.js`_ by Alexey Kutepov ([**@rexim**](https://github.com/rexim)) ([link](https://github.com/tsoding/grecha.js)), which
 was the inspiration for `reactive.js` after `React` let me down :(
 
 
