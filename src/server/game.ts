@@ -10,7 +10,7 @@ const MAX_GAMES = 256;
 
 const PLAYER_HEALTH = 100;
 const PLAYER_RUN_SPEED = 3.5;
-const PLAYER_RELOAD_TIME = 0.25;
+const PLAYER_RELOAD_TIME = 0.5;
 
 const BULLET_DAMAGE = 25;
 const BULLET_INITIAL_SPEED = 10;
@@ -548,7 +548,7 @@ export class Game {
   }
 
   public allocatePlayer(username: string): number | undefined {
-    if (this.state !== GameState.WAITING || this.state !== GameState.WAITING) {
+    if (this.state !== GameState.WAITING && this.state !== GameState.READY) {
       return;
     }
     for (const uname of this.playerTokens.values()) {
