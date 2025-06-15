@@ -1,8 +1,10 @@
+const WSS_PORT = 8492;
+
 export async function loadGloom() {
   const textDecoder = new TextDecoder("utf-8");
   const canvasDefaultWidth = 640;
   const canvasDefaultHeight = 480;
-  const url = `ws://${window.location.hostname}:8492`;
+  const url = `ws://${window.location.hostname}:${WSS_PORT}`;
 
   let canvasContainer = null, canvas = null, ctx = null;
   let fbArray = null, fb = null;

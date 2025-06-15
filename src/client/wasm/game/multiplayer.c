@@ -4,8 +4,7 @@
 #include <globals.h>
 #include <ui.h>
 
-#define PACKED       __attribute__((packed))
-#define WS_PORT      8492
+#define PACKED __attribute__((packed))
 
 #define MAX_PACKET_DROP 10
 
