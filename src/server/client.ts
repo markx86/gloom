@@ -59,7 +59,7 @@ export class Client extends Peer implements PlayerHolder {
     }
 
     const gameId = packet.popU32();
-    Logger.info("Got request to join game with ID: %s", gameId.toString(16));
+    Logger.trace("Got request to join game with ID: %s", gameId.toString(16));
 
     const game = Game.getById(gameId);
     if (game == null) {
@@ -74,7 +74,7 @@ export class Client extends Peer implements PlayerHolder {
 
     this.player = player;
 
-    Logger.info("Client (%s) joined game (%s) with ID %d", this.token.toString(16), this.player.game.id.toString(16), this.player.id);
+    Logger.success("Client (%s) joined game (%s) with ID %d", this.token.toString(16), this.player.game.id.toString(16), this.player.id);
 
     this.registerToBroadcastGroup(game.id);
     this.sendPacket(new HelloPacket(this.player));
@@ -90,7 +90,7 @@ export class Client extends Peer implements PlayerHolder {
   }
 
   private handleLeavePacket(_packet: GamePacket) {
-    Logger.info("Got request to leave game");
+    Logger.trace("Got request to leave game");
     if (!this.inBroadcastGroup()) {
       // NOTE: unreachable
       return;
@@ -102,7 +102,7 @@ export class Client extends Peer implements PlayerHolder {
   }
 
   private handleUpdatePacket(packet: GamePacket) {
-    Logger.info("Got update packet");
+    Logger.trace("Got update packet");
     if (this.player == null) {
       // NOTE: unreachable
       return;
@@ -113,10 +113,10 @@ export class Client extends Peer implements PlayerHolder {
     const y    = packet.popF32();
     const rot  = packet.popF32();
     const keys = packet.popU32();
-    Logger.info("pos = (%f, %f), rot = %f, keys = %s", x, y, rot, keys.toString(16));
+    Logger.trace("pos = (%f, %f), rot = %f, keys = %s", x, y, rot, keys.toString(16));
 
     const [ack, delta] = this.player.acknowledgeUpdatePacket(ts, x, y, rot, keys);
-    Logger.info("delta = %f, ack = %s", delta, ack);
+    Logger.trace("delta = %f, ack = %s", delta, ack);
 
     this.broadcastPacket(
       new UpdatePacket(this.player),
@@ -131,7 +131,7 @@ export class Client extends Peer implements PlayerHolder {
   }
 
   private handleFirePacket(_packet: GamePacket) {
-    Logger.info("Got fire packet");
+    Logger.trace("Got fire packet");
     if (this.player == null) {
       // NOTE: unreachable
       return;
@@ -165,20 +165,20 @@ export class Client extends Peer implements PlayerHolder {
 
     // handle WebSocket close event
     this.ws.on("close", () => {
-      Logger.info("Client disconnected");
+      Logger.trace("Client disconnected");
       if (this.player?.game) {
-        Logger.info("Removing player with ID %d from game %s", this.player.id, this.player.game.id.toString(16));
+        Logger.success("Removing player with ID %d from game %s", this.player.id, this.player.game.id.toString(16));
         this.player.game.removePlayer(this.player);
         this.broadcastPacket(new DestroyPacket(this.player), false);
       } else {
-        Logger.info("Client was not in game, nothing to do");
+        Logger.trace("Client was not in game, nothing to do");
       }
     });
 
     // handle WebSocket message event
     this.ws.on("message", (data, isBinary) => {
-      Logger.info("Data is binary: %s", isBinary);
-      Logger.info("Data is: %O", data);
+      Logger.trace("Data is binary: %s", isBinary);
+      Logger.trace("Data is: %O", data);
       if (!isBinary || !(data instanceof Buffer)) {
         return;
       }
@@ -190,9 +190,9 @@ export class Client extends Peer implements PlayerHolder {
 
       const playerToken = packet.popU32();
       
-      Logger.info("Packet type: %s", type.toString(16));
-      Logger.info("Sequence number: %s", sequence);
-      Logger.info("Player token: %s", playerToken.toString(16));
+      Logger.trace("Packet type: %s", type.toString(16));
+      Logger.trace("Sequence number: %s", sequence);
+      Logger.trace("Player token: %s", playerToken.toString(16));
 
       this.handlePacket(type, sequence, playerToken, packet);
     });

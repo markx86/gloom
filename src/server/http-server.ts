@@ -19,7 +19,9 @@ import cookieParser from "cookie-parser";
 const HTTP_PORT = 8080;
 
 const SESSION_LIFETIME = 24 * 60 * 60;
-const COOKIE_SECRET = process.env.COOKIE_SECRET ?? randomBytes(32).toString("hex");
+const COOKIE_SECRET =
+  process.env.COOKIE_SECRET != null && process.env.COOKIE_SECRET.length > 0 ?
+  process.env.COOKIE_SECRET : randomBytes(32).toString("hex");
 
 const app = express();
 
@@ -143,7 +145,7 @@ app.post("/api/register", (req, res) => {
   try {
     registerUser(username, password, (success) => {
       if (success) {
-        Logger.info("Registered user: %s", username);
+        Logger.trace("Registered user: %s", username);
         res.status(200).send();
       } else {
         res.status(400).send({ message: "That username is already taken!" });
@@ -179,7 +181,7 @@ app.post("/api/login", (req, res) => {
   try {
     checkUserCrendentials(username, password, (success) => {
       if (success) {
-        Logger.info("Logging in user: %s", username);
+        Logger.trace("Logging in user: %s", username);
         // generate session id and compute expiry date
         const sessionId = generateSessionId();
         const expirationTimestamp = getSessionCookieExpirationTimestamp();
@@ -199,7 +201,7 @@ app.post("/api/login", (req, res) => {
 });
 
 app.get("/api/logout", (_, res) => {
-  Logger.info("Logging out user: %s", res.locals.username);
+  Logger.trace("Logging out user: %s", res.locals.username);
   invalidateSession(res.locals.sessionId);
   clearSessionCookie(res);
   res.status(200).send();
@@ -210,7 +212,7 @@ app.get("/api/session/validate", (_, res) => { res.status(200).send(); });
 app.get("/api/session/refresh", (_, res) => {
   // if got here that means the session cookie is valid
   try {
-    Logger.info("Refreshing session for user: %s", res.locals.username);
+    Logger.trace("Refreshing session for user: %s", res.locals.username);
     const expirationTimestamp = getSessionCookieExpirationTimestamp();
     const currentSessionId = res.locals.sessionId;
     const newSessionId = generateSessionId();

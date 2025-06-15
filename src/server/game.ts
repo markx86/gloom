@@ -207,7 +207,7 @@ export class PlayerSprite extends GameSprite {
       this.game.removeSprite(other, this);
       this.health -= BULLET_DAMAGE;
       if (this.health <= 0) {
-        Logger.info("Player %d killed by player %d", this.id, other.owner.id);
+        Logger.trace("Player %d killed by player %d", this.id, other.owner.id);
         this.game.removePlayer(this, other.owner);
         this.holder.unsetPlayer();
       }
@@ -237,14 +237,14 @@ export class PlayerSprite extends GameSprite {
   }
 
   public acknowledgeUpdatePacket(ts: number, x: number, y: number, rotation: number, keys: number): [boolean, number] {
-    Logger.info("now: %f - ts: %f", this.game.getTime(), ts);
+    Logger.trace("now: %f - ts: %f", this.game.getTime(), ts);
     const delta = this.game.getTime() - ts;
 
     const [_, predictedX, predictedY] = this.moveAndCollide(delta, x, y);
     const dx = this.x - predictedX;
     const dy = this.y - predictedY;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    Logger.info("Distance from prediction: %d", dist)
+    Logger.trace("Distance from prediction: %d", dist)
     const ack = delta > TIME_SKEW_THRESHOLD && dist <= POS_DIFF_THRESHOLD;
 
     // FIXME: limit angle between updates
@@ -302,7 +302,6 @@ export class BulletSprite extends GameSprite {
   }
 
   protected onWallCollision() {
-    console.log("[#] Bullet hit wall, destroying");
     this.game.removeSprite(this);
   }
 }
@@ -315,7 +314,7 @@ export class SpawnPosition {
   constructor(x: number, y: number, rot: number) {
     this.x = x + 0.5;
     this.y = y + 0.5;
-    this.rot = rot * Math.PI / 180.0;
+    this.rot = -rot * Math.PI / 180.0;
   }
 }
 
@@ -497,7 +496,7 @@ export class Game {
 
       case GameState.OVER: {
         if (this.numOfPlayers == 0 || this.waitTime <= 0) {
-          Logger.info("Destroying game with ID: %s", this.id.toString(16));
+          Logger.trace("Destroying game with ID: %s", this.id.toString(16));
           Game.destroy(this);
         } else {
           this.waitTime -= delta;
@@ -533,8 +532,9 @@ export class Game {
       Logger.warning("Max players reached in game %s", this.id.toString(16));
     } else if (this.playerTokens.has(holder.getToken())) {
       const id = this.nextEntityId();
-      const pos = this.map.getSpawnPositionForPlayer(id, this.numOfPlayers);
+      const pos = this.map.getSpawnPositionForPlayer(id - 1, this.numOfPlayers);
       if (pos != null) {
+        Logger.trace("Spawining player %s (ID: %d) @ (x = %f, y = %f, r = %f)", holder.getToken(), id, pos.x, pos.y, pos.rot);
         return this.addSprite(new PlayerSprite(holder, this, id, pos.x, pos.y, pos.rot));
       }
       Logger.warning("No place to spawn player with token %s", holder.getToken());
@@ -561,7 +561,7 @@ export class Game {
       token = randomInt(2 ** 32);
     }
     this.playerTokens.set(token, username);
-    Logger.info("Allocated player with token %s", token.toString(16));
+    Logger.trace("Allocated player with token %s", token.toString(16));
     return token;
   }
 

@@ -11,12 +11,14 @@ export const GAME_ID_LEN = 8;
 
 const SALT_LEN = 8;
 
-const DATABASE_PATH = process.env.DATABASE ?? ":memory:";
+const DATABASE_PATH =
+  process.env.DATABASE != null && process.env.DATABASE.length > 0 ?
+  process.env.DATABASE : ":memory:";
 
 const db = new Database(DATABASE_PATH);
 
 export const closeDb = () => {
-  Logger.info("Closing database...");
+  Logger.trace("Closing database...");
   db.close(() => {})
 };
 

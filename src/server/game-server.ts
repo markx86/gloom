@@ -12,7 +12,7 @@ const wss = new WebSocketServer({
 });
 
 wss.on("connection", ws => {
-  Logger.info("Player connected");
+  Logger.trace("Player connected");
   ws.on("message", (data, isBinary) => {
     if (!isBinary || !(data instanceof Buffer)) {
       return;
@@ -23,7 +23,7 @@ wss.on("connection", ws => {
     if (magic === HANDSHAKE_MAGIC) {
       ws.removeAllListeners();
       new Client(ws, token);
-      Logger.info("Handshake with player successful (token %s)", token.toString(16));
+      Logger.success("Handshake with player successful (token %s)", token.toString(16));
     } else {
       ws.close();
       Logger.error("Handshake failed (invalid magic, got %s expected %s)", magic.toString(16), HANDSHAKE_MAGIC.toString(16));
