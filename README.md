@@ -3,6 +3,18 @@
 
 ---
 
+## Credits and sources
+
+- **Player textures**: _DOOM & DOOM II_ by id Software
+- **Bullet texture**: _Enemy Bullets_ by Wahib Yousaf ([link](https://gameguru101.artstation.com/projects/Lev02P))
+- **In game font**: _ZAP_ by John Zaitseff ([link](https://www.zap.org.au/projects/console-fonts-zap))
+- **UI style**: _98.css_ by Jordan Scales (@jdan) ([link](https://jdan.github.io/98.css)) 
+- **UI font**: _Microsoft Sans-Serif_ by Microsoft
+
+And last, but not least, _`grecha.js`_ by Alexey Kutepov (@rexim) ([link](https://github.com/tsoding/grecha.js)), which
+was the inspiration for `reactive.js` after `React` let me down :(
+
+
 ## Project structure
 
 The project has the following structure:
@@ -13,7 +25,7 @@ The project has the following structure:
 - `scripts` All the scripts needed to build the project.
   - `tools` Extra scripts that are used to generate source files at build-time.
 - `static` Contains the files that the HTTP server will serve to the client.
-  - `css` Stylesheet files.
+  - `css` Stylesheet and font files.
   - `html` HTML files.
   - `js` JavaScript and WASM files.
   - `img` Images used by the UI.
