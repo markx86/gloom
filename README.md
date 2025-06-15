@@ -83,14 +83,14 @@ docker compose logs -f
 ## Configuration
 
 You can configure four parameters.
-- `LOG_VERBOSE`: Enables/Disables verbose logging. Set to `1` to enable. By default it's disabled.
-- `DATABASE`: Path to the database file. This a SQLite3 database path, therefore things like `:memory:` will also work. By default it's memory, but the provided `docker-compose` file will create a volume and store the database in there.
-- `COOKIE_SECRET`: The secret key used to sign the cookies. If it's not set, the server will generate a random one each time it is restarted.
-- HTTP server port: To change this port it is necessary to edit either the `docker-compose` or the source code directly (`src/server/http-server.ts`). By default the HTTP server is hosted on port `8080`.
+- `LOG_VERBOSE`: Enables/Disables verbose logging. Set to `1` to enable. By default, it's disabled.
+- `DATABASE`: Path to the database file. This a SQLite3 database path, therefore things like `:memory:` will also work. It is set to `:memory:` by default, but the provided `docker-compose` file will create a volume and store the database there.
+- `COOKIE_SECRET`: The secret key used to sign the cookies. If it's not set, the server will generate a random one each time it is started.
+- HTTP server port: To change this port it is necessary to edit either the `docker-compose` ports tag, or the source code directly (`src/server/http-server.ts`). By default, the HTTP server is hosted on port `8080`.
 
 > [!NOTE]
 > The WebSocket server port is `8492` and while it _can_ be changed, it is not recommended.
-> However if you still wish to change it, you need to edit the `WSS_PORT` variable in `src/server/game-server.ts` and `src/client/gloom.js`.
+> However, if you still wish to change it, you'll need to edit the `WSS_PORT` variable in `src/server/game-server.ts` and `src/client/gloom.js`.
 
 > [!IMPORTANT]
 > If you're using `docker-compose`, you can change `COOKIE_SECRET` and `LOG_VERBOSE`, by creating a `.env` file in the project root,
