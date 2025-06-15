@@ -1,8 +1,8 @@
 import "./reactive.js";
 
-const MSGWND_ERROR = "error";
-const MSGWND_WARN  = "warning";
-const MSGWND_INFO  = "info";
+export const MSGWND_ERROR = "error";
+export const MSGWND_WARN  = "warning";
+export const MSGWND_INFO  = "info";
 
 function capitalize(str) {
   $assert(typeof(str) === "string", "can only capitalize strings");
@@ -115,7 +115,7 @@ function createMessageWindow(content, type, onclose) {
     $div(
       windowIcon(`/static/img/${type}.png`, "32px", "32px"),
       $div(
-        $p(content),
+        content
       ).$style("padding", "0px 8px")
     ).$style("padding", "8px 12px 0px 12px")
      .$style("display", "flex"),
@@ -129,18 +129,18 @@ function createMessageWindow(content, type, onclose) {
    .$ondestroy(onclose);
 }
 
-function showMessageWindow(message, type, onclose) {
-  $root().$add(createMessageWindow(message, type, onclose));
+export function showMessageWindow(content, type, onclose) {
+  $root().$add(createMessageWindow(content, type, onclose));
 }
 
 export function showErrorWindow(message, onclose) {
-  showMessageWindow(message, MSGWND_ERROR, onclose);
+  showMessageWindow($p(message), MSGWND_ERROR, onclose);
 }
 
 export function showWarningWindow(message, onclose) {
-  showMessageWindow(message, MSGWND_WARN, onclose);
+  showMessageWindow($p(message), MSGWND_WARN, onclose);
 }
 
 export function showInfoWindow(message, onclose) {
-  showMessageWindow(message, MSGWND_INFO, onclose);
+  showMessageWindow($p(message), MSGWND_INFO, onclose);
 }

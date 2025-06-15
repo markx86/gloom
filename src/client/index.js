@@ -4,7 +4,8 @@ import "./reactive.js";
 import {
   showErrorWindow, showInfoWindow, showWarningWindow,
   createWindow, getWindowControls,
-  helpLink, windowIcon, separator
+  helpLink, windowIcon, separator,
+  MSGWND_INFO, showMessageWindow
 } from "./windowing.js";
 
 let myGameId;
@@ -244,6 +245,32 @@ async function doJoinGame(event, intervalId) {
   }
 }
 
+function controlHelp(key, help) {
+  return $p($strong(key), " ► ", help);
+}
+
+function showGameHelp(event) {
+  const [wndEnable, wndDisable] = getWindowControls(event.target);
+  wndDisable();
+  showMessageWindow(
+    $div(
+      $h5("Controls").$style("margin", "12px 0px")
+                     .$style("font-size", "20px")
+                     .$style("padding-left", "10px"),
+      $ul(
+        $li(controlHelp("W", "Move forwards")),
+        $li(controlHelp("S", "Move backwards")),
+        $li(controlHelp("A", "Strage left")),
+        $li(controlHelp("D", "Strage right")),
+        $li(controlHelp("P", "Pauses the game")),
+        $li(controlHelp("Mouse movement", "Move the camera left and right")),
+        $li(controlHelp("Mouse buttons", "Shoot"))
+      ).$style("padding-left", "12px")
+    ),
+    MSGWND_INFO, wndEnable
+  );
+}
+
 const login = () => {
   api.get("/session/validate")
     .then(res => {
@@ -409,6 +436,7 @@ const game = (gameId, playerToken) => {
     {
       title: "GLOOM.EXE",
       buttons: {
+        help: showGameHelp,
         close: quitGame
       }
     },
