@@ -10,7 +10,7 @@ try:
     import imageio.v3 as iio
     import numpy as np
 except:
-    print("Install ImageIO with `pip3 install iio`")
+    print("Install ImageIO with `pip3 install imageio`")
     exit(-1)
 
 from os import path
