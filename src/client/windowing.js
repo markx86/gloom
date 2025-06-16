@@ -3,6 +3,7 @@ import "./reactive.js";
 export const MSGWND_ERROR = "error";
 export const MSGWND_WARN  = "warning";
 export const MSGWND_INFO  = "info";
+export const MSGWND_HELP  = "help";
 
 function capitalize(str) {
   $assert(typeof(str) === "string", "can only capitalize strings");

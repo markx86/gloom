@@ -5,7 +5,7 @@ import {
   showErrorWindow, showInfoWindow, showWarningWindow,
   createWindow, getWindowControls,
   helpLink, windowIcon, separator,
-  MSGWND_INFO, showMessageWindow
+  MSGWND_HELP, showMessageWindow
 } from "./windowing.js";
 
 let myGameId;
@@ -255,8 +255,7 @@ function showGameHelp(event) {
   showMessageWindow(
     $div(
       $h5("Controls").$style("margin", "12px 0px")
-                     .$style("font-size", "20px")
-                     .$style("padding-left", "10px"),
+                     .$style("font-size", "20px"),
       $ul(
         $li(controlHelp("W", "Move forwards")),
         $li(controlHelp("S", "Move backwards")),
@@ -266,8 +265,28 @@ function showGameHelp(event) {
         $li(controlHelp("Mouse movement", "Move the camera left and right")),
         $li(controlHelp("Mouse buttons", "Shoot"))
       ).$style("padding-left", "12px")
-    ),
-    MSGWND_INFO, wndEnable
+    ).$style("padding-left", "4px"),
+    MSGWND_HELP, wndEnable
+  );
+}
+
+function showSignUpHelp(event) {
+  const [wndEnable, wndDisable] = getWindowControls(event.target);
+  wndDisable();
+  showMessageWindow(
+    $div(
+      $h5("Creating an account").$style("margin", "12px 0px")
+                                .$style("font-size", "20px"),
+      $p("Here are the things to keep in mind when creating an account."),
+      $ul(
+        $li("Your username must be at least ", $strong("3"), " characters long"),
+        $li("Your username must be no more than ", $strong("24"), " characters long"),
+        $li("Your password must be at least ", $strong("8"), " characters long"),
+        $li("Your password must be no more than ", $strong("24"), " characters long"),
+        $li("Your password must contain at least a number and one of the following symbols", $code("!\"£$%&/()=?^-'.+#@\|~"))
+      ).$style("padding-left", "12px")
+    ).$style("padding-left", "4px"),
+    MSGWND_HELP, wndEnable
   );
 }
 
@@ -335,6 +354,7 @@ const signup = () => {
       title: "Create a Gloom account",
       width: "400px",
       buttons: {
+        help: showSignUpHelp,
         close: () => $goto("/login/help"),
       }
     },

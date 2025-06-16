@@ -148,7 +148,7 @@ window.$route = function () {
 [
   "div", "h1", "h2", "h3", "h4", "h5", "h6", "p", "a",
   "br", "hr", "canvas", "button", "input", "label", "ul", "li",
-  "strong"
+  "strong", "code"
 ].forEach(tag => window[`$${tag}`] = (...children) => $tag(tag, ...children));
 
 window.$root = function (node) {
