@@ -10,9 +10,12 @@
 - **In game font**: _ZAP_ by John Zaitseff ([link](https://www.zap.org.au/projects/console-fonts-zap))
 - **UI style**: _98.css_ by Jordan Scales ([**@jdan**](https://github.com/jdan)) ([link](https://jdan.github.io/98.css)) 
 - **UI font**: _Microsoft Sans-Serif_ by Microsoft
+- **UI icons**: _Windows 98 Icons_ by Microsoft
 
-And last, but not least, _grecha.js_ by Alexey Kutepov ([**@rexim**](https://github.com/rexim)) ([link](https://github.com/tsoding/grecha.js)), which
-was the inspiration for `reactive.js` after React let me down :(
+Other projects that helped me:
+- _grecha.js_ by Alexey Kutepov ([**@rexim**](https://github.com/rexim)) ([link](https://github.com/tsoding/grecha.js)), the inspiration for `reactive.js`
+- _Windows 98 Icon Viewer_ by Alex Meub ([link](https://win98icons.alexmeub.com)), a great website for quickly previewing all of Windows 98's icons
+- _Lode's Computer Graphics Tutorial_ by Lode Vandevenne ([link](https://lodev.org/cgtutor)), a wonderful resource about raycasters and how to make them
 
 
 ## Project structure
