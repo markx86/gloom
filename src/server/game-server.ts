@@ -1,5 +1,5 @@
 import { WebSocketServer } from "ws";
-import { Game } from "./game"
+import { Game, DT } from "./game"
 import { Client } from "./client";
 import Logger from "./logger";
 
@@ -38,4 +38,4 @@ setInterval(() => {
   const delta = (newTimestamp - timestamp) / 1000.0;
   Game.tickAll(delta);
   timestamp = newTimestamp;
-}, 1000 / 60);
+}, DT);

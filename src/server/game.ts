@@ -3,6 +3,8 @@ import { BroadcastGroup } from "./broadcast";
 import { CreatePacket, DestroyPacket, TerminatePacket, WaitPacket } from "./packet";
 import { randomInt } from "node:crypto";
 
+export const DT = 1000 / 60;
+
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 4;
 const MAX_SPRITES = 256;
@@ -22,7 +24,7 @@ const WAIT_TIME = 10;
 const OVER_TIME = 10;
 
 const POS_DIFF_THRESHOLD = 0.5;
-const TIME_SKEW_THRESHOLD = -0.1;
+const EPS_THRESHOLD = 0.5;
 
 enum GameSpriteType {
   PLAYER,
@@ -239,13 +241,36 @@ export class PlayerSprite extends GameSprite {
   public acknowledgeUpdatePacket(ts: number, x: number, y: number, rotation: number, keys: number): [boolean, number] {
     Logger.trace("now: %f - ts: %f", this.game.getTime(), ts);
     const delta = this.game.getTime() - ts;
+    const absDelta = Math.abs(delta);
 
-    const [_, predictedX, predictedY] = this.moveAndCollide(delta, x, y);
-    const dx = this.x - predictedX;
-    const dy = this.y - predictedY;
+
+    let endX: number, endY: number;
+    let startX: number, startY: number;
+
+    if (delta >= 0) {
+      startX = x; startY = y;
+      endX = this.x; endY = this.y;
+    } else {
+      startX = this.x; startY = this.y;
+      endX = x; endY = y;
+    }
+    
+    let predictedX = startX, predictedY = startY;
+    let predictionDelta = absDelta;
+    while (predictionDelta !== 0) {
+      const dt = Math.min(predictionDelta, DT);
+      const [_, newX, newY] = this.moveAndCollide(dt, predictedX, predictedY);
+      predictionDelta -= dt;
+      predictedX = newX;
+      predictedY = newY;
+    }
+
+    const dx = endX - predictedX;
+    const dy = endY - predictedY;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    Logger.trace("Distance from prediction: %d", dist)
-    const ack = delta > TIME_SKEW_THRESHOLD && dist <= POS_DIFF_THRESHOLD;
+    const eps = dist / absDelta;
+    Logger.trace("Prediction error: %f (eps: %f)", dist, eps);
+    const ack = dist <= POS_DIFF_THRESHOLD || eps <= EPS_THRESHOLD;
 
     // FIXME: limit angle between updates
   

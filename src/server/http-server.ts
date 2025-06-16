@@ -115,7 +115,7 @@ app.post("/api/register", (req, res) => {
   }
 
   // do username validation
-  const username = data.username;
+  const username = data.username.trim();
   rc = checkUsernameLength(username);
   if (rc > 0) {
     res.status(400).send({ message: `Username too long! The maximum length is ${USERNAME_MAX_LEN} characters.` });
@@ -135,7 +135,7 @@ app.post("/api/register", (req, res) => {
     res.status(400).send({ message: `Password too short! The minimum length is ${PASSWORD_MIN_LEN} characters.` });
     return;
   } else if (
-    !(password.match(/[!"£$%&/()=?^\-\.+#@\\|~]/g)?.length > 0) ||
+    !(password.match(/[!'"£$%&/()=?^\-\.+#@\\|~]/g)?.length > 0) ||
     !(password.match(/[0-9]/g).length > 0)
   ) {
     res.status(400).send({ message: "The password must contain at least one special character and one number." });
@@ -165,7 +165,7 @@ app.post("/api/login", (req, res) => {
   }
 
   // basic username validation
-  const username = data.username;
+  const username = data.username.trim();
   if (checkUsernameLength(username) !== 0) {
     res.status(401).send();
     return;
