@@ -148,7 +148,7 @@ window.$route = function () {
 [
   "div", "h1", "h2", "h3", "h4", "h5", "h6", "p", "a",
   "br", "hr", "canvas", "button", "input", "label", "ul", "li",
-  "strong", "code"
+  "strong", "code", "span"
 ].forEach(tag => window[`$${tag}`] = (...children) => $tag(tag, ...children));
 
 window.$root = function (node) {
@@ -163,10 +163,10 @@ window.$root = function (node) {
   }
 }
 
-window.$router = function (routes, errorCallback) {
+window.$router = function (routes, callbacks) {
   const result = $root();
   $assert(result != null, "no root node found!");
-  const errorHandler = errorCallback ?? console.error;
+  const errorHandler = callbacks?.onError ?? console.error;
 
   function _route() {
     const location = $route();
@@ -177,6 +177,7 @@ window.$router = function (routes, errorCallback) {
       $assert(location in routes, `unknown route ${location}`);
       $assert(routes[location] instanceof Function, "routes must be functions");
 
+      if (callbacks?.onBeforeRoute) callbacks.onBeforeRoute();
       const args = $_getArgsForRoute(location);
       const routeFn = routes[location];
       $assert(
@@ -186,6 +187,7 @@ window.$router = function (routes, errorCallback) {
       );
 
       const content = args == null ? routeFn() : routeFn(...args);
+      if (callbacks?.onAfterRoute) callbacks.onAfterRoute();
       if (content != null) {
         result.replaceChildren(content);
       }

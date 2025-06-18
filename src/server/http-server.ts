@@ -207,7 +207,7 @@ app.get("/api/logout", (_, res) => {
   res.status(200).send();
 });
 
-app.get("/api/session/validate", (_, res) => { res.status(200).send(); });
+app.get("/api/session/validate", (_, res) => { res.status(200).send({ username: res.locals.username }); });
 
 app.get("/api/session/refresh", (_, res) => {
   // if got here that means the session cookie is valid

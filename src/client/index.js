@@ -9,6 +9,7 @@ import {
 } from "./windowing.js";
 
 let myGameId;
+let intervalId;
 
 $root($("#root"));
 // disable scroll bars
@@ -216,7 +217,7 @@ async function doCreateGame(event) {
   }
 }
 
-async function doJoinGame(event, intervalId) {
+async function doJoinGame(event) {
   const createButton = $("#btn-create");
   const createButtonDisabled = createButton.$attribute("disabled") != null;
   const [_wndEnable, wndDisable] = getWindowControls(event.target);
@@ -235,7 +236,6 @@ async function doJoinGame(event, intervalId) {
     const response = await api.post("/game/join", { gameId });
     const data = await response.json();
     if (response.status === 200) {
-      clearInterval(intervalId);
       $goto("/game", gameId, data.playerToken);
     } else {
       showErrorWindow(data.message, wndEnable);
@@ -398,17 +398,25 @@ const signup = () => {
 
 const home = () => {
   myGameId = undefined;
+  api.get("/session/validate")
+    .then(res => {
+      if (res.status !== 200) {
+        throw Error("Not authenticated")
+      } else {
+        return res.json();
+      }
+    })
+    .then(data => $("#home-title").textContent = `Welcome back ${data?.username ?? "player"}`)
+    .catch(() => $goto("/login"));
+  // do not use a parameter to avoid headaches
   refreshGameId();
-  const intervalId = setInterval(refreshGameId, 5000); // refresh game id every 5 seconds
+  intervalId = setInterval(refreshGameId, 5000); // refresh game id every 5 seconds
   return createWindow(
     {
-      title: "Home of Gloom",
+      title: $span("Welcome back player").$id("home-title"),
       width: "300px",
       buttons: {
-        close: (event) => {
-          clearInterval(intervalId);
-          doLogout(event);
-        }
+        close: doLogout,
       }
     },
     $div(
@@ -438,7 +446,7 @@ const home = () => {
                   .$style("flex-grow", "1")
                   .$on("input", validateInput),
           $button("Join").$style("margin", "0px 0px 0px 8px")
-                         .$onclick((event) => doJoinGame(event, intervalId))
+                         .$onclick(doJoinGame)
         ).$style("display", "flex")
          .$style("align-items", "center")
       ).$class("field-row-stacked")
@@ -470,13 +478,19 @@ const game = (gameId, playerToken) => {
 
 api.get("/session/refresh").then(res => {
   const initialRoute = res.status === 200 ? $route() : "/login";
-  $router({
-    $first: initialRoute,
-    $default: "/login",
-    "/": home,
-    "/login": login,
-    "/login/help": loginHelp,
-    "/signup": signup,
-    "/game": game
-  }, () => $goto("/"));
+  $router(
+    {
+      $first: initialRoute,
+      $default: "/login",
+      "/": home,
+      "/login": login,
+      "/login/help": loginHelp,
+      "/signup": signup,
+      "/game": game
+    },
+    {
+      onError: () => $goto("/"),
+      onBeforeRoute: () => { if (intervalId != null) { clearInterval(intervalId); intervalId = undefined; } }
+    }
+  );
 });
