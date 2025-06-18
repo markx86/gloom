@@ -382,7 +382,8 @@ static void serv_destroy_handler(void* buf, u32 len) {
     switch_to_state(STATE_OVER);
     tracked_sprite = get_sprite(pkt->desc.field, false);
     return;
-  }
+  } else if (tracked_sprite != NULL && pkt->desc.id == tracked_sprite->desc.id)
+    tracked_sprite = get_sprite(pkt->desc.field, false);
 
   destroy_sprite(pkt->desc.id);
   // handle bullet points and damage
