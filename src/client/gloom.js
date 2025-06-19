@@ -1,3 +1,5 @@
+// NOTE: this scripts requires reactive.js
+
 const WSS_PORT = 8492;
 
 export async function loadGloom() {
@@ -15,6 +17,7 @@ export async function loadGloom() {
     const aspectRatio = fb == null ? (canvasDefaultWidth / canvasDefaultHeight) : (fb.width / fb.height);
     const parentWidth = window.innerWidth;
     const parentHeight = window.innerHeight;
+    // resize the canvas container
     let containerWidth, containerHeight;
     if (parentWidth < parentHeight) {
       containerWidth = parentWidth * 0.75;
@@ -110,6 +113,8 @@ export async function loadGloom() {
     }
   }
 
+  // void store_settings(f32 drawdist, f32 fov, f32 mousesens)
+  // FIXME: store settings separately for different users
   function store_settings(drawdist, fov, mousesens) {
     const settings = { mousesens, drawdist, fov };
     localStorage.setItem("settings", btoa(JSON.stringify(settings)));
@@ -204,7 +209,7 @@ export async function loadGloom() {
     canvas.width = canvasDefaultWidth;
     canvas.height = canvasDefaultHeight;
     canvas.style.transformOrigin = "top left";
-    // TODO maybe use 'crisp-edges' instead of 'pixelated' on Firefox
+    // TODO: maybe use 'crisp-edges' instead of 'pixelated' on Firefox
     canvas.style.imageRendering = "pixelated";
     canvas.style.background = "black";
 
@@ -252,7 +257,7 @@ export async function loadGloom() {
           data = new ArrayBuffer(8);
           view = new DataView(data);
           view.setUint32(0, playerToken, true);
-          view.setUint32(4, 0xBADC0FFE, true); // Handshake magic
+          view.setUint32(4, 0xBADC0FFE, true); // handshake magic
           ws.send(data);
         }
       }
@@ -279,6 +284,7 @@ export async function loadGloom() {
     ws.addEventListener("open", wsOpenHandler);
   }
 
+  // FIXME: load settings for the currently logged in user
   const b64Settings = localStorage.getItem("settings")
   if (b64Settings != null) {
     const settings = JSON.parse(atob(b64Settings));

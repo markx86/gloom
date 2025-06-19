@@ -68,7 +68,9 @@ void set_player_rot(f32 new_rot) {
   }
 }
 
-static u8 trace_ray(const vec2f* pos, const vec2f* ray_dir, u32 dof, struct hit* hit) {
+// use the DDA algorithm to trace a ray
+static u8 trace_ray(const vec2f* pos, const vec2f* ray_dir,
+                    u32 dof, struct hit* hit) {
   vec2f delta_dist, dist, intersec_dist;
   vec2f dpos;
   vec2i step_dir;
@@ -210,7 +212,7 @@ static inline void update_sprites(f32 delta) {
     if (s->desc.type == SPRITE_BULLET)
       s->disabled = !s->disabled && collided;
     else /* s->desc.type == SPRITE_PLAYER */ {
-      // do player sprites stuff
+      // do player sprite animation stuff
       if (s->anim_frame > 4.0f) {
         // if anim_frame > 4, the firing frame is being shown
         s->anim_frame -= delta * PLAYER_ANIM_FPS;
@@ -307,12 +309,49 @@ static inline const u8* get_player_tile(u32 x, u32 y) {
   return &player_spritesheet[((y * PLAYER_NTILES_W) + x) * (PLAYER_TILE_W * PLAYER_TILE_H)];
 }
 
+static void get_texture_info(struct sprite* s, b8* invert_x,
+                                        u32* tex_w, u32* tex_h,
+                                        const u8** tex, const u32** coltab) {
+  i32 rot;
+
+  *invert_x = false;
+
+  // do sprite specific stuff
+  if (s->desc.type == SPRITE_PLAYER) {
+    // set the player sprite data
+#define STEPS ((PLAYER_NTILES_H << 1) - 2)
+#define SLICE (TWO_PI / STEPS)
+    // determine the rotation of the sprite to use
+    // FIXME: this doesn't look right in practice, maybe take a look at this?
+    rot = (s->rot + SLICE / 2.0f - player.rot + PI) * STEPS / TWO_PI;
+    rot &= 7;
+    if (rot > 4) {
+      rot = 8 - rot;
+      *invert_x = true;
+    }
+    // get the pointer to the corresponding sprite texture
+    *tex = get_player_tile((u32)s->anim_frame, abs(rot));
+    // set the color table pointer
+    *coltab = player_coltab;
+    // set the texture width and height
+    *tex_w = PLAYER_TILE_W;
+    *tex_h = PLAYER_TILE_H;
+  } else /* s->desc.type == SPRITE_BULLET */ {
+    // set the bullet sprite data
+    *tex = bullet_texture;
+    *coltab = bullet_coltab;
+    // set bullet texture dimensions
+    *tex_w = BULLET_TEXTURE_W;
+    *tex_h = BULLET_TEXTURE_H;
+  }
+}
+
 static void draw_sprite(struct sprite* s) {
   u32 screen_h, color, a;
   u32 tex_w, tex_h;
   u32 uvw, uvh, uvx, uvy;
   i32 x_start, x_end, y_start, y_end;
-  i32 x, y, rot;
+  i32 x, y;
   const u8* tex;
   const u32* coltab;
   b8 invert_x = false;
@@ -325,38 +364,13 @@ static void draw_sprite(struct sprite* s) {
   y_end = get_y_end(s, screen_h);
   y_start = y_end - screen_h;
 
+  // compute the sprite width and height on the screen
   uvw = MAX(x_end - x_start, 0);
   uvh = MAX(y_end - y_start, 0);
 
-  if (s->desc.type == SPRITE_PLAYER) {
-    // set the player sprite data
-#define STEPS ((PLAYER_NTILES_H << 1) - 2)
-#define SLICE (TWO_PI / STEPS)
-    // determine the rotation of the sprite to use
-    rot = (s->rot + SLICE / 2.0f - player.rot + PI) * STEPS / TWO_PI;
-    rot &= 7;
-    if (rot > 4) {
-      rot = 8 - rot;
-      invert_x = true;
-    }
-    // get the pointer to the corresponding sprite texture
-    tex = get_player_tile((u32)s->anim_frame, abs(rot));
-    // set the color table pointer
-    coltab = player_coltab;
-    // set the texture width and height
-    tex_w = PLAYER_TILE_W;
-    tex_h = PLAYER_TILE_H;
-  } else /* s->desc.type == SPRITE_BULLET */ {
-    // set the bullet sprite data
-    tex = bullet_texture;
-    coltab = bullet_coltab;
-    // set bullet texture dimensions
-    tex_w = BULLET_TEXTURE_W;
-    tex_h = BULLET_TEXTURE_H;
-  }
+  get_texture_info(s, &invert_x, &tex_w, &tex_h, &tex, &coltab);
 
   a = get_alpha_mask();
-
   // draw the sprite
   for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
     // discard stripe if there's a wall closer to the camera
@@ -387,14 +401,13 @@ static inline void render_scene(void) {
     return;
 
   for (x = 0; x < FB_WIDTH; ++x) {
+    // compute ray direction
     cam_x = (2.0f * ((f32)x / FB_WIDTH)) - 1.0f;
-
-    // we do not use VEC2* macros, because this is faster
     ray_dir.x = player.dir.x + camera.plane.x * cam_x;
     ray_dir.y = player.dir.y + camera.plane.y * cam_x;
-
+    // trace ray with DDA
     cell_id = trace_ray(&player.pos, &ray_dir, camera.dof, &hit);
-
+    // store distance (squared) in z-buffer
     z_buf[x] = hit.dist * hit.dist;
 
     draw_column(cell_id, x, &hit);
@@ -512,13 +525,18 @@ static inline void render_crosshair(void) {
 }
 
 static inline void render_hud(void) {
-  u32 health_bar_w, health_bar_c;
-  u32 x;
+  u32 health_bar_w, health_bar_c, x;
+  b8 got_damage;
   const char health_lbl[] = "H";
 
+  // check if the player received damage
+  got_damage = display_health != player.health;
+
   x = 8 + STRING_WIDTH_IMM(health_lbl) + 4;
-  if (display_health != player.health)
-    draw_rect(4, 4, x + HEALTH_BAR_WIDTH, 8 + STRING_HEIGHT, COLOR(WHITE));
+  if (got_damage)
+    // if the player received damage, draw a rectangle around the health
+    // bar to draw the attention of the player
+    draw_rect(4, 4, x + HEALTH_BAR_WIDTH, 8 + STRING_HEIGHT, COLOR(MAGENTA));
 
   health_bar_c = COLOR(RED);
   draw_string_with_color(8, 8, health_lbl, health_bar_c);
@@ -526,11 +544,14 @@ static inline void render_hud(void) {
   health_bar_w = (f32)(player.health * HEALTH_BAR_WIDTH) / PLAYER_MAX_HEALTH;
   draw_rect(x, 8, health_bar_w, STRING_HEIGHT - 1, health_bar_c);
 
-  x += health_bar_w;
-  health_bar_w = (f32)((display_health - player.health) * HEALTH_BAR_WIDTH) / PLAYER_MAX_HEALTH;
-  draw_rect(x, 8, health_bar_w, STRING_HEIGHT - 1, COLOR(MAGENTA));
+  if (got_damage) {
+    // if the player received damage, animate the health difference
+    x += health_bar_w;
+    health_bar_w = (f32)((display_health - player.health) * HEALTH_BAR_WIDTH) / PLAYER_MAX_HEALTH;
+    draw_rect(x, 8, health_bar_w, STRING_HEIGHT - 1, COLOR(WHITE));
 
-  display_health = (display_health * HEALTH_BAR_LAG + player.health * (1.0f - HEALTH_BAR_LAG));
+    display_health = (display_health * HEALTH_BAR_LAG + player.health * (1.0f - HEALTH_BAR_LAG));
+  }
 }
 
 void gloom_render(void) {

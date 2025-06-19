@@ -18,12 +18,6 @@ enum client_state {
   STATE_MAX,
 };
 
-#define KEY_A 65
-#define KEY_D 68
-#define KEY_S 83
-#define KEY_W 87
-#define KEY_P 80
-
 enum color {
   COLOR_BLACK,
   COLOR_GRAY,
@@ -70,12 +64,6 @@ static inline u32 get_solid_color(u8 index) {
 
 #define COLOR(x)       get_color(COLOR_##x)
 #define SOLIDCOLOR(x)  get_solid_color(COLOR_##x)
-
-#define CALLSTATEHANDLER(name, ...)                                   \
-  do {                                                                \
-    if (__client_state < STATE_MAX && handlers[__client_state]->name) \
-      handlers[__client_state]->name(__VA_ARGS__);                    \
-  } while (0)
 
 extern enum client_state __client_state;
 

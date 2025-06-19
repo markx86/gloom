@@ -5,6 +5,8 @@
 #define BACKGROUND_COLOR SOLIDCOLOR(BLACK)
 #define ERROR_COLOR      SOLIDCOLOR(RED)
 
+#define SERVER_TIMEOUT 15.0f
+
 static void on_back_clicked(void) {
 #ifdef UNFINISHED_FEATURES
   switch_to_state(STATE_MENU);
@@ -29,10 +31,9 @@ static void add_message(const char* message) {
 static void on_tick(f32 delta) {
   enum connection_state conn_state;
 
-  if (time_in_state >= 10.0f)
-    // the connection state has not changed in the last 10s, assume something
-    // went wrong (this is not the cleanest way to do this, but bad design
-    // forced my hand!)
+  if (time_in_state >= SERVER_TIMEOUT)
+    // the connection state has not changed in the last SERVER_TIMEOUT seconds,
+    // assume something went wrong
     set_connection_state(CONN_DISCONNECTED);
 
   draw_component(48, FB_HEIGHT - 32 - STRING_HEIGHT, &back_button);
@@ -60,6 +61,7 @@ static void on_tick(f32 delta) {
       switch_to_state(STATE_WAITING);
       break;
 
+    // NOTE: this should not happen, but just in case
     case CONN_UPDATING:
       switch_to_state(STATE_GAME);
       break;

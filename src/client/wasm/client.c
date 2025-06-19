@@ -1,7 +1,25 @@
 #include <client.h>
 #include <globals.h>
 
-b8 should_tick;
+static b8 should_tick;
+
+static const struct state_handlers* handlers[STATE_MAX] = {
+  [STATE_ERROR]   = &error_state,
+  [STATE_MENU]    = &menu_state,
+  [STATE_LOADING] = &loading_state,
+  [STATE_WAITING] = &waiting_state,
+  [STATE_GAME]    = &game_state,
+  [STATE_PAUSE]   = &pause_state,
+  [STATE_OPTIONS] = &options_state,
+  [STATE_ABOUT]   = &about_state,
+  [STATE_OVER]    = &over_state
+};
+
+#define CALLSTATEHANDLER(name, ...)                                   \
+  do {                                                                \
+    if (__client_state < STATE_MAX && handlers[__client_state]->name) \
+      handlers[__client_state]->name(__VA_ARGS__);                    \
+  } while (0)
 
 u32 __fb[FB_WIDTH * FB_HEIGHT];
 u32 __alpha_mask;
@@ -24,18 +42,6 @@ const u32 __palette[] = {
   [COLOR_MAGENTA]     = 0xFF00FE,
   [COLOR_DARKCYAN]    = 0x7E7E04,
   [COLOR_CYAN]        = 0xFFFF06,
-};
-
-static const struct state_handlers* handlers[STATE_MAX] = {
-  [STATE_ERROR]   = &error_state,
-  [STATE_MENU]    = &menu_state,
-  [STATE_LOADING] = &loading_state,
-  [STATE_WAITING] = &waiting_state,
-  [STATE_GAME]    = &game_state,
-  [STATE_PAUSE]   = &pause_state,
-  [STATE_OPTIONS] = &options_state,
-  [STATE_ABOUT]   = &about_state,
-  [STATE_OVER]    = &over_state
 };
 
 enum client_state __client_state;

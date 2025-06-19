@@ -42,9 +42,7 @@ static inline void title(void) {
 }
 
 static void on_tick(f32 delta) {
-  if (dead) {
-    if (tracked_sprite == NULL)
-      return;
+  if (dead && tracked_sprite != NULL) {
     player.pos = tracked_sprite->pos;
     set_player_rot(tracked_sprite->rot);
   }

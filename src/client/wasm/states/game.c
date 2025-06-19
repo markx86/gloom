@@ -1,8 +1,15 @@
 #include <client.h>
 
+// mouse sensitivity multiplier
 f32 mouse_sensitivity;
 
 static b8 do_send_update;
+
+#define KEY_A 65
+#define KEY_D 68
+#define KEY_S 83
+#define KEY_W 87
+#define KEY_P 80
 
 static void on_enter(void) {
   if (!pointer_is_locked())

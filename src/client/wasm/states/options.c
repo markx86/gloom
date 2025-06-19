@@ -40,11 +40,14 @@ static struct component comps[] = {
 };
 
 static void save_settings(void) {
+  // save settings to local storage
   store_settings(comps[DRAWDIST_SLIDER].value,
                  comps[FOV_SLIDER].value,
                  comps[MOUSESENS_SLIDER].value);
 }
 
+// return slider value between min and max
+// FIXME: should this be in the ui module?
 static inline f32 slider_value(enum option_control ctrl, f32 min, f32 max) {
   return min + (max - min) * comps[ctrl].value;
 }
@@ -56,7 +59,6 @@ void apply_settings(void) {
 }
 
 void load_settings(f32 drawdist, f32 fov, f32 mousesens) {
-  puts("loading settings...");
   comps[DRAWDIST_SLIDER].value = drawdist;
   comps[FOV_SLIDER].value = fov;
   comps[MOUSESENS_SLIDER].value = mousesens;
@@ -68,13 +70,11 @@ static void on_enter(void) {
   struct component* c;
 
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
-
   clear_screen();
-
   draw_title(32, 32, "options");
 
+  // initialize ui components
   component_on_enter(comps, ARRLEN(comps));
-
   for (i = 1; i < ARRLEN(comps); ++i) {
     c = &comps[i];
     if (c->type != UICOMP_BUTTON)
@@ -87,9 +87,9 @@ static void on_tick(f32 delta) {
 
   UNUSED(delta);
 
+  // draw ui components
   for (i = 1; i < ARRLEN(comps); ++i)
     draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * (i-1), comps + i);
-
   draw_component(48, FB_HEIGHT - 32 - STRING_HEIGHT, &comps[BACK_BUTTON]);
 }
 
