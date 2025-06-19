@@ -7,8 +7,6 @@ STEP = 0.005
 RANGE = 2 * math.pi
 
 samples = int(RANGE // STEP) + 1
-table_size = samples * 4
-print(f"predicted cosine table size = {round(table_size / 1024)}KB")
 
 cos_table = []
 for i in range(samples):
