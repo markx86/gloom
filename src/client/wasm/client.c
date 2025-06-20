@@ -77,11 +77,7 @@ void init(b8 ws_connected, u32 game_id, u32 player_token) {
   apply_settings();
   multiplayer_init(game_id, player_token);
   register_fb(__fb, FB_WIDTH, FB_HEIGHT, FB_SIZE);
-#ifdef UNFINISHED_FEATURES
   switch_to_state(ws_connected ? STATE_MENU : STATE_ERROR);
-#else
-  switch_to_state(ws_connected ? STATE_LOADING : STATE_ERROR);
-#endif
 }
 
 void exit(void) {

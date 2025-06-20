@@ -10,6 +10,7 @@ import {
 
 let myGameId;
 let intervalId;
+let gameWs;
 
 $root($("#root"));
 // disable scroll bars
@@ -458,7 +459,7 @@ const game = (gameId, wssPort, playerToken) => {
   $assert(typeof(gameId) === "number" && typeof(wssPort) === "number" && typeof(playerToken) === "number");
 
   (new Promise(resolve => resolve()))
-    .then(() => gloomLauncher(wssPort, gameId, playerToken, gotoHome));
+    .then(() => gameWs = gloomLauncher(wssPort, gameId, playerToken, gotoHome));
 
   return createWindow(
     {
@@ -490,7 +491,20 @@ api.get("/session/refresh").then(res => {
     },
     {
       onError: () => $goto("/"),
-      onBeforeRoute: () => { if (intervalId != null) { clearInterval(intervalId); intervalId = undefined; } }
+      onBeforeRoute: () => {
+        // clear any interval that's running
+        if (intervalId != null) {
+          clearInterval(intervalId);
+          intervalId = undefined;
+        }
+        // close dangling WebSocket
+        if (gameWs != null) {
+          if (gameWs.readyState !== WebSocket.CLOSED) {
+            gameWs.close();
+          }
+          gameWs = undefined;
+        }
+      }
     }
   );
 });

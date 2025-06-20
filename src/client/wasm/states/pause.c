@@ -12,10 +12,6 @@ static void on_options_clicked(void) {
   switch_to_state(STATE_OPTIONS);
 }
 
-static void on_about_clicked(void) {
-  switch_to_state(STATE_ABOUT);
-}
-
 static void on_quit_clicked(void) {
 #ifdef UNFINISHED_FEATURES
   switch_to_state(STATE_MENU);
@@ -27,7 +23,6 @@ static void on_quit_clicked(void) {
 static struct component buttons[] = {
   { .type = UICOMP_BUTTON, .text = "> resume", .on_click = on_resume_clicked },
   { .type = UICOMP_BUTTON, .text = "> options", .on_click = on_options_clicked },
-  { .type = UICOMP_BUTTON, .text = "> about", .on_click = on_about_clicked },
   { .type = UICOMP_BUTTON, .text = "> quit", .on_click = on_quit_clicked }
 };
 

@@ -1,7 +1,7 @@
 import { BulletSprite, Game, GameSprite, PlayerSprite } from "./game";
 
 export enum GamePacketType {
-  JOIN,
+  READY,
   LEAVE,
   UPDATE,
   FIRE,

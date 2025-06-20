@@ -9,7 +9,7 @@
 #define MAX_PACKET_DROP 10U
 
 enum game_pkt_type {
-  GPKT_JOIN,
+  GPKT_READY,
   GPKT_LEAVE,
   GPKT_UPDATE,
   GPKT_FIRE,
@@ -28,9 +28,7 @@ struct game_pkt_hdr {
     struct body PACKED;         \
   } PACKED
 
-DEFINE_GPKT(join, {
-  u32 game_id;
-});
+DEFINE_GPKT(ready, {});
 
 DEFINE_GPKT(leave, {});
 
@@ -154,9 +152,8 @@ void multiplayer_init(u32 gid, u32 token) {
 }
 
 void join_game(void) {
-  struct game_pkt_join pkt;
-  init_game_pkt(&pkt, GPKT_JOIN);
-  pkt.game_id = game_id;
+  struct game_pkt_ready pkt;
+  init_game_pkt(&pkt, GPKT_READY);
   set_connection_state(CONN_JOINING);
   send_packet_checked(&pkt, sizeof(pkt));
 }

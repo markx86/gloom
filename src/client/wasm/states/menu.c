@@ -9,7 +9,7 @@ static void on_options_clicked(void) { switch_to_state(STATE_OPTIONS); }
 static void on_about_clicked(void) { switch_to_state(STATE_ABOUT); }
 
 static struct component comps[] = {
-  { .type = UICOMP_BUTTON, .text = "> play", .on_click = on_play_clicked },
+  { .type = UICOMP_BUTTON, .text = "> ready", .on_click = on_play_clicked },
   { .type = UICOMP_BUTTON, .text = "> options", .on_click = on_options_clicked },
   { .type = UICOMP_BUTTON, .text = "> about", .on_click = on_about_clicked },
   { .type = UICOMP_BUTTON, .text = "> quit", .on_click = exit }

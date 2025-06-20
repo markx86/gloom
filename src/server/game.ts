@@ -510,6 +510,7 @@ export class Game {
       }
 
       case GameState.PLAYING: {
+        // FIXME: add a maximum game duration
         if (this.numOfPlayers <= 1) {
           this.waitTime = OVER_TIME;
           this.state = GameState.OVER;
@@ -590,6 +591,12 @@ export class Game {
     return token;
   }
 
+  public deallocatePlayer(token: number) {
+    if (this.playerTokens.delete(token)) {
+      Logger.trace("Deallocated player with token %s", token.toString(16));
+    }
+  }
+
   private addSprite<T extends GameSprite>(sprite: T): T | undefined {
     if (this.sprites.length < MAX_SPRITES) {
       this.sprites.push(sprite);
@@ -606,7 +613,7 @@ export class Game {
   public removePlayer(player: PlayerSprite, actor: PlayerSprite | undefined = undefined) {
     if (this.removeSprite(player, actor)) {
       --this.numOfPlayers;
-      this.playerTokens.delete(player.holder.getToken());
+      this.deallocatePlayer(player.holder.getToken());
     }
   }
 

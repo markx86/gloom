@@ -212,7 +212,7 @@ static inline void update_sprites(f32 delta) {
     if (s->desc.type == SPRITE_BULLET)
       s->disabled = !s->disabled && collided;
     else /* s->desc.type == SPRITE_PLAYER */ {
-      // do player sprite animation stuff
+      // do player sprite animation
       if (s->anim_frame > 4.0f) {
         // if anim_frame > 4, the firing frame is being shown
         s->anim_frame -= delta * PLAYER_ANIM_FPS;

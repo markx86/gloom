@@ -252,10 +252,11 @@ export async function loadGloom() {
       if (online) {
         // send handshake
         {
-          data = new ArrayBuffer(8);
+          data = new ArrayBuffer(12);
           view = new DataView(data);
           view.setUint32(0, playerToken, true);
-          view.setUint32(4, 0xBADC0FFE, true); // handshake magic
+          view.setUint32(4, gameId, true);
+          view.setUint32(8, 0xBADC0FFE, true); // handshake magic
           ws.send(data);
         }
       }
@@ -280,6 +281,8 @@ export async function loadGloom() {
     });
     ws.addEventListener("error", wsErrorHandler);
     ws.addEventListener("open", wsOpenHandler);
+
+    return ws;
   }
 
   // FIXME: load settings for the currently logged in user

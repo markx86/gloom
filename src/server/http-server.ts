@@ -1,4 +1,3 @@
-import Logger from "./logger.ts";
 import { randomBytes } from "node:crypto";
 import {
   USERNAME_MAX_LEN, USERNAME_MIN_LEN,
@@ -11,8 +10,9 @@ import {
   invalidateSession,
   refreshSession
 } from "./database.ts";
-import { Game } from "./game.ts";
+import Logger from "./logger.ts";
 import Maps from "./maps.ts"
+import { Game } from "./game.ts";
 import express from "express";
 import cookieParser from "cookie-parser";
 import { getEnvStringOrDefault, getEnvIntOrDefault } from "./util.ts";

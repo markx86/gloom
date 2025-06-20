@@ -19,12 +19,13 @@ wss.on("connection", ws => {
       return;
     }
     const view = new DataView(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
-    const token = view.getUint32(0, true);
-    const magic = view.getUint32(4, true);
+    const playerToken = view.getUint32(0, true);
+    const gameId = view.getUint32(4, true);
+    const magic = view.getUint32(8, true);
     if (magic === HANDSHAKE_MAGIC) {
       ws.removeAllListeners();
-      new Client(ws, token);
-      Logger.success("Handshake with player successful (token %s)", token.toString(16));
+      new Client(ws, playerToken, gameId);
+      Logger.success("Handshake with player successful (token %s)", playerToken.toString(16));
     } else {
       ws.close();
       Logger.error("Handshake failed (invalid magic, got %s expected %s)", magic.toString(16), HANDSHAKE_MAGIC.toString(16));

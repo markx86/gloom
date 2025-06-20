@@ -7,7 +7,8 @@ import { Peer } from "./broadcast";
 const MAX_PACKET_DROP = 10;
 
 export class Client extends Peer implements PlayerHolder {
-  private token: number;
+  private gameId: number;
+  private playerToken: number;
   private player: PlayerSprite | null;
   private ws: WebSocket;
   private clientSequence: number;
@@ -18,7 +19,7 @@ export class Client extends Peer implements PlayerHolder {
   }
 
   public getToken(): number {
-    return this.token;
+    return this.playerToken;
   }
 
   public sendPacket(pkt: ServerPacket) {
@@ -41,10 +42,10 @@ export class Client extends Peer implements PlayerHolder {
       return false;
     }
 
-    if (this.token !== playerToken) {
-      Logger.error("Invalid player token! Got %s expected %s", playerToken.toString(16), this.token?.toString(16));
+    if (this.playerToken !== playerToken) {
+      Logger.error("Invalid player token! Got %s expected %s", playerToken.toString(16), this.playerToken?.toString(16));
       return false;
-    } else if (type !== GamePacketType.JOIN && !this.inBroadcastGroup()) {
+    } else if (type !== GamePacketType.READY && !this.inBroadcastGroup()) {
       Logger.error("Player is not in any game!");
       return false;
     }
@@ -52,16 +53,13 @@ export class Client extends Peer implements PlayerHolder {
     return true;
   }
 
-  private _handleJoinPacket(packet: GamePacket): boolean {
+  private _handleReadyPacket(): boolean {
     if (this.player != null) {
-      Logger.error("Player sent hello packet, after it had already sent one!");
+      Logger.error("Player sent ready packet, after it had already sent one!");
       return false;
     }
 
-    const gameId = packet.popU32();
-    Logger.trace("Got request to join game with ID: %s", gameId.toString(16));
-
-    const game = Game.getById(gameId);
+    const game = Game.getById(this.gameId);
     if (game == null) {
       Logger.error("No game with that ID");
       return false;
@@ -74,7 +72,7 @@ export class Client extends Peer implements PlayerHolder {
 
     this.player = player;
 
-    Logger.success("Client (%s) joined game (%s) with ID %d", this.token.toString(16), this.player.game.id.toString(16), this.player.id);
+    Logger.success("Client (%s) joined game (%s) with ID %d", this.playerToken.toString(16), this.player.game.id.toString(16), this.player.id);
 
     this.registerToBroadcastGroup(game.id);
     this.sendPacket(new HelloPacket(this.player));
@@ -83,8 +81,8 @@ export class Client extends Peer implements PlayerHolder {
     return true;
   }
 
-  private handleJoinPacket(packet: GamePacket) {
-    if (!this._handleJoinPacket(packet)) {
+  private handleReadyPacket() {
+    if (!this._handleReadyPacket()) {
       this.sendPacket(new TerminatePacket());
     }
   }
@@ -146,18 +144,19 @@ export class Client extends Peer implements PlayerHolder {
     }
 
     switch (type) {
-      case GamePacketType.JOIN:   { this.handleJoinPacket(packet); break; }
+      case GamePacketType.READY:   { this.handleReadyPacket(); break; }
       case GamePacketType.LEAVE:  { this.handleLeavePacket(packet); break; }
       case GamePacketType.UPDATE: { this.handleUpdatePacket(packet); break; }
       case GamePacketType.FIRE:   { this.handleFirePacket(packet); break; }
     }
   }
 
-  public constructor(ws: WebSocket, token: number) {
+  public constructor(ws: WebSocket, playerToken: number, gameId: number) {
     super();
 
     this.ws = ws;
-    this.token = token;
+    this.playerToken = playerToken;
+    this.gameId = gameId;
     this.player = null;
     this.serverSequence = this.clientSequence = 0;
 
@@ -171,7 +170,8 @@ export class Client extends Peer implements PlayerHolder {
         this.player.game.removePlayer(this.player);
         this.broadcastPacket(new DestroyPacket(this.player), false);
       } else {
-        Logger.trace("Client was not in game, nothing to do");
+        Logger.trace("Client was not in game, deallocating player");
+        Game.getById(this.gameId)?.deallocatePlayer(this.playerToken);
       }
     });
 
@@ -183,13 +183,13 @@ export class Client extends Peer implements PlayerHolder {
         return;
       }
       const packet = new GamePacket(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
-      
+
       const typeAndSeq = packet.popU32();
       const type = (typeAndSeq >> 30) & 3;
       const sequence = (typeAndSeq & 0x3FFFFFFF);
 
       const playerToken = packet.popU32();
-      
+
       Logger.trace("Packet type: %s", type.toString(16));
       Logger.trace("Sequence number: %s", sequence);
       Logger.trace("Player token: %s", playerToken.toString(16));
