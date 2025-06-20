@@ -177,8 +177,9 @@ export class HelloPacket extends ServerPacket {
 }
 
 export class UpdatePacket extends ServerPacket {
-  public constructor(sprite: GameSprite) {
-    super(ServerPacketType.UPDATE, SIZEOF_STRUCT_SPRITE_UPDATE)
+  public constructor(sprite: GameSprite, timestamp: number) {
+    super(ServerPacketType.UPDATE, 4 + SIZEOF_STRUCT_SPRITE_UPDATE)
+    this.pushF32(timestamp);
     this.pushSpriteUpdate(sprite);
   }
 }

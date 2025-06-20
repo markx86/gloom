@@ -1,6 +1,8 @@
 #ifndef __TYPES_H__
 #define __TYPES_H__
 
+#define PACKED __attribute__((packed))
+
 #define __STATICASSERT(x) _Static_assert(x, #x)
 
 typedef unsigned int u32;
@@ -26,9 +28,9 @@ __STATICASSERT(sizeof(b8) == 1);
 #define true  1
 #define false 0
 
-typedef struct { i32 x, y; } vec2i;
-typedef struct { u32 x, y; } vec2u;
-typedef struct { f32 x, y; } vec2f;
+typedef struct { i32 x, y; } PACKED vec2i;
+typedef struct { u32 x, y; } PACKED vec2u;
+typedef struct { f32 x, y; } PACKED vec2f;
 
 #undef __STATICASSERT
 

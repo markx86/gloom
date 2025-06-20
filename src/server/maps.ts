@@ -118,8 +118,8 @@ const mapSpirals = new GameMap(32, 32, [
 ], [
   new SpawnPosition(10, 8, 180),
   new SpawnPosition(32 - 11, 32 - 9, 0),
-  new SpawnPosition(32 - 11, 8, 90),
-  new SpawnPosition(10, 32 - 9, -90)
+  new SpawnPosition(8, 32 - 11, 90),
+  new SpawnPosition(32 - 9, 10, -90)
 ]);
 
 const mapCrazyCurves = new GameMap(32, 32, [

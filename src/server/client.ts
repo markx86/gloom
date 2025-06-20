@@ -1,7 +1,7 @@
 import Logger from "./logger";
 import { WebSocket } from "ws";
 import { Game, PlayerHolder, PlayerSprite } from "./game";
-import { GamePacketType, ServerPacket, HelloPacket, UpdatePacket, DestroyPacket, GamePacket, WaitPacket, TerminatePacket } from "./packet";
+import { GamePacketType, ServerPacket, HelloPacket, UpdatePacket, DestroyPacket, GamePacket, WaitPacket } from "./packet";
 import { Peer } from "./broadcast";
 
 const MAX_PACKET_DROP = 10;
@@ -24,7 +24,8 @@ export class Client extends Peer implements PlayerHolder {
 
   public sendPacket(pkt: ServerPacket) {
     const seq = this.serverSequence++;
-    this.ws.send(pkt.getRaw(seq));
+    // this.ws.send(pkt.getRaw(seq));
+    setTimeout(() => this.ws.send(pkt.getRaw(seq)), 40);
   }
 
   private checkPacket(type: GamePacketType, sequence: number, playerToken: number): boolean {
@@ -81,9 +82,9 @@ export class Client extends Peer implements PlayerHolder {
     return true;
   }
 
-  private handleReadyPacket() {
+  private handleReadyPacket(_packet: GamePacket) {
     if (!this._handleReadyPacket()) {
-      this.sendPacket(new TerminatePacket());
+      this.ws.close();
     }
   }
 
@@ -106,26 +107,13 @@ export class Client extends Peer implements PlayerHolder {
       return;
     }
 
-    const ts   = packet.popF32();
-    const x    = packet.popF32();
-    const y    = packet.popF32();
-    const rot  = packet.popF32();
     const keys = packet.popU32();
-    Logger.trace("pos = (%f, %f), rot = %f, keys = %s", x, y, rot, keys.toString(16));
+    const rot  = packet.popF32();
+    const ts = packet.popF32();
+    Logger.trace("keys = %s, rot = %f, ts = %f", keys.toString(16), rot, ts);
 
-    const [ack, delta] = this.player.acknowledgeUpdatePacket(ts, x, y, rot, keys);
-    Logger.trace("delta = %f, ack = %s", delta, ack);
-
-    this.broadcastPacket(
-      new UpdatePacket(this.player),
-      !ack
-    );
-
-    if (ack) {
-      this.player.tick(delta);
-    } else {
-      Logger.warning("Update packet not acknowledged");
-    }
+    this.player.processUpdatePacket(keys, rot);
+    this.broadcastPacket(new UpdatePacket(this.player, ts), true);
   }
 
   private handleFirePacket(_packet: GamePacket) {
@@ -144,7 +132,7 @@ export class Client extends Peer implements PlayerHolder {
     }
 
     switch (type) {
-      case GamePacketType.READY:   { this.handleReadyPacket(); break; }
+      case GamePacketType.READY:   { this.handleReadyPacket(packet); break; }
       case GamePacketType.LEAVE:  { this.handleLeavePacket(packet); break; }
       case GamePacketType.UPDATE: { this.handleUpdatePacket(packet); break; }
       case GamePacketType.FIRE:   { this.handleFirePacket(packet); break; }
@@ -173,6 +161,8 @@ export class Client extends Peer implements PlayerHolder {
         Logger.trace("Client was not in game, deallocating player");
         Game.getById(this.gameId)?.deallocatePlayer(this.playerToken);
       }
+      this.unsetPlayer();
+      this.removeFromBroadcastGroup();
     });
 
     // handle WebSocket message event
@@ -194,7 +184,8 @@ export class Client extends Peer implements PlayerHolder {
       Logger.trace("Sequence number: %s", sequence);
       Logger.trace("Player token: %s", playerToken.toString(16));
 
-      this.handlePacket(type, sequence, playerToken, packet);
+      // this.handlePacket(type, sequence, playerToken, packet);
+      setTimeout(() => this.handlePacket(type, sequence, playerToken, packet), 40);
     });
   }
 }

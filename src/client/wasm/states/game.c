@@ -55,8 +55,10 @@ static void on_key(u32 code, char ch, b8 pressed) {
       return;
   }
 
-  if (keys.all_keys != prev_keys)
+  if (keys.all_keys != prev_keys) {
+    queue_key_input();
     do_send_update = true;
+  }
 
   UNUSED(ch);
 }

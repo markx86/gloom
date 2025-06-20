@@ -34,6 +34,7 @@ struct camera {
 struct player {
   f32 rot;
   vec2f pos;
+  vec2f fake_pos;
   vec2f dir;
   i32 health;
 };
@@ -54,9 +55,8 @@ struct sprite_desc {
 struct sprite {
   struct sprite_desc desc;
   f32 rot;
-  f32 vel;
   vec2f pos;
-  vec2f dir;
+  vec2f vel;
   struct {
     i32 screen_x;
     i32 screen_halfw;
@@ -97,12 +97,16 @@ extern struct camera camera;
 extern struct sprites sprites;
 extern struct map map;
 extern union keys keys;
+extern const f32 sprite_radius[SPRITE_MAX];
 
 #define PLAYER_MAX_HEALTH 100
 #define BULLET_DAMAGE     25
 
 void set_camera_fov(f32 new_fov);
 void set_player_rot(f32 new_rot);
+
+vec2f get_direction_from_keys(void);
+b8 move_and_collide(vec2f* pos, vec2f* diff, f32 radius);
 
 void gloom_init(void);
 void gloom_tick(f32 delta);

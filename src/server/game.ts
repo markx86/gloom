@@ -23,9 +23,6 @@ const IDLE_TIME = 300;
 const WAIT_TIME = 10;
 const OVER_TIME = 10;
 
-const POS_DIFF_THRESHOLD = 0.5;
-const EPS_THRESHOLD = 0.5;
-
 enum GameSpriteType {
   PLAYER,
   BULLET
@@ -238,42 +235,9 @@ export class PlayerSprite extends GameSprite {
     })
   }
 
-  public acknowledgeUpdatePacket(ts: number, x: number, y: number, rotation: number, keys: number): [boolean, number] {
-    Logger.trace("now: %f - ts: %f", this.game.getTime(), ts);
-    const delta = this.game.getTime() - ts;
-    const absDelta = Math.abs(delta);
+  public processUpdatePacket(keys: number, rotation: number) {
+    this.rotation = rotation;
 
-
-    let endX: number, endY: number;
-    let startX: number, startY: number;
-
-    if (delta >= 0) {
-      startX = x; startY = y;
-      endX = this.x; endY = this.y;
-    } else {
-      startX = this.x; startY = this.y;
-      endX = x; endY = y;
-    }
-    
-    let predictedX = startX, predictedY = startY;
-    let predictionDelta = absDelta;
-    while (predictionDelta !== 0) {
-      const dt = Math.min(predictionDelta, DT);
-      const [_, newX, newY] = this.moveAndCollide(dt, predictedX, predictedY);
-      predictionDelta -= dt;
-      predictedX = newX;
-      predictedY = newY;
-    }
-
-    const dx = endX - predictedX;
-    const dy = endY - predictedY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const eps = dist / absDelta;
-    Logger.trace("Prediction error: %f (eps: %f)", dist, eps);
-    const ack = dist <= POS_DIFF_THRESHOLD || eps <= EPS_THRESHOLD;
-
-    // FIXME: limit angle between updates
-  
     const longDir = ((keys & 0x00FF) !== 0 ? 1 : 0) - ((keys & 0xFF00) !== 0 ? 1 : 0);
     keys >>= 16;
     const sideDir = ((keys & 0x00FF) !== 0 ? 1 : 0) - ((keys & 0xFF00) !== 0 ? 1 : 0);
@@ -293,13 +257,7 @@ export class PlayerSprite extends GameSprite {
     }
     this.velocity = (longDir !== 0 || sideDir !== 0) ? PLAYER_RUN_SPEED : 0;
 
-    if (ack) {
-      this.x = x;
-      this.y = y;
-      this.rotation = rotation;
-    }
-
-    return [ack, delta];
+    Logger.trace("Player %d is @ (x = %f, y = %f)", this.id, this.x, this.y);
   }
 
   public fireBullet(): BulletSprite | undefined {
@@ -448,14 +406,10 @@ export class Game {
     Game.games.delete(game.id);
   }
 
-  public static destroyAll() {
-    Game.games.forEach((game, _) => Game.destroy(game));
-  }
-
   public static getById(id: number): Game | null {
     const game = Game.games.get(id);
     if (!game) {
-      Logger.error("No game exists with ID %s", id.toString(16));
+      Logger.trace("No game exists with ID %s", id.toString(16));
       return null;
     }
     return game;

@@ -64,6 +64,12 @@ void set_pointer_locked(b8 locked) {
     switch_to_state(STATE_PAUSE);
 }
 
+void on_ws_close(void) {
+  set_connection_state(CONN_DISCONNECTED);
+  if (get_client_state() != STATE_OVER)
+    switch_to_state(STATE_ERROR);
+}
+
 void key_event(u32 code, char ch, b8 pressed) { CALLSTATEHANDLER(on_key, code, ch, pressed); }
 void mouse_down(u32 x, u32 y, u32 button) { CALLSTATEHANDLER(on_mouse_down, x, y, button); }
 void mouse_up(u32 x, u32 y, u32 button) { CALLSTATEHANDLER(on_mouse_up, x, y, button); }

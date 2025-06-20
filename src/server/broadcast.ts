@@ -14,7 +14,7 @@ export abstract class Peer {
     }
   }
 
-  protected broadcastPacket(packet: ServerPacket, includeSelf: boolean = false) {
+  protected broadcastPacket(packet: ServerPacket, includeSelf: boolean) {
     this.broadcastGroup?.send(packet, includeSelf ? null : this);
   }
 

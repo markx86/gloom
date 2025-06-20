@@ -279,6 +279,7 @@ export async function loadGloom() {
         instance.exports.multiplayer_on_recv(pkt.byteLength);
       }
     });
+    ws.addEventListener("close", instance.exports.on_ws_close);
     ws.addEventListener("error", wsErrorHandler);
     ws.addEventListener("open", wsOpenHandler);
 

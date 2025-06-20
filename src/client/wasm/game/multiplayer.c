@@ -4,8 +4,6 @@
 #include <globals.h>
 #include <ui.h>
 
-#define PACKED __attribute__((packed))
-
 #define MAX_PACKET_DROP 10U
 
 enum game_pkt_type {
@@ -33,10 +31,9 @@ DEFINE_GPKT(ready, {});
 DEFINE_GPKT(leave, {});
 
 DEFINE_GPKT(update, {
-  f32 ts;
-  vec2f pos;
-  f32 rot;
   u32 keys;
+  f32 rot;
+  f32 ts;
 });
 
 DEFINE_GPKT(fire, {});
@@ -67,11 +64,6 @@ struct sprite_init {
   struct sprite_transform transform;
 } PACKED;
 
-struct sprite_update {
-  u8 id;
-  struct sprite_transform transform;
-} PACKED;
-
 #define DEFINE_SPKT(name, body) \
   struct serv_pkt_##name {      \
     struct serv_pkt_hdr hdr;    \
@@ -87,7 +79,9 @@ DEFINE_SPKT(hello, {
 });
 
 DEFINE_SPKT(update, {
-  struct sprite_update update;
+  f32 ts;
+  u8 id;
+  struct sprite_transform transform;
 });
 
 DEFINE_SPKT(create, {
@@ -106,6 +100,54 @@ DEFINE_SPKT(wait, {
 DEFINE_SPKT(death, {});
 
 DEFINE_SPKT(terminate, {});
+
+#define MODPOW2INCR(x, m) ((x + 1) & ((m) - 1))
+#define MODPOW2DIST(x, y, m) (((x) - (y)) & ((m) - 1))
+
+#define RING_SIZE 128
+
+struct input_log {
+  f32 ts;
+  vec2f vel;
+};
+
+struct {
+  struct input_log *_tail, *_head;
+  struct input_log _buffer[RING_SIZE];
+} iring = {
+  ._tail = iring._buffer,
+  ._head = iring._buffer
+};
+
+static void iring_push_elem(f32 ts, vec2f* vel) {
+  iring._head->ts = ts;
+  iring._head->vel = *vel;
+  if (++iring._head >= iring._buffer + RING_SIZE)
+    iring._head = iring._buffer;
+  if (iring._head == iring._tail)
+    ++iring._tail;
+}
+
+static void iring_set_tail(struct input_log* ilog) {
+  if ((u32)(ilog - iring._buffer) < RING_SIZE)
+    iring._tail = ilog;
+}
+
+static struct input_log* iring_get_next(void) {
+  struct input_log* ilog;
+  if (iring._tail == iring._head)
+    return NULL;
+  ilog = iring._tail;
+  if (++iring._tail >= iring._buffer + RING_SIZE)
+    iring._tail = iring._buffer;
+  return ilog;
+}
+
+static struct input_log* iring_get_after(struct input_log* ilog) {
+  if (++ilog >= iring._buffer + RING_SIZE)
+    ilog = iring._buffer;
+  return ilog == iring._head ? NULL : ilog;
+}
 
 static u8 player_id;
 static u32 game_id, player_token;
@@ -131,6 +173,10 @@ enum connection_state __conn_state;
 
 typedef void (*serv_pkt_handler_t)(void*, u32);
 
+static inline f32 get_ts(void) {
+  return time() - game_start;
+}
+
 static void init_game_pkt(void* hdrp, enum game_pkt_type type) {
   struct game_pkt_hdr* hdr = hdrp;
   hdr->type = type;
@@ -151,6 +197,11 @@ void multiplayer_init(u32 gid, u32 token) {
   set_connection_state(CONN_CONNECTED);
 }
 
+void queue_key_input(void) {
+  vec2f vel = get_direction_from_keys();
+  iring_push_elem(get_ts(), &VEC2SCALE(&vel, PLAYER_RUN_SPEED));
+}
+
 void join_game(void) {
   struct game_pkt_ready pkt;
   init_game_pkt(&pkt, GPKT_READY);
@@ -169,10 +220,9 @@ void leave_game(void) {
 void send_update(void) {
   struct game_pkt_update pkt;
   init_game_pkt(&pkt, GPKT_UPDATE);
-  pkt.ts = time() - game_start;
-  pkt.pos = player.pos;
-  pkt.rot = player.rot;
   pkt.keys = keys.all_keys;
+  pkt.rot = player.rot;
+  pkt.ts = get_ts();
   send_packet_checked(&pkt, sizeof(pkt));
 }
 
@@ -194,18 +244,11 @@ static void pkt_type_error(const char* pkt_type) {
 
 static void apply_sprite_transform(struct sprite* s,
                                    struct sprite_transform* t) {
-  // we compute the inverse square root,
-  // because it's faster than computing the normat square root
-  // and because we need it to compute the direction vector
-  f32 inv_vel = inv_sqrt(t->vel.x * t->vel.x + t->vel.y * t->vel.y);
   s->rot = t->rot;
   s->pos = t->pos;
-  // compute the direction vector by normalizing the velocity vector
-  s->dir.x = t->vel.x * inv_vel;
-  s->dir.y = t->vel.y * inv_vel;
+  s->vel = t->vel;
   // since we have computed the inverse of the velocity,
   // we have to do this inversion to obtain the normat velocity
-  s->vel = 1.0f / inv_vel;
   s->disabled = false; // reset disabled flag
 }
 
@@ -238,13 +281,20 @@ static struct sprite* get_sprite(u8 id, b8 can_alloc) {
 
 // remove sprite with the requested @id
 static void destroy_sprite(u8 id) {
-  u32 i;
+  u32 i, tid;
   struct sprite* s = get_sprite(id, false);
   if (!s)
     return;
+  printf("destroying sprite %u (type %u)\n", s->desc.id, s->desc.type);
+  // save the id of the tracked if we're going to shift it
+  tid = tracked_sprite != NULL && tracked_sprite->desc.id > s->desc.id ?
+        tracked_sprite->desc.id : 0;
   for (i = (u32)(s - sprites.s) + 1; i < sprites.n; ++i)
     sprites.s[i - 1] = sprites.s[i];
   --sprites.n;
+  // update sprite tracker pointer if the position in the array changed
+  if (tid > 0)
+    tracked_sprite = get_sprite(tid, false);
 }
 
 // initialize sprite from packet data
@@ -255,6 +305,8 @@ static void init_sprite(struct sprite_init* init) {
     return;
   // get or allocate the requested sprite
   if ((s = get_sprite(init->desc.id, true))) {
+    printf("creating sprite with id %u (type %u)\n",
+           init->desc.id, init->desc.type);
     // initialize the sprite struct with the provided data
     memset(s, 0, sizeof(*s));
     s->desc = init->desc;
@@ -317,7 +369,7 @@ static void serv_hello_handler(void* buf, u32 len) {
         init_sprite(s);
       else {
         // init data refers to the player
-        player.pos = s->transform.pos;
+        player.pos = player.fake_pos = s->transform.pos;
         player.rot = s->transform.rot;
       }
       len -= sizeof(*s);
@@ -343,9 +395,42 @@ static void serv_hello_handler(void* buf, u32 len) {
   set_connection_state(CONN_WAITING);
 }
 
+static inline void reconcile(f32 ts, vec2f* pos, vec2f* vel) {
+  f32 delta;
+  struct input_log* ilog;
+  vec2f diff;
+  const f32 radius = sprite_radius[SPRITE_PLAYER];
+
+  // discard all old logs
+  for (ilog = iring_get_next(); ilog != NULL; ilog = iring_get_next()) {
+    if (ts < ilog->ts)
+      break;
+  }
+
+  // step through all past events and recompute the current player position
+  if (ilog != NULL) {
+    iring_set_tail(ilog);
+
+    for (; ilog != NULL; ilog = iring_get_after(ilog)) {
+      delta = ilog->ts - ts;
+      diff = VEC2SCALE(vel, delta);
+      move_and_collide(pos, &diff, radius);
+      vel = &ilog->vel;
+      ts = ilog->ts;
+    }
+  }
+
+  delta = get_ts() - ts;
+  diff = VEC2SCALE(vel, delta);
+  move_and_collide(pos, &diff, radius);
+
+  // set recomputed player position
+  player.pos = *pos;
+}
+
 static void serv_update_handler(void* buf, u32 len) {
-  struct sprite_update* u;
   struct sprite* s;
+  struct sprite_transform* t;
   struct serv_pkt_update* pkt = buf;
 
   // check connection state
@@ -361,13 +446,12 @@ static void serv_update_handler(void* buf, u32 len) {
   }
 
   // process update data
-  u = &pkt->update;
-  if (u->id == player_id) {
+  t = &pkt->transform;
+  if (pkt->id == player_id)
     // update data refers to the player
-    player.pos = u->transform.pos;
-    set_player_rot(u->transform.rot);
-  } else if ((s = get_sprite(u->id, false)))
-    apply_sprite_transform(s, &u->transform);
+    reconcile(pkt->ts, &t->pos, &t->vel);
+  else if ((s = get_sprite(pkt->id, false)))
+    apply_sprite_transform(s, t);
 }
 
 static void serv_create_handler(void* buf, u32 len) {
@@ -411,6 +495,9 @@ static void serv_destroy_handler(void* buf, u32 len) {
     switch_to_state(STATE_OVER);
     // make sprite tracker follow the player sprite that "killed" the player
     tracked_sprite = get_sprite(pkt->desc.field, false);
+    // clear the player sprite id, since once the player is dead the server will
+    // reuse they're sprite id for other sprites
+    player_id = 0;
     return;
   } else if (tracked_sprite != NULL && pkt->desc.id == tracked_sprite->desc.id)
     // if the tracked sprite is "killed", follow the "killer"
