@@ -8,3 +8,4 @@ build/
 **/*.wasm
 **/*.min.js*
 **/compile_commands.json
+.env

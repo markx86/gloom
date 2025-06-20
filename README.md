@@ -1,5 +1,5 @@
 # gloom
-#### a 2.5D FPS game written in WASM and TypeScript
+#### a 2.5D multiplayer FPS game written in WASM and TypeScript
 
 ---
 
@@ -18,12 +18,50 @@ Other projects that helped me:
 - _Lode's Computer Graphics Tutorial_ by Lode Vandevenne ([link](https://lodev.org/cgtutor)), a wonderful resource about raycasters and how to make them
 
 
+## How to use
+
+When you visit the website without a valid session, you will see a prompt asking you to login.
+
+![login](.github/images/login.png)
+
+If you don't have an account, you can close the window (by clicking the `X` button) or click on the help button (`?`), and click
+"I want to create an account" on the help window.
+
+![help](.github/images/help.png)
+
+Once you're on the registration page, you will need to choose a username and a password. To view the password and username requirements,
+click on the help button in the window title bar.
+
+![registration](.github/images/register.png)
+
+Once you're logged in, you will see a window with two options.
+
+![home](.github/images/home.png)
+
+Clicking on `Create`, will tell the game server to instantiate a game. Once the game is ready, its ID will be displayed under
+`Your game`. You can copy this ID and share it with your friends to play together.
+To join a game, you have to enter the correct ID in the text-box (or leave it empty if you want to join the game you've just created),
+and then click on the `Join` button. 
+
+![menu](.github/images/menu.png)
+
+In the menu you can adjust your render distance and FOV to your liking. Do note that you can also do this while you're in game.
+When you are ready to go, click on `> ready` and you'll join the game world.
+
+![waiting](.github/images/waiting.png)
+
+Once there are at least two players in the game, a countdown will start, at the end of which the players will be allowed to move.
+
+![in-game](.github/images/in-game.png)
+
+If you need any help with the controls, click on the help button in window title bar.
+
 ## Project structure
 
 The project has the following structure:
 
-- `Dockerfile` This file describes the docker environment necessary to build the client and the server.
-- `docker-compose.yml` This file is a working (and production ready) docker compose file to quickly setup and host the server.
+- `Dockerfile` This file describes the Docker environment necessary to build the client and the server.
+- `docker-compose.yml` This file is a working (and production ready) `docker-compose` file to quickly setup and host the server.
 - `package.json` NPM project file.
 - `scripts` All the scripts needed to build the project.
   - `tools` Extra scripts that are used to generate source files at build-time.
@@ -41,7 +79,7 @@ The project has the following structure:
 
 ## Setting it up
 
-To host the server you will need the [`docker`](https://www.docker.com/get-started) installed and configured on your system.
+To host the server you will need the [Docker](https://www.docker.com/get-started) installed and configured on your system.
 The first step is to clone this repository:
 
 ```sh
@@ -85,15 +123,12 @@ docker compose logs -f
 
 ## Configuration
 
-You can configure four parameters.
+The server accepts the following environment variables:
 - `LOG_VERBOSE`: Enables/Disables verbose logging. Set to `1` to enable. By default, it's disabled.
 - `DATABASE`: Path to the database file. This a SQLite3 database path, therefore things like `:memory:` will also work. It is set to `:memory:` by default, but the provided `docker-compose` file will create a volume and store the database there.
 - `COOKIE_SECRET`: The secret key used to sign the cookies. If it's not set, the server will generate a random one each time it is started.
-- HTTP server port: To change this port it is necessary to edit either the `docker-compose` ports tag, or the source code directly (`src/server/http-server.ts`). By default, the HTTP server is hosted on port `8080`.
-
-> [!NOTE]
-> The WebSocket server port is `8492` and while it _can_ be changed, it is not recommended.
-> However, if you still wish to change it, you'll need to edit the `WSS_PORT` variable in `src/server/game-server.ts` and `src/client/gloom.js`.
+- `HTTP_PORT`: Controls the port on which the HTTP server should listen for incoming requests. By default, it's set to 8080.
+- 'WSS_PORT': Controls the port on which the WebSocket server should listen for incoming connections. By default, it's set to 8492.
 
 > [!IMPORTANT]
 > If you're using `docker-compose`, you can change `COOKIE_SECRET` and `LOG_VERBOSE`, by creating a `.env` file in the project root,
