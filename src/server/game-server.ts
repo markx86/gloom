@@ -1,9 +1,10 @@
 import { WebSocketServer } from "ws";
 import { Game, DT } from "./game"
 import { Client } from "./client";
+import { getEnvIntOrDefault } from "./util";
 import Logger from "./logger";
 
-const WSS_PORT = 8492;
+export const WSS_PORT = getEnvIntOrDefault("WSS_PORT", 8492, 0, 0xFFFF);
 const HANDSHAKE_MAGIC = 0xBADC0FFE
 
 const wss = new WebSocketServer({

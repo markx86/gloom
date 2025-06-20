@@ -15,13 +15,13 @@ import { Game } from "./game.ts";
 import Maps from "./maps.ts"
 import express from "express";
 import cookieParser from "cookie-parser";
+import { getEnvStringOrDefault, getEnvIntOrDefault } from "./util.ts";
+import { WSS_PORT } from "./game-server.ts";
 
-const HTTP_PORT = 8080;
+const COOKIE_SECRET = getEnvStringOrDefault("COOKIE_SECRET", randomBytes(32).toString("hex"));
+export const HTTP_PORT = getEnvIntOrDefault("HTTP_PORT", 8080, 0, 0xFFFF);
 
 const SESSION_LIFETIME = 24 * 60 * 60;
-const COOKIE_SECRET =
-  process.env.COOKIE_SECRET != null && process.env.COOKIE_SECRET.length > 0 ?
-  process.env.COOKIE_SECRET : randomBytes(32).toString("hex");
 
 const app = express();
 
@@ -272,7 +272,7 @@ app.post("/api/game/join", (req, res) => {
   if (playerToken == null) {
     res.status(403).send({ message: "You are already in the game." });
   } else {
-    res.status(200).send({ playerToken });
+    res.status(200).send({ playerToken, wssPort: WSS_PORT });
   }
 });
 

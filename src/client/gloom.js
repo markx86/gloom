@@ -1,12 +1,9 @@
 // NOTE: this scripts requires reactive.js
 
-const WSS_PORT = 8492;
-
 export async function loadGloom() {
   const textDecoder = new TextDecoder("utf-8");
   const canvasDefaultWidth = 640;
   const canvasDefaultHeight = 480;
-  const url = `ws://${window.location.hostname}:${WSS_PORT}`;
 
   let canvasContainer = null, canvas = null, ctx = null;
   let fbArray = null, fb = null;
@@ -221,8 +218,9 @@ export async function loadGloom() {
   const memory = instance.exports.memory;
     
 
-  const launchGloom = (gameId, playerToken, onCloseHandler) => {
+  const launchGloom = (wssPort, gameId, playerToken, onCloseHandler) => {
     setupGame();
+    const url = `ws://${window.location.hostname}:${wssPort}`;
     ws = new WebSocket(url);
 
     function exitGame() {

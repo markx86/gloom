@@ -1,4 +1,6 @@
-const LOG_TRACE = process.env.LOG_VERBOSE === "1";
+import { getEnvStringOrDefault } from "./util";
+
+const LOG_TRACE = getEnvStringOrDefault("LOG_VERBOSE", "0") === "1";
 
 export default class Logger {
   public static error(message: any, ...optargs: any[]) {

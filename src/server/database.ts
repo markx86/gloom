@@ -1,6 +1,7 @@
-import Logger from "./logger.ts";
 import { Database } from "sqlite3";
 import { randomBytes, hash } from "node:crypto";
+import { getEnvStringOrDefault } from "./util.ts";
+import Logger from "./logger.ts";
 
 export const USERNAME_MAX_LEN = 24;
 export const USERNAME_MIN_LEN = 3;
@@ -11,9 +12,7 @@ export const GAME_ID_LEN = 8;
 
 const SALT_LEN = 8;
 
-const DATABASE_PATH =
-  process.env.DATABASE != null && process.env.DATABASE.length > 0 ?
-  process.env.DATABASE : ":memory:";
+const DATABASE_PATH = getEnvStringOrDefault("DATABASE", ":memory:");
 
 const db = new Database(DATABASE_PATH);
 

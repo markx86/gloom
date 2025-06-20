@@ -236,7 +236,7 @@ async function doJoinGame(event) {
     const response = await api.post("/game/join", { gameId });
     const data = await response.json();
     if (response.status === 200) {
-      $goto("/game", gameId, data.playerToken);
+      $goto("/game", gameId, data.wssPort, data.playerToken);
     } else {
       showErrorWindow(data.message, wndEnable);
     }
@@ -454,11 +454,11 @@ const home = () => {
   );
 };
 
-const game = (gameId, playerToken) => {
-  $assert(typeof(gameId) === "number" && typeof(playerToken) === "number");
+const game = (gameId, wssPort, playerToken) => {
+  $assert(typeof(gameId) === "number" && typeof(wssPort) === "number" && typeof(playerToken) === "number");
 
   (new Promise(resolve => resolve()))
-    .then(() => gloomLauncher(gameId, playerToken, gotoHome));
+    .then(() => gloomLauncher(wssPort, gameId, playerToken, gotoHome));
 
   return createWindow(
     {
