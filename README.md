@@ -46,7 +46,7 @@ and then click on the `Join` button.
 ![menu](.github/images/menu.png)
 
 In the menu you can adjust your render distance and FOV to your liking. Do note that you can also do this while you're in game.
-When you are ready to go, click on `> ready` and you'll join the game world.
+When you are ready to go, click on `> ready` and you will join the game world.
 
 ![waiting](.github/images/waiting.png)
 

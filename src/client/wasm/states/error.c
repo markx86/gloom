@@ -9,7 +9,8 @@ static void on_enter(void) {
   clear_screen();
 
   draw_title(32, 32, "disconnected");
-  draw_string(48, 32 + TITLE_HEIGHT, "an fatal error occurred, you've been disconnected");
+  draw_string(48, 32 + TITLE_HEIGHT,
+              "a fatal error occurred, you've been disconnected");
 }
 
 const struct state_handlers error_state = {

@@ -5,11 +5,7 @@
 #define BACKGROUND_COLOR SOLIDCOLOR(DARKMAGENTA)
 
 static void on_back_clicked(void) {
-#ifdef UNFINISHED_FEATURES
   switch_to_state(STATE_MENU);
-#else
-  switch_to_state(STATE_PAUSE);
-#endif
 }
 
 static struct component comps[] = {

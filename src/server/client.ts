@@ -24,8 +24,7 @@ export class Client extends Peer implements PlayerHolder {
 
   public sendPacket(pkt: ServerPacket) {
     const seq = this.serverSequence++;
-    // this.ws.send(pkt.getRaw(seq));
-    setTimeout(() => this.ws.send(pkt.getRaw(seq)), 40);
+    this.ws.send(pkt.getRaw(seq));
   }
 
   private checkPacket(type: GamePacketType, sequence: number, playerToken: number): boolean {
@@ -184,8 +183,7 @@ export class Client extends Peer implements PlayerHolder {
       Logger.trace("Sequence number: %s", sequence);
       Logger.trace("Player token: %s", playerToken.toString(16));
 
-      // this.handlePacket(type, sequence, playerToken, packet);
-      setTimeout(() => this.handlePacket(type, sequence, playerToken, packet), 40);
+      this.handlePacket(type, sequence, playerToken, packet);
     });
   }
 }
