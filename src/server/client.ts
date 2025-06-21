@@ -53,36 +53,35 @@ export class Client extends Peer implements PlayerHolder {
     return true;
   }
 
-  private _handleReadyPacket(): boolean {
+  private _handleReadyPacket(packet: GamePacket): boolean {
+    const ready = packet.popU8() != 0;
     if (this.player != null) {
-      Logger.error("Player sent ready packet, after it had already sent one!");
-      return false;
+      this.player.setReady(ready);
+    } else {
+      const game = Game.getById(this.gameId);
+      if (game == null) {
+        Logger.error("No game with that ID");
+        return false;
+      }
+  
+      const player = game.newPlayer(this);
+      if (player == null) {
+        return false;
+      }
+      this.player = player;
+      this.player.setReady(ready);
+  
+      Logger.success("Client (%s) joined game (%s) with ID %d", this.playerToken.toString(16), this.player.game.id.toString(16), this.player.id);
+
+      this.registerToBroadcastGroup(game.id);
+      this.sendPacket(new HelloPacket(this.player));
+      this.sendPacket(new WaitPacket(game));
     }
-
-    const game = Game.getById(this.gameId);
-    if (game == null) {
-      Logger.error("No game with that ID");
-      return false;
-    }
-
-    const player = game.newPlayer(this);
-    if (player == null) {
-      return false;
-    }
-
-    this.player = player;
-
-    Logger.success("Client (%s) joined game (%s) with ID %d", this.playerToken.toString(16), this.player.game.id.toString(16), this.player.id);
-
-    this.registerToBroadcastGroup(game.id);
-    this.sendPacket(new HelloPacket(this.player));
-    this.sendPacket(new WaitPacket(game));
-
     return true;
   }
 
-  private handleReadyPacket(_packet: GamePacket) {
-    if (!this._handleReadyPacket()) {
+  private handleReadyPacket(packet: GamePacket) {
+    if (!this._handleReadyPacket(packet)) {
       this.ws.close();
     }
   }

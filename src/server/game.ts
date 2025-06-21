@@ -190,6 +190,7 @@ export class PlayerSprite extends GameSprite {
 
   private health: number;
   private reloadTime: number;
+  private ready: boolean;
 
   public constructor(holder: PlayerHolder, game: Game, id: number,
                      x: number, y: number, r: number = 0) {
@@ -197,6 +198,15 @@ export class PlayerSprite extends GameSprite {
     this.holder = holder;
     this.health = PLAYER_HEALTH;
     this.reloadTime = 0;
+    this.ready = false;
+  }
+
+  public setReady(yes: boolean) {
+    this.ready = yes;
+  }
+
+  public isReady(): boolean {
+    return this.ready;
   }
 
   protected onWallCollision() {}
@@ -432,10 +442,20 @@ export class Game {
     Game.games.forEach(game => game.tick(delta));
   }
 
+  private readyPlayers(): number {
+    let readyPlayers = 0;
+    this.sprites.forEach(sprite => {
+      if (sprite instanceof PlayerSprite) {
+        readyPlayers += sprite.isReady() ? 1 : 0;
+      }
+    });
+    return readyPlayers;
+  }
+
   private tick(delta: number) {
     switch (this.state) {
       case GameState.WAITING: {
-        if (this.numOfPlayers >= MIN_PLAYERS) {
+        if (this.numOfPlayers >= MIN_PLAYERS && this.readyPlayers() === this.numOfPlayers) {
           this.waitTime = WAIT_TIME;
           this.state = GameState.READY;
           this.broadcastGroup.send(new WaitPacket(this));
@@ -448,7 +468,7 @@ export class Game {
       }
 
       case GameState.READY: {
-        if (this.numOfPlayers < MIN_PLAYERS) {
+        if (this.numOfPlayers < MIN_PLAYERS || this.readyPlayers() !== this.numOfPlayers) {
           this.waitTime = IDLE_TIME;
           this.state = GameState.WAITING;
         } else if (this.waitTime <= 0) {

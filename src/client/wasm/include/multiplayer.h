@@ -38,9 +38,14 @@ void queue_key_input(void);
 
 void multiplayer_init(u32 gid, u32 token);
 
-void join_game(void);
+void signal_ready(b8 yes);
 void leave_game(void);
 void send_update(void);
 void fire_bullet(void);
+
+static inline void join_game(void) {
+  signal_ready(false);
+  set_connection_state(CONN_JOINING);
+}
 
 #endif

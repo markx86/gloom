@@ -26,7 +26,9 @@ struct game_pkt_hdr {
     struct body PACKED;         \
   } PACKED
 
-DEFINE_GPKT(ready, {});
+DEFINE_GPKT(ready, {
+  b8 yes;
+});
 
 DEFINE_GPKT(leave, {});
 
@@ -202,10 +204,10 @@ void queue_key_input(void) {
   iring_push_elem(get_ts(), &VEC2SCALE(&vel, PLAYER_RUN_SPEED));
 }
 
-void join_game(void) {
+void signal_ready(b8 yes) {
   struct game_pkt_ready pkt;
   init_game_pkt(&pkt, GPKT_READY);
-  set_connection_state(CONN_JOINING);
+  pkt.yes = yes;
   send_packet_checked(&pkt, sizeof(pkt));
 }
 
@@ -516,7 +518,7 @@ static void serv_destroy_handler(void* buf, u32 len) {
   // if the number of players left is 0 and we are in game,
   // switch to the game over screen
   if (pkt->desc.type == SPRITE_PLAYER &&
-      get_client_state() == STATE_GAME &&
+      get_client_state() != STATE_WAITING &&
       count_player_sprites() == 0) {
     switch_to_state(STATE_OVER);
   }
