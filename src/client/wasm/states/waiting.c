@@ -30,11 +30,16 @@ static struct component comps[] = {
   [2] = { .type = UICOMP_BUTTON, .text = "> quit", .on_click = on_quit_clicked }
 };
 
+static b8 ready;
+
+static void set_ready(b8 yes) {
+  ready = yes;
+  comps[0].text = ready ? "> ready: yes" : "> ready: no";
+}
+
 static void on_ready_click(void) {
-  // hacky, but it works
-  b8 switch_to_ready = comps[0].text[2] == 'n';
-  comps[0].text = switch_to_ready ? "> ready" : "> not ready";
-  signal_ready(switch_to_ready);
+  set_ready(!ready);
+  signal_ready(ready);
 }
 #endif
 
@@ -91,7 +96,7 @@ static void on_enter(void) {
   set_alpha(0x7F);
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
   component_on_enter(comps, ARRLEN(comps));
-  comps[0].text = "> not ready"; // update ready button text
+  set_ready(false);
   gloom_init();
   timer_start = time();
 }

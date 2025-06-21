@@ -43,14 +43,13 @@ Clicking on `Create`, will tell the game server to instantiate a game. Once the 
 To join a game, you have to enter the correct ID in the text-box (or leave it empty if you want to join the game you've just created),
 and then click on the `Join` button. 
 
-![menu](.github/images/menu.png)
-
-In the menu you can adjust your render distance and FOV to your liking. Do note that you can also do this while you're in game.
-When you are ready to go, click on `> ready` and you will join the game world.
-
 ![waiting](.github/images/waiting.png)
 
-Once there are at least two players in the game, a countdown will start, at the end of which the players will be allowed to move.
+In the waiting menu you can adjust your settings while you wait for other players to join.
+Once there are at least two players in the game, and every player has clicked the `> ready` button,
+a countdown will start, at the end of which the players will be allowed to move.
+Note that clicking the ready button again, will stop the countdown. You will have to press it again
+to restart it.
 
 ![in-game](.github/images/in-game.png)
 
@@ -128,8 +127,8 @@ The server accepts the following environment variables:
 - `DATABASE`: Path to the database file. This a SQLite3 database path, therefore things like `:memory:` will also work. It is set to `:memory:` by default, but the provided `docker-compose` file will create a volume and store the database there.
 - `COOKIE_SECRET`: The secret key used to sign the cookies. If it's not set, the server will generate a random one each time it is started.
 - `HTTP_PORT`: Controls the port on which the HTTP server should listen for incoming requests. By default, it's set to 8080.
-- 'WSS_PORT': Controls the port on which the WebSocket server should listen for incoming connections. By default, it's set to 8492.
+- `WSS_PORT`: Controls the port on which the WebSocket server should listen for incoming connections. By default, it's set to 8492.
 
 > [!IMPORTANT]
-> If you're using `docker-compose`, you can change `COOKIE_SECRET` and `LOG_VERBOSE`, by creating a `.env` file in the project root,
+> If you're using `docker-compose`, you can change these options by creating a `.env` file in the project root,
 > and writing your values there, in the form `PARAM_NAME=param_value`. For example `COOKIE_SECRET=mySuperSecret1234`.
