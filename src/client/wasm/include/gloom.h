@@ -25,6 +25,7 @@ struct camera {
   u32 dof;
   f32 fov;
   f32 plane_halfw;
+  vec2f pos;
   vec2f plane;
   struct {
     f32 m11, m12, m21, m22;
@@ -34,7 +35,6 @@ struct camera {
 struct player {
   f32 rot;
   vec2f pos;
-  vec2f fake_pos;
   vec2f dir;
   i32 health;
 };
@@ -58,12 +58,13 @@ struct sprite {
   vec2f pos;
   vec2f vel;
   struct {
+    b8 disabled;
     i32 screen_x;
     i32 screen_halfw;
     f32 inv_depth;
     f32 depth2;
-    b8 disabled;
     f32 anim_frame;
+    f32 rel_rot;
   };
 };
 

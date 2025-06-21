@@ -1,5 +1,5 @@
 #include <math.h>
-#define DECLARE_COS_TABLE
+#define DECLARE_TABLE
 #include <cos_table.h>
 
 f32 inv_sqrt(f32 n) {
@@ -20,7 +20,7 @@ f32 cos(f32 angle) {
   u32 i1, i2;
   angle = absf(angle);
   angle = modf(angle, TWO_PI);
-  w = angle * STEP;
+  w = angle * INV_COS_STEP;
   i1 = (u32)w;
   i2 = i1 + 1;
   if (i2 >= SAMPLES)

@@ -131,7 +131,9 @@ export async function loadGloom() {
       register_fb,
       send_packet,
       store_settings,
-      time
+      time,
+      // FIXME: implement acos(..) in WASM
+      acos: Math.acos
     },
   };
   

@@ -12,20 +12,19 @@ cos_table = []
 for i in range(samples):
     a = STEP * i
     cos_table.append(math.cos(a))
-
 cos_arr = "f,".join(str(v) for v in cos_table)
 
 src = f"""#include <types.h>
 
 #define SAMPLES         {samples}
-#define STEP            {1 / STEP}
+#define INV_COS_STEP    {1 / STEP}
 
-#ifdef DECLARE_COS_TABLE
+#ifdef DECLARE_TABLE
 
 static const f32 cos_table[] = {{
-    {cos_arr}
+  {cos_arr}
 }};
 
-#endif
+#endif // DECLARE_TABLE
 """
 write_file("cos_table.h", src)

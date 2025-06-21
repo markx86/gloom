@@ -327,8 +327,8 @@ static inline const u8* get_player_tile(u32 x, u32 y) {
 }
 
 static void get_texture_info(struct sprite* s, b8* invert_x,
-                                        u32* tex_w, u32* tex_h,
-                                        const u8** tex, const u32** coltab) {
+                             u32* tex_w, u32* tex_h,
+                             const u8** tex, const u32** coltab) {
   i32 rot;
 
   *invert_x = false;
@@ -338,9 +338,9 @@ static void get_texture_info(struct sprite* s, b8* invert_x,
     // set the player sprite data
 #define STEPS ((PLAYER_NTILES_H << 1) - 2)
 #define SLICE (TWO_PI / STEPS)
+    // compute angle between
     // determine the rotation of the sprite to use
-    // FIXME: this doesn't look right in practice, maybe take a look at this?
-    rot = (s->rot + SLICE / 2.0f - player.rot + PI) * STEPS / TWO_PI;
+    rot = (s->rot + SLICE / 2.0f - s->rel_rot + PI) * STEPS / TWO_PI;
     rot &= 7;
     if (rot > 4) {
       rot = 8 - rot;
@@ -418,10 +418,8 @@ static inline void render_scene(void) {
     return;
 
   // interpolate camera position with real position
-  player.fake_pos.x = player.pos.x * PLAYER_POS_INTERP +
-                      player.fake_pos.x * (1.0f - PLAYER_POS_INTERP);
-  player.fake_pos.y = player.pos.y * PLAYER_POS_INTERP +
-                      player.fake_pos.y * (1.0f - PLAYER_POS_INTERP);
+  camera.pos.x = lerp(PLAYER_POS_INTERP, camera.pos.x, player.pos.x);
+  camera.pos.y = lerp(PLAYER_POS_INTERP, camera.pos.y, player.pos.y);
 
   for (x = 0; x < FB_WIDTH; ++x) {
     // compute ray direction
@@ -429,7 +427,7 @@ static inline void render_scene(void) {
     ray_dir.x = player.dir.x + camera.plane.x * cam_x;
     ray_dir.y = player.dir.y + camera.plane.y * cam_x;
     // trace ray with DDA
-    cell_id = trace_ray(&player.fake_pos, &ray_dir, camera.dof, &hit);
+    cell_id = trace_ray(&camera.pos, &ray_dir, camera.dof, &hit);
     // store distance (squared) in z-buffer
     z_buf[x] = hit.dist * hit.dist;
 
@@ -438,7 +436,7 @@ static inline void render_scene(void) {
 }
 
 static inline void render_sprites(void) {
-  vec2f proj, diff;
+  vec2f proj, diff, dir_to_s;
   u32 i, j, k, n;
   struct sprite *s, *on_screen_sprites[MAX_SPRITES];
 
@@ -455,7 +453,7 @@ static inline void render_sprites(void) {
     if (s == tracked_sprite)
       continue;
 
-    diff = VEC2SUB(&s->pos, &player.fake_pos);
+    diff = VEC2SUB(&s->pos, &camera.pos);
 
     // compute coordinates in camera space
     proj.x = camera.inv_mat.m11 * diff.x + camera.inv_mat.m12 * diff.y;
@@ -481,6 +479,16 @@ static inline void render_sprites(void) {
       continue;
 
     s->depth2 = proj.y * proj.y;
+
+    // compute angle relative to the player direction vector
+    if (s->desc.type == SPRITE_PLAYER) {
+      // only do this for player sprites,
+      // since they're the only sprites that need it
+      dir_to_s = vec2f_normalized(&diff);
+      s->rel_rot = acos(dir_to_s.x * player.dir.x + dir_to_s.y * player.dir.y);
+      s->rel_rot *= signf(proj.x);
+      s->rel_rot += player.rot;
+    }
 
     // look for index to insert the new sprite
     for (j = 0; j < n; ++j) {
@@ -577,8 +585,7 @@ static inline void render_hud(void) {
                     / PLAYER_MAX_HEALTH;
     draw_rect(x, 8, health_bar_w, STRING_HEIGHT - 1, COLOR(WHITE));
 
-    display_health = (display_health * HEALTH_BAR_LAG +
-                      player.health * (1.0f - HEALTH_BAR_LAG));
+    display_health = lerp(HEALTH_BAR_LAG, player.health, display_health);
   }
 }
 
@@ -590,6 +597,7 @@ void gloom_render(void) {
 }
 
 void gloom_init(void) {
+  camera.pos = player.pos;
   // may seem counter intuitive, you should look into
   // the hello packet handler in multiplayer.c
   set_player_rot(player.rot);

@@ -68,7 +68,17 @@ static inline u32 abs(i32 v) {
 #define HALF_PI    (PI / 2.0f)
 #define QUARTER_PI (HALF_PI / 2.0f)
 
+static inline vec2f vec2f_normalized(vec2f* vec) {
+  vec2f v;
+  f32 mod = inv_sqrt(VEC2LENGTH2(vec));
+  v.x = vec->x * mod;
+  v.y = vec->y * mod;
+  return v;
+}
+
 f32 cos(f32 angle);
+// this should be in env.h, but it feels better to put it here
+f32 acos(f32 value);
 
 static inline f32 sin(f32 angle) {
     return cos(angle - HALF_PI);

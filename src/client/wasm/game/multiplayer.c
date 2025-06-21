@@ -101,23 +101,22 @@ DEFINE_SPKT(death, {});
 
 DEFINE_SPKT(terminate, {});
 
-#define MODPOW2INCR(x, m) ((x + 1) & ((m) - 1))
-#define MODPOW2DIST(x, y, m) (((x) - (y)) & ((m) - 1))
-
-#define RING_SIZE 128
-
 struct input_log {
   f32 ts;
   vec2f vel;
 };
 
+#define RING_SIZE 128
+
 struct {
   struct input_log *_tail, *_head;
   struct input_log _buffer[RING_SIZE];
-} iring = {
-  ._tail = iring._buffer,
-  ._head = iring._buffer
-};
+} iring;
+
+static void iring_init(void) {
+  iring._tail = iring._buffer;
+  iring._head = iring._buffer;
+}
 
 static void iring_push_elem(f32 ts, vec2f* vel) {
   iring._head->ts = ts;
@@ -194,6 +193,7 @@ void multiplayer_init(u32 gid, u32 token) {
   player_token = token;
   // reset game packet sequence
   client_seq = server_seq = 0;
+  iring_init();
   set_connection_state(CONN_CONNECTED);
 }
 
@@ -369,7 +369,7 @@ static void serv_hello_handler(void* buf, u32 len) {
         init_sprite(s);
       else {
         // init data refers to the player
-        player.pos = player.fake_pos = s->transform.pos;
+        player.pos = s->transform.pos;
         player.rot = s->transform.rot;
       }
       len -= sizeof(*s);
