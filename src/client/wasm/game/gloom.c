@@ -19,6 +19,9 @@
 #define PLAYER_SPRITE_W (PLAYER_TILE_W * 5)
 #define PLAYER_SPRITE_H (PLAYER_TILE_H * 5)
 
+#define MINIMAP_TILE_W 4
+#define MINIMAP_TILE_H 4
+
 #define HEALTH_BAR_WIDTH 64
 #define HEALTH_BAR_LAG   0.85f
 
@@ -589,11 +592,43 @@ static inline void render_hud(void) {
   }
 }
 
+static inline void render_minimap(void) {
+  u32 minimap_x, minimap_y;
+  u32 i, j;
+  u32 x, y;
+  u8 cell_id;
+
+  if (map.tiles == NULL)
+    return;
+
+  minimap_x = FB_WIDTH - (map.w * MINIMAP_TILE_W) - 4;
+  minimap_y = 4;
+
+  draw_rect(minimap_x, minimap_y, map.w * MINIMAP_TILE_W, map.h * MINIMAP_TILE_H, COLOR(WHITE));
+
+  for (i = 0; i < map.w; ++i) {
+    for (j = 0; j < map.h; ++j) {
+      cell_id = map.tiles[i + j * map.w];
+      if (cell_id) {
+        x = i * MINIMAP_TILE_W;
+        y = j * MINIMAP_TILE_H;
+        draw_rect(minimap_x + x, minimap_y + y, MINIMAP_TILE_W, MINIMAP_TILE_H, COLOR(GRAY));
+      }
+    }
+  }
+
+  draw_rect(minimap_x + player.pos.x * MINIMAP_TILE_W - MINIMAP_TILE_W / 4,
+            minimap_y + player.pos.y * MINIMAP_TILE_H - MINIMAP_TILE_H / 4,
+            MINIMAP_TILE_W / 2, MINIMAP_TILE_H / 2,
+            COLOR(RED));
+}
+
 void gloom_render(void) {
   render_scene();
   render_sprites();
   render_crosshair();
   render_hud();
+  render_minimap();
 }
 
 void gloom_init(void) {
