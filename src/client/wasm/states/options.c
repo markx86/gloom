@@ -28,13 +28,13 @@ enum option_control {
 static struct component comps[] = {
   [BACK_BUTTON]      = { .type = UICOMP_BUTTON,   .text = "> back", .on_click = on_back_clicked },
 #ifdef UNFINISHED_FEATURES
-  [SOUND_CHECKBOX]   = { .type = UICOMP_CHECKBOX, .text = "> sound", .ticked = true },
-  [VOLUME_SLIDER]    = { .type = UICOMP_SLIDER,   .text = "> volume", .value = 1.0f },
+  [SOUND_CHECKBOX]   = { .type = UICOMP_CHECKBOX, .text = "> sound" },
+  [VOLUME_SLIDER]    = { .type = UICOMP_SLIDER,   .text = "> volume" },
 #endif
-  [FOV_SLIDER]       = { .type = UICOMP_SLIDER,   .text = "> field of view", .value = 0.5f },
-  [DRAWDIST_SLIDER]  = { .type = UICOMP_SLIDER,   .text = "> draw distance", .value = 0.66f },
-  [MOUSESENS_SLIDER] = { .type = UICOMP_SLIDER,   .text = "> mouse sensitivity", .value = 0.5f },
-  [CAMERA_SMOOTHING] = { .type = UICOMP_CHECKBOX, .text = "> camera smoothing", .ticked = true },
+  [FOV_SLIDER]       = { .type = UICOMP_SLIDER,   .text = "> field of view" },
+  [DRAWDIST_SLIDER]  = { .type = UICOMP_SLIDER,   .text = "> draw distance" },
+  [MOUSESENS_SLIDER] = { .type = UICOMP_SLIDER,   .text = "> mouse sensitivity" },
+  [CAMERA_SMOOTHING] = { .type = UICOMP_CHECKBOX, .text = "> camera smoothing" },
 };
 
 static void save_settings(void) {
@@ -64,6 +64,10 @@ void load_settings(f32 drawdist, f32 fov, f32 mousesens, b8 camsmooth) {
   comps[MOUSESENS_SLIDER].value = mousesens;
   comps[CAMERA_SMOOTHING].ticked = camsmooth != 0;
   apply_settings();
+}
+
+void load_defaults(void) {
+  load_settings(0.66f, 0.5f, 0.5f, true);
 }
 
 static void on_enter(void) {

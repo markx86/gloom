@@ -89,10 +89,6 @@ export class Client extends Peer implements PlayerHolder {
 
   private handleLeavePacket(_packet: GamePacket) {
     Logger.trace("Got request to leave game");
-    if (!this.inBroadcastGroup()) {
-      // NOTE: unreachable
-      return;
-    }
 
     this.removeFromBroadcastGroup();
     this.player?.game.removePlayer(this.player);

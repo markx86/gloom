@@ -9,6 +9,7 @@ export async function loadGloom() {
   let fbArray = null, fb = null;
   let originTime = 0;
   let ws = null;
+  let settingsKey = null;
   
   function updateViewportSize() {
     const aspectRatio = fb == null ? (canvasDefaultWidth / canvasDefaultHeight) : (fb.width / fb.height);
@@ -111,11 +112,10 @@ export async function loadGloom() {
   }
 
   // void store_settings(f32 drawdist, f32 fov, f32 mousesens, b8 camsmooth);
-  // FIXME: store settings separately for different users
   function store_settings(drawdist, fov, mousesens, camsmooth) {
     camsmooth = camsmooth !== 0;
     const settings = { mousesens, drawdist, fov, camsmooth };
-    localStorage.setItem("settings", btoa(JSON.stringify(settings)));
+    localStorage.setItem(settingsKey, btoa(JSON.stringify(settings)));
   }
   
   // f32 time(void);
@@ -195,7 +195,21 @@ export async function loadGloom() {
     canvas[f]("mouseenter", processMouseEvent);
   }
 
-  function setupGame() {
+  function loadSettings(username) {
+    settingsKey = `settings-${username}`;
+    const b64Settings = localStorage.getItem(settingsKey);
+    if (b64Settings != null) {
+      const settings = JSON.parse(atob(b64Settings));
+      instance.exports.load_settings(
+        settings.drawdist, settings.fov,
+        settings.mousesens, settings.camsmooth
+      );
+    } else {
+      instance.exports.load_defaults();
+    }
+  }
+
+  function setupGame(username) {
     originTime = Date.now();
     
     canvas = $("#viewport");
@@ -213,6 +227,7 @@ export async function loadGloom() {
     canvas.style.imageRendering = "pixelated";
     canvas.style.background = "black";
 
+    loadSettings(username);
     toggleListeners(true);
   }
 
@@ -221,8 +236,9 @@ export async function loadGloom() {
   const memory = instance.exports.memory;
     
 
-  const launchGloom = (wssPort, gameId, playerToken, onCloseHandler) => {
-    setupGame();
+  const launchGloom = (username, wssPort, gameId, playerToken, onCloseHandler) => {
+    setupGame(username, wssPort);
+
     const url = `ws://${window.location.hostname}:${wssPort}`;
     ws = new WebSocket(url);
 
@@ -287,16 +303,6 @@ export async function loadGloom() {
     ws.addEventListener("open", wsOpenHandler);
 
     return ws;
-  }
-
-  // FIXME: load settings for the currently logged in user
-  const b64Settings = localStorage.getItem("settings")
-  if (b64Settings != null) {
-    const settings = JSON.parse(atob(b64Settings));
-    instance.exports.load_settings(
-      settings.drawdist, settings.fov,
-      settings.mousesens, settings.camsmooth
-    );
   }
 
   return [launchGloom, instance.exports.exit];

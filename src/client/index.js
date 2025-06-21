@@ -8,7 +8,8 @@ import {
   MSGWND_HELP, showMessageWindow
 } from "./windowing.js";
 
-let myGameId;
+let currentUser;
+let currentGameId;
 let intervalId;
 let gameWs;
 
@@ -173,19 +174,19 @@ function zeroPadL(s, w) {
 }
 
 function setGameId(gameId) {
-  if (gameId !== myGameId) {
+  if (gameId !== currentGameId) {
     const gameIdString = zeroPadL(gameId.toString(16), 8).toUpperCase();
     $("#game-id").textContent = gameIdString;
     $("#field-game-id").placeholder = `Enter game ID (default: ${gameIdString})`;
     $("#btn-create").$disable();
-    myGameId = gameId;
+    currentGameId = gameId;
   }
 }
 
 function getGameId() {
   const gameIdString = $("#field-game-id")?.value;
   if (gameIdString == null || gameIdString.length === 0) {
-    return myGameId;
+    return currentGameId;
   } else if (gameIdString.length === 8) {
     const gameId = parseInt(gameIdString, 16);
     if (isFinite(gameId) && !isNaN(gameId)) {
@@ -398,7 +399,7 @@ const signup = () => {
 };
 
 const home = () => {
-  myGameId = undefined;
+  currentGameId = undefined;
   api.get("/session/validate")
     .then(res => {
       if (res.status !== 200) {
@@ -407,7 +408,10 @@ const home = () => {
         return res.json();
       }
     })
-    .then(data => $("#home-title").textContent = `Welcome back ${data?.username ?? "player"}`)
+    .then(data => {
+      currentUser = data?.username ?? "player";
+      $("#home-title").textContent = `Welcome back ${currentUser}`;
+    })
     .catch(() => $goto("/login"));
   // do not use a parameter to avoid headaches
   refreshGameId();
@@ -456,10 +460,15 @@ const home = () => {
 };
 
 const game = (gameId, wssPort, playerToken) => {
-  $assert(typeof(gameId) === "number" && typeof(wssPort) === "number" && typeof(playerToken) === "number");
+  $assert(
+    typeof(gameId) === "number" &&
+    typeof(wssPort) === "number" &&
+    typeof(playerToken) === "number" &&
+    currentUser != null
+  );
 
   (new Promise(resolve => resolve()))
-    .then(() => gameWs = gloomLauncher(wssPort, gameId, playerToken, gotoHome));
+    .then(() => gameWs = gloomLauncher(currentUser, wssPort, gameId, playerToken, gotoHome));
 
   return createWindow(
     {
