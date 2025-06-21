@@ -30,6 +30,7 @@ struct camera {
   struct {
     f32 m11, m12, m21, m22;
   } inv_mat;
+  b8 smoothing;
 };
 
 struct player {

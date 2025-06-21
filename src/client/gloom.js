@@ -110,10 +110,11 @@ export async function loadGloom() {
     }
   }
 
-  // void store_settings(f32 drawdist, f32 fov, f32 mousesens)
+  // void store_settings(f32 drawdist, f32 fov, f32 mousesens, b8 camsmooth);
   // FIXME: store settings separately for different users
-  function store_settings(drawdist, fov, mousesens) {
-    const settings = { mousesens, drawdist, fov };
+  function store_settings(drawdist, fov, mousesens, camsmooth) {
+    camsmooth = camsmooth !== 0;
+    const settings = { mousesens, drawdist, fov, camsmooth };
     localStorage.setItem("settings", btoa(JSON.stringify(settings)));
   }
   
@@ -292,7 +293,10 @@ export async function loadGloom() {
   const b64Settings = localStorage.getItem("settings")
   if (b64Settings != null) {
     const settings = JSON.parse(atob(b64Settings));
-    instance.exports.load_settings(settings.drawdist, settings.fov, settings.mousesens);
+    instance.exports.load_settings(
+      settings.drawdist, settings.fov,
+      settings.mousesens, settings.camsmooth
+    );
   }
 
   return [launchGloom, instance.exports.exit];

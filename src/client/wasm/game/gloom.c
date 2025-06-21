@@ -22,7 +22,7 @@
 #define HEALTH_BAR_WIDTH 64
 #define HEALTH_BAR_LAG   0.85f
 
-#define PLAYER_POS_INTERP 0.66f
+#define CAMERA_POS_INTERP 0.66f
 
 struct player player;
 struct map map;
@@ -179,8 +179,7 @@ vec2f get_direction_from_keys(void) {
     // if the user is trying to go both forwards and sideways,
     // we normalize the vector by dividing by sqrt(2).
     // we divide by sqrt(2), because both player.long_dir and player.side_dir,
-    // have a length of 1, therefore
-    // ||player.long_dir + player.side_dir|| = sqrt(2).
+    // have a length of 1, therefore ||vec_long_dir + vec_side_dir|| = sqrt(2).
     if (long_dir) {
       dir.x *= INV_SQRT2;
       dir.y *= INV_SQRT2;
@@ -417,9 +416,12 @@ static inline void render_scene(void) {
   if (map.tiles == NULL)
     return;
 
-  // interpolate camera position with real position
-  camera.pos.x = lerp(PLAYER_POS_INTERP, camera.pos.x, player.pos.x);
-  camera.pos.y = lerp(PLAYER_POS_INTERP, camera.pos.y, player.pos.y);
+  if (camera.smoothing) {
+    // interpolate camera position with real position
+    camera.pos.x = lerp(CAMERA_POS_INTERP, camera.pos.x, player.pos.x);
+    camera.pos.y = lerp(CAMERA_POS_INTERP, camera.pos.y, player.pos.y);
+  } else
+    camera.pos = player.pos;
 
   for (x = 0; x < FB_WIDTH; ++x) {
     // compute ray direction

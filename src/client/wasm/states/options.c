@@ -21,7 +21,8 @@ enum option_control {
 #endif
   FOV_SLIDER,
   DRAWDIST_SLIDER,
-  MOUSESENS_SLIDER
+  MOUSESENS_SLIDER,
+  CAMERA_SMOOTHING
 };
 
 static struct component comps[] = {
@@ -30,16 +31,18 @@ static struct component comps[] = {
   [SOUND_CHECKBOX]   = { .type = UICOMP_CHECKBOX, .text = "> sound", .ticked = true },
   [VOLUME_SLIDER]    = { .type = UICOMP_SLIDER,   .text = "> volume", .value = 1.0f },
 #endif
-  [DRAWDIST_SLIDER]  = { .type = UICOMP_SLIDER,   .text = "> draw distance", .value = 0.66f },
   [FOV_SLIDER]       = { .type = UICOMP_SLIDER,   .text = "> field of view", .value = 0.5f },
+  [DRAWDIST_SLIDER]  = { .type = UICOMP_SLIDER,   .text = "> draw distance", .value = 0.66f },
   [MOUSESENS_SLIDER] = { .type = UICOMP_SLIDER,   .text = "> mouse sensitivity", .value = 0.5f },
+  [CAMERA_SMOOTHING] = { .type = UICOMP_CHECKBOX, .text = "> camera smoothing", .ticked = true },
 };
 
 static void save_settings(void) {
   // save settings to local storage
   store_settings(comps[DRAWDIST_SLIDER].value,
                  comps[FOV_SLIDER].value,
-                 comps[MOUSESENS_SLIDER].value);
+                 comps[MOUSESENS_SLIDER].value,
+                 comps[CAMERA_SMOOTHING].ticked);
 }
 
 // return slider value between min and max
@@ -50,14 +53,16 @@ static inline f32 slider_value(enum option_control ctrl, f32 min, f32 max) {
 
 void apply_settings(void) {
   camera.dof = slider_value(DRAWDIST_SLIDER, MIN_CAMERA_DOF, MAX_CAMERA_DOF);
+  camera.smoothing = comps[CAMERA_SMOOTHING].ticked;
   set_camera_fov(DEG2RAD(slider_value(FOV_SLIDER, MAX_CAMERA_FOV, MIN_CAMERA_FOV)));
   mouse_sensitivity = slider_value(MOUSESENS_SLIDER, MIN_MOUSE_SENS, MAX_MOUSE_SENS);
 }
 
-void load_settings(f32 drawdist, f32 fov, f32 mousesens) {
+void load_settings(f32 drawdist, f32 fov, f32 mousesens, b8 camsmooth) {
   comps[DRAWDIST_SLIDER].value = drawdist;
   comps[FOV_SLIDER].value = fov;
   comps[MOUSESENS_SLIDER].value = mousesens;
+  comps[CAMERA_SMOOTHING].ticked = camsmooth != 0;
   apply_settings();
 }
 
