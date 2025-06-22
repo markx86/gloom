@@ -56,12 +56,18 @@ void switch_to_state(enum client_state new_state) {
 
 void set_pointer_locked(b8 locked) {
   __pointer_locked = locked;
-  if (!locked)
+  if (!locked) {
     keys.all_keys = 0;
-  // dirty hack to pause on lost focus because I refuse to add another
-  // handler just for pointer lock changes
-  if (get_client_state() == STATE_GAME && !locked)
-    switch_to_state(STATE_PAUSE);
+    // dirty hack to pause on lost focus because I refuse to add another
+    // handler just for pointer lock changes
+    if (get_client_state() == STATE_GAME) {
+      // notify the server the player has stopped
+      queue_key_input();
+      send_update();
+      // switch to pause menu
+      switch_to_state(STATE_PAUSE);
+    }
+  }
 }
 
 void on_ws_close(void) {
