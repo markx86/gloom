@@ -429,7 +429,11 @@ export class Game {
   }
 
   public isWaiting(): boolean {
-    return this.state == GameState.WAITING;
+    return this.state === GameState.WAITING;
+  }
+
+  public isPlaying(): boolean {
+    return this.state === GameState.PLAYING;
   }
   
   public static tickAll(delta: number) {
@@ -541,13 +545,13 @@ export class Game {
     return this.addSprite(new BulletSprite(player, this.nextEntityId()));
   }
 
-  public allocatePlayer(username: string): number | undefined {
+  public allocatePlayer(username: string): number | string {
     if (this.state !== GameState.WAITING && this.state !== GameState.READY) {
-      return;
+      return "That game has already started.";
     }
     for (const uname of this.playerTokens.values()) {
       if (uname === username) {
-        return;
+        return "You're already in the game";
       }
     }
     let token: number | undefined;

@@ -15,11 +15,11 @@ enum connection_state {
 extern enum connection_state __conn_state;
 
 static inline b8 is_disconnected(void) {
-  return __conn_state <= CONN_DISCONNECTED;
+  return __conn_state == CONN_DISCONNECTED;
 }
 
 static inline b8 in_game(void) {
-  return __conn_state >= CONN_WAITING;
+  return __conn_state == CONN_UPDATING;
 }
 
 static inline enum connection_state get_connection_state(void) {

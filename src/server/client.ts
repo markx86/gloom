@@ -54,9 +54,14 @@ export class Client extends Peer {
   }
 
   private handleUpdatePacket(packet: GamePacket) {
-    Logger.trace("Got update packet");
     // discard update packets if the player is dead
     if (this.player.getHealth() <= 0) {
+      Logger.trace("Player is dead %d (token: %s), discarding update packet", this.player.id, this.player.token.toString(16));
+      return;
+    }
+    // discard update packets if the game hasn't started
+    if (!this.player.game.isPlaying()) {
+      Logger.trace("Game hasn't started, discarding update packet for player %d (token: %s)", this.player.id, this.player.token.toString(16));
       return;
     }
 

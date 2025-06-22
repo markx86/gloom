@@ -39,7 +39,7 @@ static const vec2i sprite_dims[] = {
 };
 
 const f32 sprite_radius[] = {
-  [SPRITE_PLAYER] = 0.15f,
+  [SPRITE_PLAYER] = 0.20f,
   [SPRITE_BULLET] = 0.01f
 };
 

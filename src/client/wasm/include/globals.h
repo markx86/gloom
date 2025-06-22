@@ -15,9 +15,10 @@ extern const struct state_handlers
   over_state;
 
 extern struct sprite* tracked_sprite;
-extern f32 wait_time;
 extern f32 mouse_sensitivity;
 
 void apply_settings(void);
+void set_ready(b8 yes);
+void set_wait_time(f32 wtime);
 
 #endif

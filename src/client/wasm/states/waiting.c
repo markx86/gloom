@@ -4,8 +4,8 @@
 #define BACKGROUND_COLOR SOLIDCOLOR(BLACK)
 #define FOREGROUND_COLOR SOLIDCOLOR(LIGHTGRAY)
 
-f32 wait_time;
-static f32 timer_start;
+static f32 wait_time, timer_start;
+static b8 ready;
 
 static void on_ready_click(void);
 static void on_options_click(void) { switch_to_state(STATE_OPTIONS); }
@@ -17,11 +17,14 @@ static struct component comps[] = {
   [2] = { .type = UICOMP_BUTTON, .text = "> quit", .on_click = on_quit_clicked }
 };
 
-static b8 ready;
-
-static void set_ready(b8 yes) {
+void set_ready(b8 yes) {
   ready = yes;
   comps[0].text = ready ? "> ready: yes" : "> ready: no";
+}
+
+void set_wait_time(f32 wtime) {
+  wait_time = wtime;
+  timer_start = time();
 }
 
 static void on_ready_click(void) {
@@ -42,10 +45,14 @@ static void on_tick(f32 delta) {
   char time_str[32];
   const char* text;
   f32 time_left;
-  u32 y;
-  u32 i;
+  u32 y, i;
 
   UNUSED(delta);
+
+  if (in_game()) {
+    switch_to_state(STATE_GAME);
+    return;
+  }
 
   time_left = wait_time - (time() - timer_start);
 
@@ -66,8 +73,9 @@ static void on_tick(f32 delta) {
   draw_rect(48 - 2, y - 2, STRING_WIDTH(text) + 4, STRING_HEIGHT + 4, BACKGROUND_COLOR);
   draw_string(48, y, text);
   y += STRING_HEIGHT + 8;
-  for (i = 0; i < ARRLEN(comps); ++i)
+  for (i = 0; i < ARRLEN(comps) - 1; ++i)
     draw_component(48, y + i * 24, comps + i);
+  draw_component(48, FB_HEIGHT - 48, comps + 2);
 
   display_game_id();
 }
@@ -76,9 +84,7 @@ static void on_enter(void) {
   set_alpha(0x7F);
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
   component_on_enter(comps, ARRLEN(comps));
-  set_ready(false);
   gloom_init();
-  timer_start = time();
 }
 
 static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {

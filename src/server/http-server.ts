@@ -269,8 +269,8 @@ app.post("/api/game/join", (req, res) => {
   }
 
   const playerToken = game.allocatePlayer(res.locals.username);
-  if (playerToken == null) {
-    res.status(403).send({ message: "You are already in the game." });
+  if (typeof(playerToken) === "string") {
+    res.status(403).send({ message: playerToken });
   } else {
     res.status(200).send({ playerToken, wssPort: WSS_PORT });
   }

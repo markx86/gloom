@@ -10,7 +10,7 @@ static void save_settings(void);
 static void on_back_clicked(void) {
   apply_settings();
   save_settings();
-  switch_to_state(STATE_PAUSE);
+  switch_to_state(in_game() ? STATE_PAUSE : STATE_WAITING);
 }
 
 enum option_control {

@@ -1,3 +1,4 @@
+#include <globals.h>
 #include <client.h>
 #include <ui.h>
 
@@ -54,6 +55,7 @@ static void on_tick(f32 delta) {
       break;
 
     case CONN_WAITING:
+      set_ready(false);
       switch_to_state(STATE_WAITING);
       break;
 

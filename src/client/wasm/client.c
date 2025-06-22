@@ -93,7 +93,6 @@ void init(b8 ws_connected, u32 game_id, u32 player_token) {
 void exit(void) {
   if (pointer_is_locked())
     pointer_release();
-  if (in_game())
-    leave_game();
+  leave_game();
   should_tick = false;
 }

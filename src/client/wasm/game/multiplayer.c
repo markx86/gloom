@@ -547,7 +547,6 @@ static void serv_wait_handler(void* buf, u32 len) {
     // if the wait flag is false (the game has the minimum amount of players)
     // and the seconds left to wait are 0, switch to game state
     set_connection_state(CONN_UPDATING);
-    switch_to_state(STATE_GAME);
     game_start = time(); // set the game start time
   }
   else
@@ -555,7 +554,7 @@ static void serv_wait_handler(void* buf, u32 len) {
     // players, yet) wait an infinite time (-1.0f means infinite wait),
     // otherwise initialize the wait timer to the number of seconds requested
     // by the server
-    wait_time = pkt->wait ? -1.0f : (f32)pkt->seconds;
+    set_wait_time(pkt->wait ? -1.0f : (f32)pkt->seconds);
 }
 
 static void serv_terminate_handler(void* buf, u32 len) {
