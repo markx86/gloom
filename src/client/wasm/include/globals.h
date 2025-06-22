@@ -7,13 +7,11 @@ struct sprite;
 
 extern const struct state_handlers
   error_state,
-  menu_state,
   loading_state,
   waiting_state,
   game_state,
   pause_state,
   options_state,
-  about_state,
   over_state;
 
 extern struct sprite* tracked_sprite;

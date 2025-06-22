@@ -5,13 +5,11 @@ static b8 should_tick;
 
 static const struct state_handlers* handlers[STATE_MAX] = {
   [STATE_ERROR]   = &error_state,
-  [STATE_MENU]    = &menu_state,
   [STATE_LOADING] = &loading_state,
   [STATE_WAITING] = &waiting_state,
   [STATE_GAME]    = &game_state,
   [STATE_PAUSE]   = &pause_state,
   [STATE_OPTIONS] = &options_state,
-  [STATE_ABOUT]   = &about_state,
   [STATE_OVER]    = &over_state
 };
 
