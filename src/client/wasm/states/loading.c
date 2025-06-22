@@ -8,11 +8,7 @@
 #define SERVER_TIMEOUT 15.0f
 
 static void on_back_clicked(void) {
-#ifdef UNFINISHED_FEATURES
-  switch_to_state(STATE_MENU);
-#else
   exit();
-#endif
 }
 
 static struct component back_button = {
@@ -49,7 +45,7 @@ static void on_tick(f32 delta) {
   // on connection state changed
   switch (conn_state) {
     case CONN_CONNECTED:
-      add_message("> sending join request");
+      add_message("> connected to server");
       join_game();
       break;
 
@@ -74,7 +70,7 @@ static void on_tick(f32 delta) {
 }
 
 static void on_enter(void) {
-  // if the client is not connected to the server, go back to main menu
+  // if the client is not connected to the server, go to error screen
   if (is_disconnected()) {
     switch_to_state(STATE_ERROR);
     return;

@@ -8,11 +8,7 @@ static b8 dead;
 #define BACKGROUND_COLOR (dead ? SOLIDCOLOR(RED)   : SOLIDCOLOR(GREEN))
 
 static void on_back_clicked(void) {
-#ifdef UNFINISHED_FEATURES
-  switch_to_state(STATE_MENU);
-#else
   exit();
-#endif
 }
 
 static struct component back_btn = {

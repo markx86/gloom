@@ -192,9 +192,6 @@ vec2f get_direction_from_keys(void) {
 static inline void update_player_position(f32 delta) {
   vec2f dir;
 
-  if (map.tiles == NULL)
-    return;
-
   // a dead man cannot move :^)
   if (player.health <= 0)
     return;
@@ -412,9 +409,6 @@ static inline void render_scene(void) {
   f32 cam_x;
   vec2f ray_dir;
   struct hit hit;
-
-  if (map.tiles == NULL)
-    return;
 
   if (camera.smoothing) {
     // interpolate camera position with real position

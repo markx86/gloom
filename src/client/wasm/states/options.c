@@ -15,10 +15,6 @@ static void on_back_clicked(void) {
 
 enum option_control {
   BACK_BUTTON,
-#ifdef UNFINISHED_FEATURES
-  SOUND_CHECKBOX,
-  VOLUME_SLIDER,
-#endif
   FOV_SLIDER,
   DRAWDIST_SLIDER,
   MOUSESENS_SLIDER,
@@ -27,10 +23,6 @@ enum option_control {
 
 static struct component comps[] = {
   [BACK_BUTTON]      = { .type = UICOMP_BUTTON,   .text = "> back", .on_click = on_back_clicked },
-#ifdef UNFINISHED_FEATURES
-  [SOUND_CHECKBOX]   = { .type = UICOMP_CHECKBOX, .text = "> sound" },
-  [VOLUME_SLIDER]    = { .type = UICOMP_SLIDER,   .text = "> volume" },
-#endif
   [FOV_SLIDER]       = { .type = UICOMP_SLIDER,   .text = "> field of view" },
   [DRAWDIST_SLIDER]  = { .type = UICOMP_SLIDER,   .text = "> draw distance" },
   [MOUSESENS_SLIDER] = { .type = UICOMP_SLIDER,   .text = "> mouse sensitivity" },

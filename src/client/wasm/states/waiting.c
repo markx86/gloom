@@ -7,23 +7,10 @@
 f32 wait_time;
 static f32 timer_start;
 
-#ifdef UNFINISHED_FEATURES
-static void on_back_clicked(void) {
-  switch_to_state(STATE_MENU);
-}
-#else
 static void on_ready_click(void);
 static void on_options_click(void) { switch_to_state(STATE_OPTIONS); }
 static void on_quit_clicked(void) { exit(); }
-#endif
 
-#ifdef UNFINISHED_FEATURES
-static struct component back_btn = {
-  .type = UICOMP_BUTTON,
-  .text = "> back",
-  .on_click = on_back_clicked
-};
-#else
 static struct component comps[] = {
   [0] = { .type = UICOMP_BUTTON, .on_click = on_ready_click },
   [1] = { .type = UICOMP_BUTTON, .text = "> options", .on_click = on_options_click },
@@ -41,7 +28,6 @@ static void on_ready_click(void) {
   set_ready(!ready);
   signal_ready(ready);
 }
-#endif
 
 static inline void title(void) {
   const char title[] = "waiting";
@@ -57,9 +43,7 @@ static void on_tick(f32 delta) {
   const char* text;
   f32 time_left;
   u32 y;
-#ifndef UNFINISHED_FEATURES
   u32 i;
-#endif
 
   UNUSED(delta);
 
@@ -82,12 +66,8 @@ static void on_tick(f32 delta) {
   draw_rect(48 - 2, y - 2, STRING_WIDTH(text) + 4, STRING_HEIGHT + 4, BACKGROUND_COLOR);
   draw_string(48, y, text);
   y += STRING_HEIGHT + 8;
-#ifdef UNFINISHED_FEATURES
-  draw_component(48, y, &back_btn);
-#else
   for (i = 0; i < ARRLEN(comps); ++i)
     draw_component(48, y + i * 24, comps + i);
-#endif
 
   display_game_id();
 }
