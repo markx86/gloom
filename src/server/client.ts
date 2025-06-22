@@ -1,26 +1,16 @@
 import Logger from "./logger";
 import { WebSocket } from "ws";
-import { Game, PlayerHolder, PlayerSprite } from "./game";
+import { PlayerSprite } from "./game";
 import { GamePacketType, ServerPacket, HelloPacket, UpdatePacket, DestroyPacket, GamePacket, WaitPacket } from "./packet";
 import { Peer } from "./broadcast";
 
 const MAX_PACKET_DROP = 10;
 
-export class Client extends Peer implements PlayerHolder {
-  private gameId: number;
-  private playerToken: number;
-  private player: PlayerSprite | null;
+export class Client extends Peer {
+  private player: PlayerSprite;
   private ws: WebSocket;
   private clientSequence: number;
   private serverSequence: number;
-
-  public unsetPlayer(): void {
-    this.player = null;
-  }
-
-  public getToken(): number {
-    return this.playerToken;
-  }
 
   public sendPacket(pkt: ServerPacket) {
     const seq = this.serverSequence++;
@@ -42,8 +32,8 @@ export class Client extends Peer implements PlayerHolder {
       return false;
     }
 
-    if (this.playerToken !== playerToken) {
-      Logger.error("Invalid player token! Got %s expected %s", playerToken.toString(16), this.playerToken?.toString(16));
+    if (this.player.token !== playerToken) {
+      Logger.error("Invalid player token! Got %s expected %s", playerToken.toString(16), this.player.token.toString(16));
       return false;
     } else if (type !== GamePacketType.READY && !this.inBroadcastGroup()) {
       Logger.error("Player is not in any game!");
@@ -53,51 +43,20 @@ export class Client extends Peer implements PlayerHolder {
     return true;
   }
 
-  private _handleReadyPacket(packet: GamePacket): boolean {
-    const ready = packet.popU8() != 0;
-    if (this.player != null) {
-      this.player.setReady(ready);
-    } else {
-      const game = Game.getById(this.gameId);
-      if (game == null) {
-        Logger.error("No game with that ID");
-        return false;
-      }
-  
-      const player = game.newPlayer(this);
-      if (player == null) {
-        return false;
-      }
-      this.player = player;
-      this.player.setReady(ready);
-  
-      Logger.success("Client (%s) joined game (%s) with ID %d", this.playerToken.toString(16), this.player.game.id.toString(16), this.player.id);
-
-      this.registerToBroadcastGroup(game.id);
-      this.sendPacket(new HelloPacket(this.player));
-      this.sendPacket(new WaitPacket(game));
-    }
-    return true;
-  }
-
   private handleReadyPacket(packet: GamePacket) {
-    if (!this._handleReadyPacket(packet)) {
-      this.ws.close();
-    }
+    const ready = packet.popU8() != 0;
+    this.player.setReady(ready);
   }
 
   private handleLeavePacket(_packet: GamePacket) {
     Logger.trace("Got request to leave game");
-
-    this.removeFromBroadcastGroup();
-    this.player?.game.removePlayer(this.player);
-    this.unsetPlayer();
+    this.ws.close();
   }
 
   private handleUpdatePacket(packet: GamePacket) {
     Logger.trace("Got update packet");
-    if (this.player == null) {
-      // NOTE: unreachable
+    // discard update packets if the player is dead
+    if (this.player.getHealth() <= 0) {
       return;
     }
 
@@ -112,11 +71,6 @@ export class Client extends Peer implements PlayerHolder {
 
   private handleFirePacket(_packet: GamePacket) {
     Logger.trace("Got fire packet");
-    if (this.player == null) {
-      // NOTE: unreachable
-      return;
-    }
-
     this.player.fireBullet();
   }
 
@@ -126,36 +80,37 @@ export class Client extends Peer implements PlayerHolder {
     }
 
     switch (type) {
-      case GamePacketType.READY:   { this.handleReadyPacket(packet); break; }
+      case GamePacketType.READY:  {
+        this.handleReadyPacket(packet);
+        // if this is the first ready packet we receive from the client,
+        // assume that they're ready to receive map data
+        if (sequence === 0) {
+          Logger.trace("Sending HELLO to player %s", this.player.token.toString(16));
+          this.sendPacket(new HelloPacket(this.player));
+          this.sendPacket(new WaitPacket(this.player.game));
+        }
+        break;
+      }
       case GamePacketType.LEAVE:  { this.handleLeavePacket(packet); break; }
       case GamePacketType.UPDATE: { this.handleUpdatePacket(packet); break; }
       case GamePacketType.FIRE:   { this.handleFirePacket(packet); break; }
     }
   }
 
-  public constructor(ws: WebSocket, playerToken: number, gameId: number) {
+  public constructor(ws: WebSocket, player: PlayerSprite) {
     super();
 
     this.ws = ws;
-    this.playerToken = playerToken;
-    this.gameId = gameId;
-    this.player = null;
+    this.player = player;
     this.serverSequence = this.clientSequence = 0;
 
     this.ws.on("error", Logger.error);
 
     // handle WebSocket close event
     this.ws.on("close", () => {
-      Logger.trace("Client disconnected");
-      if (this.player?.game) {
-        Logger.success("Removing player with ID %d from game %s", this.player.id, this.player.game.id.toString(16));
-        this.player.game.removePlayer(this.player);
-        this.broadcastPacket(new DestroyPacket(this.player), false);
-      } else {
-        Logger.trace("Client was not in game, deallocating player");
-        Game.getById(this.gameId)?.deallocatePlayer(this.playerToken);
-      }
-      this.unsetPlayer();
+      Logger.success("Removing player with ID %d from game %s", this.player.id, this.player.game.id.toString(16));
+      this.player.game.removePlayer(this.player);
+      this.broadcastPacket(new DestroyPacket(this.player), false);
       this.removeFromBroadcastGroup();
     });
 
@@ -180,5 +135,7 @@ export class Client extends Peer implements PlayerHolder {
 
       this.handlePacket(type, sequence, playerToken, packet);
     });
+
+    this.registerToBroadcastGroup(this.player.game.id);
   }
 }

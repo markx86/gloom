@@ -180,22 +180,17 @@ export abstract class GameSprite {
   }
 }
 
-export interface PlayerHolder {
-  getToken(): number;
-  unsetPlayer(): void;
-}
-
 export class PlayerSprite extends GameSprite {
-  readonly holder: PlayerHolder;
+  readonly token: number;
 
   private health: number;
   private reloadTime: number;
   private ready: boolean;
 
-  public constructor(holder: PlayerHolder, game: Game, id: number,
+  public constructor(token: number, game: Game, id: number,
                      x: number, y: number, r: number = 0) {
     super(game, id, GameSpriteType.PLAYER, 0.15, x, y, 0, r);
-    this.holder = holder;
+    this.token = token;
     this.health = PLAYER_HEALTH;
     this.reloadTime = 0;
     this.ready = false;
@@ -218,7 +213,6 @@ export class PlayerSprite extends GameSprite {
       if (this.health <= 0) {
         Logger.trace("Player %d killed by player %d", this.id, other.owner.id);
         this.game.removePlayer(this, other.owner);
-        this.holder.unsetPlayer();
       }
     }
   }
@@ -271,7 +265,7 @@ export class PlayerSprite extends GameSprite {
   }
 
   public fireBullet(): BulletSprite | undefined {
-    if (this.reloadTime <= 0) {
+    if (this.reloadTime <= 0 && this.health > 0) {
       this.reloadTime = PLAYER_RELOAD_TIME;
       return this.game.newBullet(this);
     }
@@ -527,17 +521,17 @@ export class Game {
     return id + 1;
   }
 
-  public newPlayer(holder: PlayerHolder): PlayerSprite | undefined {
+  public newPlayer(token: number): PlayerSprite | undefined {
     if (this.numOfPlayers++ >= MAX_PLAYERS) {
       Logger.warning("Max players reached in game %s", this.id.toString(16));
-    } else if (this.playerTokens.has(holder.getToken())) {
+    } else if (this.playerTokens.has(token)) {
       const id = this.nextEntityId();
       const pos = this.map.getSpawnPositionForPlayer(id - 1, this.numOfPlayers);
       if (pos != null) {
-        Logger.trace("Spawining player %s (ID: %d) @ (x = %f, y = %f, r = %f)", holder.getToken(), id, pos.x, pos.y, pos.rot);
-        return this.addSprite(new PlayerSprite(holder, this, id, pos.x, pos.y, pos.rot));
+        Logger.trace("Spawining player %s (ID: %d) @ (x = %f, y = %f, r = %f)", token.toString(16), id, pos.x, pos.y, pos.rot);
+        return this.addSprite(new PlayerSprite(token, this, id, pos.x, pos.y, pos.rot));
       }
-      Logger.warning("No place to spawn player with token %s", holder.getToken());
+      Logger.warning("No place to spawn player with token %s", token);
     } else {
       Logger.error("No player with that token");
     }
@@ -587,7 +581,7 @@ export class Game {
   public removePlayer(player: PlayerSprite, actor: PlayerSprite | undefined = undefined) {
     if (this.removeSprite(player, actor)) {
       --this.numOfPlayers;
-      this.deallocatePlayer(player.holder.getToken());
+      this.deallocatePlayer(player.token);
     }
   }
 

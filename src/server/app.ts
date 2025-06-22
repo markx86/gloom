@@ -10,6 +10,7 @@ process.on("exit", closeDb);
 process.on("uncaughtException", (e) => {
   Logger.error("Unhandled exception: %O", e);
   closeDb();
+  process.exit(-1);
 });
 
 import { HTTP_PORT } from "./http-server.ts";
