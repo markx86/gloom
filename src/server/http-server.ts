@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import {
   USERNAME_MAX_LEN, USERNAME_MIN_LEN,
   PASSWORD_MAX_LEN, PASSWORD_MIN_LEN,
@@ -13,13 +12,24 @@ import {
 import Logger from "./logger.ts";
 import Maps from "./maps.ts"
 import { Game } from "./game.ts";
-import express from "express";
-import cookieParser from "cookie-parser";
 import { getEnvStringOrDefault, getEnvIntOrDefault } from "./util.ts";
 import { WSS_PORT } from "./game-server.ts";
 
+import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import http from "node:http";
+import https from "node:https";
+import express from "express";
+import cookieParser from "cookie-parser";
+
+const httpsOptions = {
+  key: readFileSync(getEnvStringOrDefault("HTTPS_KEY", "./cert.key")),
+  cert: readFileSync(getEnvStringOrDefault("HTTPS_CERT", "./cert.pem"))
+};
+
 const COOKIE_SECRET = getEnvStringOrDefault("COOKIE_SECRET", randomBytes(32).toString("hex"));
 export const HTTP_PORT = getEnvIntOrDefault("HTTP_PORT", 8080, 0, 0xFFFF);
+export const HTTPS_PORT = getEnvIntOrDefault("HTTP_PORT", 8443, 0, 0xFFFF);
 
 const SESSION_LIFETIME = 24 * 60 * 60;
 
@@ -276,4 +286,8 @@ app.post("/api/game/join", (req, res) => {
   }
 });
 
-app.listen(HTTP_PORT);
+const httpServer = http.createServer(app);
+httpServer.listen(HTTP_PORT);
+
+const httpsServer = https.createServer(httpsOptions, app);
+httpsServer.listen(HTTPS_PORT);

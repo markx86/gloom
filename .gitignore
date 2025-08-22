@@ -9,3 +9,5 @@ build/
 **/*.min.js*
 **/compile_commands.json
 .env
+cert.key
+cert.pem
