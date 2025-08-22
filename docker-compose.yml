@@ -5,6 +5,7 @@ services:
     ports:
       - 8492:8492
       - 8080:8080
+      - 8443:8443
     environment:
       - DATABASE=/database/gloom.db
       - COOKIE_SECRET=${COOKIE_SECRET}
