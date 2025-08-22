@@ -284,7 +284,7 @@ function showSignUpHelp(event) {
         $li("Your username must be at least ", $strong("3"), " characters long"),
         $li("Your username must be no more than ", $strong("24"), " characters long"),
         $li("Your password must be at least ", $strong("8"), " characters long"),
-        $li("Your password must be no more than ", $strong("24"), " characters long"),
+        $li("Your password must be no more than ", $strong("64"), " characters long"),
         $li("Your password must contain at least a number and one of the following symbols", $code("!\"£$%&/()=?^-'.+#@\|~"))
       ).$style("padding-left", "12px")
     ).$style("padding-left", "4px"),
