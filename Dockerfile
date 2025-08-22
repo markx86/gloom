@@ -29,6 +29,8 @@ COPY static/ static/
 COPY res/ res/
 COPY scripts/ scripts/
 COPY src/ src/
+COPY cert.key .
+COPY cert.pem .
 
 # build the project
 RUN npm run build
