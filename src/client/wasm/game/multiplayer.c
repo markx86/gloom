@@ -604,7 +604,7 @@ void multiplayer_on_recv(u32 len) {
   }
 
   // ensure sequence number is within margin of error
-  if (hdr->seq - server_seq < MAX_PACKET_DROP)
+  if (abs(hdr->seq - server_seq) < MAX_PACKET_DROP)
     server_seq = hdr->seq + 1;
   else {
     eprintf("invalid sequence number (expected %u got %u)\n",

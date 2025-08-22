@@ -1,10 +1,23 @@
 #!/usr/bin/env node
 
+import http from "node:http";
+import https from "node:https";
+import Stream from "node:stream";
+import { readFileSync } from "node:fs";
+
 import Logger from "./logger.ts";
+import { closeDb } from "./database.ts";
+import { getEnvStringOrDefault } from "./util.ts";
+import { HTTP_PORT, HTTPS_PORT } from "./ports.ts";
+import { app } from "./http-server.ts"
+import { wss } from "./game-server.ts"
+
+const httpsOptions = {
+  key: readFileSync(getEnvStringOrDefault("HTTPS_KEY", "./cert.key")),
+  cert: readFileSync(getEnvStringOrDefault("HTTPS_CERT", "./cert.pem"))
+};
 
 process.on("SIGINT", () => process.exit(0));
-
-import { closeDb } from "./database.ts";
 
 process.on("exit", closeDb);
 process.on("uncaughtException", (e) => {
@@ -13,10 +26,14 @@ process.on("uncaughtException", (e) => {
   process.exit(-1);
 });
 
-import { HTTP_PORT } from "./http-server.ts";
-import { WSS_PORT } from "./game-server.ts";
-
-if (HTTP_PORT === WSS_PORT) {
-  Logger.error("HTTP_PORT cannot be the same as WSS_PORT");
-  process.exit(-1);
+function handleUpgrade(request: http.IncomingMessage, socket: Stream.Duplex, head: Buffer) {
+  wss.handleUpgrade(request, socket, head, (ws, request) => wss.emit("connection", ws, request));
 }
+
+const httpServer = http.createServer(app);
+httpServer.listen(HTTP_PORT);
+httpServer.on("upgrade", handleUpgrade);
+
+const httpsServer = https.createServer(httpsOptions, app);
+httpsServer.listen(HTTPS_PORT);
+httpsServer.on("upgrade", handleUpgrade);

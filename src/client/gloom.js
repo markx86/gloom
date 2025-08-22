@@ -236,10 +236,11 @@ export async function loadGloom() {
   const memory = instance.exports.memory;
     
 
-  const launchGloom = (username, wssPort, gameId, playerToken, onCloseHandler) => {
-    setupGame(username, wssPort);
+  const launchGloom = (username, gameId, playerToken, onCloseHandler) => {
+    setupGame(username);
 
-    const url = `ws://${window.location.hostname}:${wssPort}`;
+    const proto = window.location.protocol.replace("http", "ws");
+    const url = `${proto}//${window.location.host}`;
     ws = new WebSocket(url);
 
     function exitGame() {
