@@ -10,7 +10,7 @@ shift
 extra_flags="$@"
 outfile=$(basename $outpath)
 wasmdir="./src/client/wasm"
-gendir="/tmp/gloom-gen"
+gendir=$(mktemp --directory)
 
 mkdir -p $gendir
 

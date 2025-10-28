@@ -34,8 +34,8 @@ export async function loadGloom() {
     canvas.style.transform = `scale(${scaleToFit})`;
   }
   
-  // void write(i32 fd, const char* str, u32 len);
-  function write(fd, p, l) {
+  // void platform_write(i32 fd, const char* str, u32 len);
+  function platform_write(fd, p, l) {
     const s = textDecoder.decode(memory.buffer.slice(p, p + l));
     switch (fd) {
       case 1:
@@ -49,8 +49,8 @@ export async function loadGloom() {
     }
   }
   
-  // u32 request_mem(u32 size);
-  function request_mem(sz) {
+  // u32 platform_request_mem(u32 size);
+  function platform_request_mem(sz) {
     const pages = (sz + (1 << 16) - 1) >> 16;
     const fbAddress = fbArray.byteOffset;
     const fbSize = fbArray.byteLength;
@@ -59,12 +59,11 @@ export async function loadGloom() {
     memory.grow(pages);
     // re-register framebuffer, because it gets detached every time we
     // call memory.grow(..)
-    register_fb(fbAddress, fbWidth, fbHeight, fbSize);
+    setFramebuffer(fbAddress, fbWidth, fbHeight, fbSize);
     return pages << 16;
   }
   
-  // void register_fb(void* addr, u32 width, u32 height, u32 size);
-  function register_fb(addr, width, height, size) {
+  function setFramebuffer(addr, width, height, size) {
     fbArray = new Uint8ClampedArray(memory.buffer, addr, size);
     fb = new ImageData(fbArray, width, height);
     canvas.width = width;
@@ -76,8 +75,8 @@ export async function loadGloom() {
     return document.pointerLockElement === canvas;
   }
   
-  // void pointer_lock(void);
-  async function pointer_lock() {
+  // void platform_pointer_lock(void);
+  async function platform_pointer_lock() {
     if (pointerIsLocked()) {
       return;
     }
@@ -96,13 +95,13 @@ export async function loadGloom() {
     }
   }
   
-  // void pointer_release(void);
-  function pointer_release() {
+  // void platform_pointer_release(void);
+  function platform_pointer_release() {
     document.exitPointerLock();
   }
   
-  // i32 send_packet(void* pkt, u32 len);
-  function send_packet(bufptr, len) {
+  // i32 platform_send_packet(void* pkt, u32 len);
+  function platform_send_packet(bufptr, len) {
     try {
       ws.send(memory.buffer.slice(bufptr, bufptr + len));
       return len;
@@ -111,30 +110,29 @@ export async function loadGloom() {
     }
   }
 
-  // void store_settings(f32 drawdist, f32 fov, f32 mousesens, b8 camsmooth);
-  function store_settings(drawdist, fov, mousesens, camsmooth) {
+  // void platform_settings_store(f32 drawdist, f32 fov, f32 mousesens, b8 camsmooth);
+  function platform_settings_store(drawdist, fov, mousesens, camsmooth) {
     camsmooth = camsmooth !== 0;
     const settings = { mousesens, drawdist, fov, camsmooth };
     localStorage.setItem(settingsKey, btoa(JSON.stringify(settings)));
   }
   
-  // f32 time(void);
-  function time() {
+  // f32 platform_get_time(void);
+  function platform_get_time() {
     return (Date.now() - originTime) / 1e3;
   }
   
   const importObject = {
     env: {
-      write,
-      pointer_lock,
-      pointer_release,
-      request_mem,
-      register_fb,
-      send_packet,
-      store_settings,
-      time,
+      platform_write,
+      platform_pointer_lock,
+      platform_pointer_release,
+      platform_request_mem,
+      platform_send_packet,
+      platform_settings_store,
+      platform_get_time,
       // FIXME: implement acos(..) in WASM
-      acos: Math.acos
+      platform_acos: Math.acos
     },
   };
   
@@ -142,7 +140,7 @@ export async function loadGloom() {
     if (instance == null) {
       return;
     }
-    instance.exports.key_event(event.keyCode, event.key.charCodeAt(0), event.type === "keydown");
+    instance.exports.gloom_on_key_event(event.keyCode, event.key.charCodeAt(0), event.type === "keydown");
   }
   
   let mouseButtons = 0;
@@ -153,15 +151,15 @@ export async function loadGloom() {
     }
     switch (e.type) {
       case "mousedown": {
-        instance.exports.mouse_down(e.offsetX, e.offsetY, e.button);
+        instance.exports.gloom_on_mouse_down(e.offsetX, e.offsetY, e.button);
         break;
       }
       case "mouseup": {
-        instance.exports.mouse_up(e.offsetX, e.offsetY, e.button);
+        instance.exports.gloom_on_mouse_up(e.offsetX, e.offsetY, e.button);
         break;
       }
       case "mousemove": {
-        instance.exports.mouse_moved(e.offsetX, e.offsetY, e.movementX, e.movementY);
+        instance.exports.gloom_on_mouse_moved(e.offsetX, e.offsetY, e.movementX, e.movementY);
         break;
       }
       case "mouseleave": {
@@ -178,7 +176,7 @@ export async function loadGloom() {
   }
   
   function processPointerLockChange() {
-    instance.exports.set_pointer_locked(pointerIsLocked());
+    instance.exports.gloom_set_pointer_locked(pointerIsLocked());
   }
 
   function toggleListeners(on) {
@@ -200,12 +198,12 @@ export async function loadGloom() {
     const b64Settings = localStorage.getItem(settingsKey);
     if (b64Settings != null) {
       const settings = JSON.parse(atob(b64Settings));
-      instance.exports.load_settings(
+      instance.exports.gloom_settings_load(
         settings.drawdist, settings.fov,
         settings.mousesens, settings.camsmooth
       );
     } else {
-      instance.exports.load_defaults();
+      instance.exports.gloom_settings_defaults();
     }
   }
 
@@ -253,7 +251,7 @@ export async function loadGloom() {
 
     function tick(timestamp) {
       const delta = (timestamp - prevTimestamp) / 1000;
-      if (instance.exports.tick(delta) !== 0) {
+      if (instance.exports.gloom_tick(delta) !== 0) {
         ctx.putImageData(fb, 0, 0);
         prevTimestamp = timestamp;
         window.requestAnimationFrame(tick);
@@ -280,7 +278,15 @@ export async function loadGloom() {
           ws.send(data);
         }
       }
-      instance.exports.init(online, gameId, playerToken);
+
+      setFramebuffer(
+        instance.exports.gloom_framebuffer(),
+        instance.exports.gloom_framebuffer_width(),
+        instance.exports.gloom_framebuffer_height(),
+        instance.exports.gloom_framebuffer_size()
+      );
+      instance.exports.gloom_init(online, gameId, playerToken);
+
       window.requestAnimationFrame((timestamp) => {
         updateViewportSize();
         prevTimestamp = timestamp;
@@ -290,21 +296,24 @@ export async function loadGloom() {
   
     const wsErrorHandler = () => startGame(false);
     const wsOpenHandler = () => startGame(true);
+
+    const pktBuffer = instance.exports.gloom_packet_buffer();
+    const pktBufferSize = instance.exports.gloom_packet_buffer_size();
   
     ws.binaryType = "arraybuffer";
     ws.addEventListener("message", e => {
       if (e.data instanceof ArrayBuffer) {
         const pkt = new Uint8Array(e.data);
-        new Uint8Array(memory.buffer, instance.exports.__pkt_buf, 0x1000).set(pkt);
-        instance.exports.multiplayer_on_recv(pkt.byteLength);
+        new Uint8Array(memory.buffer, pktBuffer, pktBufferSize).set(pkt);
+        instance.exports.gloom_on_recv_packet(pkt.byteLength);
       }
     });
-    ws.addEventListener("close", instance.exports.on_ws_close);
+    ws.addEventListener("close", instance.exports.gloom_on_ws_close);
     ws.addEventListener("error", wsErrorHandler);
     ws.addEventListener("open", wsOpenHandler);
 
     return ws;
   }
 
-  return [launchGloom, instance.exports.exit];
+  return [launchGloom, instance.exports.gloom_exit];
 }

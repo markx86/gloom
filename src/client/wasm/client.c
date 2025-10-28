@@ -1,98 +1,90 @@
-#include <client.h>
-#include <globals.h>
+#include <gloom/client.h>
+#include <gloom/globals.h>
 
 static b8 should_tick;
 
-static const struct state_handlers* handlers[STATE_MAX] = {
-  [STATE_ERROR]   = &error_state,
-  [STATE_LOADING] = &loading_state,
-  [STATE_WAITING] = &waiting_state,
-  [STATE_GAME]    = &game_state,
-  [STATE_PAUSE]   = &pause_state,
-  [STATE_OPTIONS] = &options_state,
-  [STATE_OVER]    = &over_state
+static const struct state_handlers* handlers[CLIENT_STATE_MAX] = {
+  [CLIENT_ERROR]   = &g_error_state,
+  [CLIENT_LOADING] = &g_loading_state,
+  [CLIENT_WAITING] = &g_waiting_state,
+  [CLIENT_GAME]    = &g_game_state,
+  [CLIENT_PAUSE]   = &g_pause_state,
+  [CLIENT_OPTIONS] = &g_options_state,
+  [CLIENT_OVER]    = &g_over_state
 };
 
-#define CALLSTATEHANDLER(name, ...)                                   \
-  do {                                                                \
-    if (__client_state < STATE_MAX && handlers[__client_state]->name) \
-      handlers[__client_state]->name(__VA_ARGS__);                    \
+#define CALL_STATE_HANDLER(name, ...)                                      \
+  do {                                                                     \
+    if (_client_state < CLIENT_STATE_MAX && handlers[_client_state]->name) \
+      handlers[_client_state]->name(__VA_ARGS__);                          \
   } while (0)
 
-u32 __fb[FB_WIDTH * FB_HEIGHT];
-u32 __alpha_mask;
-b8 __pointer_locked;
+b8 _pointer_locked;
 
-const u32 __palette[] = {
-  [COLOR_BLACK]       = 0x000000,
-  [COLOR_GRAY]        = 0x7E7E7E,
-  [COLOR_LIGHTGRAY]   = 0xBEBEBE,
-  [COLOR_WHITE]       = 0xFFFFFF,
-  [COLOR_DARKRED]     = 0x00007E,
-  [COLOR_RED]         = 0x0000FE,
-  [COLOR_DARKGREEN]   = 0x007E04,
-  [COLOR_GREEN]       = 0x04FF06,
-  [COLOR_DARKYELLOW]  = 0x007E7E,
-  [COLOR_YELLOW]      = 0x04FFFF,
-  [COLOR_DARKBLUE]    = 0x7E0000,
-  [COLOR_BLUE]        = 0xFF0000,
-  [COLOR_DARKMAGENTA] = 0x7E007E,
-  [COLOR_MAGENTA]     = 0xFF00FE,
-  [COLOR_DARKCYAN]    = 0x7E7E04,
-  [COLOR_CYAN]        = 0xFFFF06,
-};
+enum client_state _client_state;
 
-enum client_state __client_state;
-
-void switch_to_state(enum client_state new_state) {
-  if (get_client_state() < STATE_MAX) {
-    printf("switching client state from %d to %d\n", __client_state, new_state);
-    __client_state = new_state;
-    CALLSTATEHANDLER(on_enter);
+void client_switch_state(enum client_state new_state) {
+  if (client_get_state() < CLIENT_STATE_MAX) {
+    printf("switching client state from %d to %d\n", _client_state, new_state);
+    _client_state = new_state;
+    CALL_STATE_HANDLER(on_enter);
   }
 }
 
-void set_pointer_locked(b8 locked) {
-  __pointer_locked = locked;
+void gloom_set_pointer_locked(b8 locked) {
+  _pointer_locked = locked;
   if (!locked) {
-    keys.all_keys = 0;
+    g_keys.all_keys = 0;
     // dirty hack to pause on lost focus because I refuse to add another
     // handler just for pointer lock changes
-    if (get_client_state() == STATE_GAME) {
+    if (client_get_state() == CLIENT_GAME) {
       // notify the server the player has stopped
       queue_key_input();
-      send_update();
+      multiplayer_send_update();
       // switch to pause menu
-      switch_to_state(STATE_PAUSE);
+      client_switch_state(CLIENT_PAUSE);
     }
   }
 }
 
-void on_ws_close(void) {
-  set_connection_state(CONN_DISCONNECTED);
-  if (get_client_state() != STATE_OVER)
-    switch_to_state(STATE_ERROR);
+void gloom_on_ws_close(void) {
+  multiplayer_set_state(MULTIPLAYER_DISCONNECTED);
+  if (client_get_state() != CLIENT_OVER)
+    client_switch_state(CLIENT_ERROR);
 }
 
-void key_event(u32 code, char ch, b8 pressed) { CALLSTATEHANDLER(on_key, code, ch, pressed); }
-void mouse_down(u32 x, u32 y, u32 button) { CALLSTATEHANDLER(on_mouse_down, x, y, button); }
-void mouse_up(u32 x, u32 y, u32 button) { CALLSTATEHANDLER(on_mouse_up, x, y, button); }
-void mouse_moved(u32 x, u32 y, i32 dx, i32 dy) { CALLSTATEHANDLER(on_mouse_moved, x, y, dx, dy); }
-b8 tick(f32 delta) { CALLSTATEHANDLER(on_tick, delta); return should_tick; }
+void gloom_on_key_event(u32 code, char ch, b8 pressed) {
+  CALL_STATE_HANDLER(on_key, code, ch, pressed);
+}
 
-void init(b8 ws_connected, u32 game_id, u32 player_token) {
-  __pointer_locked = false;
+void gloom_on_mouse_down(u32 x, u32 y, u32 button) {
+  CALL_STATE_HANDLER(on_mouse_down, x, y, button);
+}
+
+void gloom_on_mouse_up(u32 x, u32 y, u32 button) {
+  CALL_STATE_HANDLER(on_mouse_up, x, y, button);
+}
+
+void gloom_on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
+  CALL_STATE_HANDLER(on_mouse_moved, x, y, dx, dy);
+}
+
+b8 gloom_tick(f32 delta) {
+  CALL_STATE_HANDLER(on_tick, delta); return should_tick;
+}
+
+void gloom_init(b8 ws_connected, u32 game_id, u32 player_token) {
+  _pointer_locked = false;
   should_tick = true;
-  tracked_sprite = NULL;
-  apply_settings();
+  g_tracked_sprite_set(NULL);
+  g_settings_apply();
   multiplayer_init(game_id, player_token);
-  register_fb(__fb, FB_WIDTH, FB_HEIGHT, FB_SIZE);
-  switch_to_state(ws_connected ? STATE_LOADING : STATE_ERROR);
+  client_switch_state(ws_connected ? CLIENT_LOADING : CLIENT_ERROR);
 }
 
-void exit(void) {
-  if (pointer_is_locked())
-    pointer_release();
-  leave_game();
+void gloom_exit(void) {
+  if (client_pointer_is_locked())
+    platform_pointer_release();
+  multiplayer_leave();
   should_tick = false;
 }

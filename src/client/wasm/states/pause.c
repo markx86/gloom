@@ -1,19 +1,22 @@
-#include <client.h>
-#include <ui.h>
+#include <gloom/client.h>
+#include <gloom/ui.h>
 
-#define FOREGROUND_COLOR SOLIDCOLOR(LIGHTGRAY)
-#define BACKGROUND_COLOR SOLIDCOLOR(BLACK)
+#define FOREGROUND_COLOR SOLID_COLOR(LIGHTGRAY)
+#define BACKGROUND_COLOR SOLID_COLOR(BLACK)
 
-static void on_resume_clicked(void) {
-  switch_to_state(STATE_GAME);
+static
+void on_resume_clicked(void) {
+  client_switch_state(CLIENT_GAME);
 }
 
-static void on_options_clicked(void) {
-  switch_to_state(STATE_OPTIONS);
+static
+void on_options_clicked(void) {
+  client_switch_state(CLIENT_OPTIONS);
 }
 
-static void on_quit_clicked(void) {
-  exit();
+static
+void on_quit_clicked(void) {
+  gloom_exit();
 }
 
 static struct component buttons[] = {
@@ -22,54 +25,60 @@ static struct component buttons[] = {
   { .type = UICOMP_BUTTON, .text = "> quit", .on_click = on_quit_clicked }
 };
 
-static void title(void) {
+static
+void title(void) {
   const char title[] = "menu";
-  draw_rect(
+  ui_draw_rect(
     32, 32 + (FONT_HEIGHT >> 1),
     TITLE_WIDTH_IMM(title), TITLE_HEIGHT - FONT_HEIGHT,
     BACKGROUND_COLOR);
-  draw_title(32, 32, title);
+  ui_draw_title(32, 32, title);
 }
 
-static void on_tick(f32 delta) {
+static
+void on_tick(f32 delta) {
   u32 i;
 
-  gloom_tick(delta);
+  game_tick(delta);
 
   title();
   for (i = 0; i < ARRLEN(buttons); ++i)
-    draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * i, buttons + i);
+    ui_draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * i, buttons + i);
 
   display_game_id();
 }
 
-static void on_enter(void) {
-  if (pointer_is_locked())
-    pointer_release();
+static
+void on_enter(void) {
+  if (client_pointer_is_locked())
+    platform_pointer_release();
 
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
 
   // darken the screen by decreasing the alpha channel
-  set_alpha(0x7F);
+  color_set_alpha(0x7F);
 
-  component_on_enter(buttons, ARRLEN(buttons));
+  ui_on_enter(buttons, ARRLEN(buttons));
 }
 
-static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
-  component_on_mouse_moved(x, y, dx, dy, buttons, ARRLEN(buttons));
+static
+void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
+  ui_on_mouse_moved(x, y, dx, dy, buttons, ARRLEN(buttons));
 }
 
-static void on_mouse_down(u32 x, u32 y, u32 button) {
+static
+void on_mouse_down(u32 x, u32 y, u32 button) {
   UNUSED(button);
-  component_on_mouse_down(x, y, buttons, ARRLEN(buttons));
+  ui_on_mouse_down(x, y, buttons, ARRLEN(buttons));
 }
 
-static void on_mouse_up(u32 x, u32 y, u32 button) {
+static
+void on_mouse_up(u32 x, u32 y, u32 button) {
   UNUSED(button);
-  component_on_mouse_up(x, y, buttons, ARRLEN(buttons));
+  ui_on_mouse_up(x, y, buttons, ARRLEN(buttons));
 }
 
-const struct state_handlers pause_state = {
+const struct state_handlers g_pause_state = {
   .on_tick = on_tick,
   .on_enter = on_enter,
   .on_mouse_moved = on_mouse_moved,

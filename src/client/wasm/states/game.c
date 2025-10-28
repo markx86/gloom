@@ -1,8 +1,7 @@
-#include <client.h>
+#include <gloom/client.h>
 
 // mouse sensitivity multiplier
-f32 mouse_sensitivity;
-
+static f32 mouse_sensitivity;
 static b8 do_send_update;
 
 #define KEY_A 65
@@ -11,51 +10,58 @@ static b8 do_send_update;
 #define KEY_W 87
 #define KEY_P 80
 
-static void on_enter(void) {
-  if (!pointer_is_locked())
-    pointer_lock();
+void g_mouse_sensitivity_set(f32 mousesens) {
+  mouse_sensitivity = mousesens;
+}
 
-  set_alpha(0xFF);
+static
+void on_enter(void) {
+  if (!client_pointer_is_locked())
+    platform_pointer_lock();
+
+  color_set_alpha(0xFF);
   do_send_update = false;
 }
 
-static void on_tick(f32 delta) {
+static
+void on_tick(f32 delta) {
   if (do_send_update) {
-    send_update();
+    multiplayer_send_update();
     do_send_update = false;
   }
-  gloom_tick(delta);
+  game_tick(delta);
 }
 
-static void on_key(u32 code, char ch, b8 pressed) {
+static
+void on_key(u32 code, char ch, b8 pressed) {
   u32 prev_keys;
 
-  if (!pointer_is_locked())
+  if (!client_pointer_is_locked())
     return;
 
-  prev_keys = keys.all_keys;
+  prev_keys = g_keys.all_keys;
   switch (code) {
     case KEY_W:
-      keys.forward = pressed;
+      g_keys.forward = pressed;
       break;
     case KEY_S:
-      keys.backward = pressed;
+      g_keys.backward = pressed;
       break;
     case KEY_A:
-      keys.left = pressed;
+      g_keys.left = pressed;
       break;
     case KEY_D:
-      keys.right = pressed;
+      g_keys.right = pressed;
       break;
     case KEY_P:
-      switch_to_state(STATE_PAUSE);
+      client_switch_state(CLIENT_PAUSE);
       return;
     default:
       printf("unhandled key %d (%c)\n", code, ch);
       return;
   }
 
-  if (keys.all_keys != prev_keys) {
+  if (g_keys.all_keys != prev_keys) {
     queue_key_input();
     do_send_update = true;
   }
@@ -63,33 +69,35 @@ static void on_key(u32 code, char ch, b8 pressed) {
   UNUSED(ch);
 }
 
-static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
-  if (!pointer_is_locked())
-    return;
-
-  off_player_rot(dx * mouse_sensitivity * PLAYER_ROT_SPEED);
-
-  do_send_update = true;
-
+static
+void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
   UNUSED(x);
   UNUSED(y);
   UNUSED(dy);
+
+  if (!client_pointer_is_locked())
+    return;
+
+  game_player_add_rot(dx * mouse_sensitivity * PLAYER_ROT_SPEED);
+
+  do_send_update = true;
 }
 
-static void on_mouse_down(u32 x, u32 y, u32 button) {
+static
+void on_mouse_down(u32 x, u32 y, u32 button) {
   UNUSED(button);
   UNUSED(x);
   UNUSED(y);
 
-  if (!pointer_is_locked()) {
-    pointer_lock();
+  if (!client_pointer_is_locked()) {
+    platform_pointer_lock();
     return;
   }
 
-  fire_bullet();
+  multiplayer_fire_bullet();
 }
 
-const struct state_handlers game_state = {
+const struct state_handlers g_game_state = {
   .on_enter = on_enter,
   .on_tick = on_tick,
   .on_key = on_key,

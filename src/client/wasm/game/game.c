@@ -1,8 +1,8 @@
-#include <gloom.h>
-#include <globals.h>
-#include <ui.h>
+#include <gloom/game.h>
+#include <gloom/globals.h>
+#include <gloom/ui.h>
 
-#include <sprites.c>
+#include "sprites.c"
 
 // reduced DOF for computing collision rays
 #define COLL_DOF 8
@@ -27,55 +27,56 @@
 
 #define CAMERA_POS_INTERP 0.66f
 
-struct player player;
-struct map map;
-struct sprites sprites;
-struct camera camera;
-union keys keys;
+struct player g_player;
+struct map g_map;
+struct sprites g_sprites;
+struct camera g_camera;
+union keys g_keys;
 
 static f32 z_buf[FB_WIDTH];
 static i32 display_health;
 
-static const vec2i sprite_dims[] = {
+const vec2i g_sprite_dims[] = {
   [SPRITE_PLAYER] = { .x = PLAYER_SPRITE_W, .y = PLAYER_SPRITE_H },
   [SPRITE_BULLET] = { .x = BULLET_SPRITE_W, .y = BULLET_SPRITE_H }
 };
 
-const f32 sprite_radius[] = {
+const f32 g_sprite_radius[] = {
   [SPRITE_PLAYER] = 0.20f,
   [SPRITE_BULLET] = 0.01f
 };
 
 // NOTE: @new_fov must be in radians
-void set_camera_fov(f32 new_fov) {
-  camera.fov = new_fov;
-  camera.plane_halfw = 1.0f / (2.0f * tan(new_fov / 2.0f));
+void game_set_camera_fov(f32 new_fov) {
+  g_camera.fov = new_fov;
+  g_camera.plane_halfw = 1.0f / (2.0f * tan(new_fov / 2.0f));
 }
 
 // NOTE: @new_rot must be in radians
-void set_player_rot(f32 new_rot) {
+void game_set_player_rot(f32 new_rot) {
   f32 c;
 
-  player.rot = new_rot;
+  g_player.rot = new_rot;
   // compute player versor
-  player.dir.x = cos(new_rot);
-  player.dir.y = sin(new_rot);
+  g_player.dir.x = cos(new_rot);
+  g_player.dir.y = sin(new_rot);
   // compute camera plane offset
-  camera.plane.x = -player.dir.y * camera.plane_halfw;
-  camera.plane.y = +player.dir.x * camera.plane_halfw;
+  g_camera.plane.x = -g_player.dir.y * g_camera.plane_halfw;
+  g_camera.plane.y = +g_player.dir.x * g_camera.plane_halfw;
   // compute camera inverse matrix
   {
-    c = 1.0f / (camera.plane.x * player.dir.y - camera.plane.y * player.dir.x);
-    camera.inv_mat.m11 = +player.dir.y * c;
-    camera.inv_mat.m12 = -player.dir.x * c;
-    camera.inv_mat.m21 = -camera.plane.y * c;
-    camera.inv_mat.m22 = +camera.plane.x * c;
+    c = g_camera.plane.x * g_player.dir.y - g_camera.plane.y * g_player.dir.x;
+    c = 1.0f / c;
+    g_camera.inv_mat.m11 = +g_player.dir.y * c;
+    g_camera.inv_mat.m12 = -g_player.dir.x * c;
+    g_camera.inv_mat.m21 = -g_camera.plane.y * c;
+    g_camera.inv_mat.m22 = +g_camera.plane.x * c;
   }
 }
 
 // use the DDA algorithm to trace a ray
-static u8 trace_ray(const vec2f* pos, const vec2f* ray_dir,
-                    u32 dof, struct hit* hit) {
+static
+u8 trace_ray(const vec2f* pos, const vec2f* ray_dir, u32 dof, struct hit* hit) {
   vec2f delta_dist, dist, intersec_dist;
   vec2f dpos;
   vec2i step_dir;
@@ -104,10 +105,10 @@ static u8 trace_ray(const vec2f* pos, const vec2f* ray_dir,
   vertical = true;
   cell_id = 0;
   for (d = 0; d < dof; ++d) {
-    if (map_coords.x >= map.w || map_coords.y >= map.h)
+    if (map_coords.x >= g_map.w || map_coords.y >= g_map.h)
       break;
 
-    if ((cell_id = map.tiles[map_coords.x + map_coords.y * map.w]))
+    if ((cell_id = g_map.tiles[map_coords.x + map_coords.y * g_map.w]))
       break;
 
     if (intersec_dist.y < intersec_dist.x) {
@@ -128,7 +129,7 @@ static u8 trace_ray(const vec2f* pos, const vec2f* ray_dir,
   return cell_id;
 }
 
-b8 move_and_collide(vec2f* pos, vec2f* diff, f32 radius) {
+b8 game_move_and_collide(vec2f* pos, vec2f* diff, f32 radius) {
   struct hit hit;
   f32 v_dist, h_dist;
   vec2f v_dir, h_dir;
@@ -160,24 +161,24 @@ b8 move_and_collide(vec2f* pos, vec2f* diff, f32 radius) {
   return collided;
 }
 
-vec2f get_direction_from_keys(void) {
+vec2f game_get_player_dir(void) {
   i32 long_dir, side_dir;
   vec2f dir = {
     .x = 0.0f, .y = 0.0f
   };
 
-  long_dir = keys.forward - keys.backward;
-  side_dir = keys.right - keys.left;
+  long_dir = g_keys.forward - g_keys.backward;
+  side_dir = g_keys.right - g_keys.left;
 
   // forward movement
   if (long_dir) {
-    dir.x += player.dir.x * long_dir;
-    dir.y += player.dir.y * long_dir;
+    dir.x += g_player.dir.x * long_dir;
+    dir.y += g_player.dir.y * long_dir;
   }
   // sideways movement
   if (side_dir) {
-    dir.x += -player.dir.y * side_dir;
-    dir.y += +player.dir.x * side_dir;
+    dir.x += -g_player.dir.y * side_dir;
+    dir.y += +g_player.dir.x * side_dir;
 
     // if the user is trying to go both forwards and sideways,
     // we normalize the vector by dividing by sqrt(2).
@@ -192,21 +193,23 @@ vec2f get_direction_from_keys(void) {
   return dir;
 }
 
-static inline void update_player_position(f32 delta) {
+static inline
+void update_player_position(f32 delta) {
   vec2f dir;
 
   // a dead man cannot move :^)
-  if (player.health <= 0)
+  if (g_player.health <= 0)
     return;
 
-  dir = get_direction_from_keys();
+  dir = game_get_player_dir();
 
-  move_and_collide(&player.pos,
-                   &VEC2SCALE(&dir, delta * PLAYER_RUN_SPEED),
-                   sprite_radius[SPRITE_PLAYER]);
+  game_move_and_collide(&g_player.pos,
+                        &VEC2SCALE(&dir, delta * PLAYER_RUN_SPEED),
+                        g_sprite_radius[SPRITE_PLAYER]);
 }
 
-static inline void update_sprites(f32 delta) {
+static inline
+void update_sprites(f32 delta) {
   b8 collided;
   u32 i, j;
   f32 dist_from_other2, min_dist2;
@@ -214,14 +217,14 @@ static inline void update_sprites(f32 delta) {
   vec2f diff;
   struct sprite *s, *other;
 
-  for (i = 0; i < sprites.n; ++i) {
-    s = sprites.s + i;
+  for (i = 0; i < g_sprites.n; ++i) {
+    s = g_sprites.s + i;
 
-    s_radius = sprite_radius[s->desc.type];
+    s_radius = g_sprite_radius[s->desc.type];
 
-    collided = move_and_collide(&s->pos,
-                                &VEC2SCALE(&s->vel, delta),
-                                s_radius);
+    collided = game_move_and_collide(&s->pos,
+                                     &VEC2SCALE(&s->vel, delta),
+                                     s_radius);
     // disable bullet sprites on collision with a wall
     if (s->desc.type == SPRITE_BULLET)
       s->disabled = !s->disabled && collided;
@@ -246,8 +249,8 @@ static inline void update_sprites(f32 delta) {
     if (s->disabled || s->desc.type != SPRITE_PLAYER)
       continue;
 
-    for (j = 0; j < sprites.n; ++j) {
-      other = sprites.s + j;
+    for (j = 0; j < g_sprites.n; ++j) {
+      other = g_sprites.s + j;
 
       if (other->disabled || other == s)
         continue;
@@ -257,7 +260,7 @@ static inline void update_sprites(f32 delta) {
       diff = VEC2SUB(&other->pos, &s->pos);
 
       // compute minimum distance between the two sprites
-      min_dist2 = s_radius + sprite_radius[other->desc.id];
+      min_dist2 = s_radius + g_sprite_radius[other->desc.id];
       min_dist2 *= min_dist2;
 
       // compute the distance from the player and check if the sprite collided
@@ -274,12 +277,13 @@ static inline void update_sprites(f32 delta) {
   UNUSED(delta);
 }
 
-void gloom_update(f32 delta) {
+void game_update(f32 delta) {
   update_player_position(delta);
   update_sprites(delta);
 }
 
-static void draw_column(u8 cell_id, i32 x, const struct hit* hit) {
+static
+void draw_column(u8 cell_id, i32 x, const struct hit* hit) {
   i32 y, line_y, line_height;
   u32 line_color;
 
@@ -297,17 +301,18 @@ static void draw_column(u8 cell_id, i32 x, const struct hit* hit) {
   // fill column
   y = 0;
   for (; y < line_y; ++y)
-    set_pixel(x, y, COLOR(BLUE));
+    fb_set_pixel(x, y, COLOR(BLUE));
   if (cell_id) {
     line_y += line_height;
     for (; y < line_y; ++y)
-      set_pixel(x, y, line_color);
+      fb_set_pixel(x, y, line_color);
   }
   for (; y < FB_HEIGHT; ++y)
-    set_pixel(x, y, COLOR(BLACK));
+    fb_set_pixel(x, y, COLOR(BLACK));
 }
 
-static inline i32 get_y_end(struct sprite* s, u32 screen_h) {
+static inline
+i32 get_y_end(struct sprite* s, u32 screen_h) {
   switch (s->desc.type) {
     case SPRITE_BULLET:
       // we add a little offset to the bullet's vertical height so
@@ -320,14 +325,15 @@ static inline i32 get_y_end(struct sprite* s, u32 screen_h) {
   }
 }
 
-static inline const u8* get_player_tile(u32 x, u32 y) {
+static inline
+const u8* get_player_tile(u32 x, u32 y) {
   return &player_spritesheet[((y * PLAYER_NTILES_W) + x) *
                              (PLAYER_TILE_W * PLAYER_TILE_H)];
 }
 
-static void get_texture_info(struct sprite* s, b8* invert_x,
-                             u32* tex_w, u32* tex_h,
-                             const u8** tex, const u32** coltab) {
+static
+void get_texture_info(struct sprite* s, b8* invert_x, u32* tex_w, u32* tex_h,
+                      const u8** tex, const u32** coltab) {
   i32 rot;
 
   *invert_x = false;
@@ -362,7 +368,8 @@ static void get_texture_info(struct sprite* s, b8* invert_x,
   }
 }
 
-static void draw_sprite(struct sprite* s) {
+static
+void draw_sprite(struct sprite* s) {
   u32 screen_h, color, a;
   u32 tex_w, tex_h;
   u32 uvw, uvh, uvx, uvy;
@@ -372,7 +379,7 @@ static void draw_sprite(struct sprite* s) {
   const u32* coltab;
   b8 invert_x = false;
 
-  screen_h = (f32)sprite_dims[s->desc.type].y * s->inv_depth;
+  screen_h = (f32)g_sprite_dims[s->desc.type].y * s->inv_depth;
 
   // determine screen coordinates of the sprite
   x_start = s->screen_x - s->screen_halfw;
@@ -386,7 +393,7 @@ static void draw_sprite(struct sprite* s) {
 
   get_texture_info(s, &invert_x, &tex_w, &tex_h, &tex, &coltab);
 
-  a = get_alpha_mask();
+  a = color_get_alpha_mask();
   // draw the sprite
   for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
     // discard stripe if there's a wall closer to the camera
@@ -401,32 +408,33 @@ static void draw_sprite(struct sprite* s) {
       uvy = (f32)((y - y_start) * tex_h) / uvh;
       color = tex[uvx + uvy * tex_w];
       if (color)
-        set_pixel(x, y, coltab[color] | a);
+        fb_set_pixel(x, y, coltab[color] | a);
     }
   }
 }
 
-static inline void render_scene(void) {
+static inline
+void render_scene(void) {
   u8 cell_id;
   i32 x;
   f32 cam_x;
   vec2f ray_dir;
   struct hit hit;
 
-  if (camera.smoothing) {
+  if (g_camera.smoothing) {
     // interpolate camera position with real position
-    camera.pos.x = lerp(CAMERA_POS_INTERP, camera.pos.x, player.pos.x);
-    camera.pos.y = lerp(CAMERA_POS_INTERP, camera.pos.y, player.pos.y);
+    g_camera.pos.x = lerp(CAMERA_POS_INTERP, g_camera.pos.x, g_player.pos.x);
+    g_camera.pos.y = lerp(CAMERA_POS_INTERP, g_camera.pos.y, g_player.pos.y);
   } else
-    camera.pos = player.pos;
+    g_camera.pos = g_player.pos;
 
   for (x = 0; x < FB_WIDTH; ++x) {
     // compute ray direction
     cam_x = (2.0f * ((f32)x / FB_WIDTH)) - 1.0f;
-    ray_dir.x = player.dir.x + camera.plane.x * cam_x;
-    ray_dir.y = player.dir.y + camera.plane.y * cam_x;
+    ray_dir.x = g_player.dir.x + g_camera.plane.x * cam_x;
+    ray_dir.y = g_player.dir.y + g_camera.plane.y * cam_x;
     // trace ray with DDA
-    cell_id = trace_ray(&camera.pos, &ray_dir, camera.dof, &hit);
+    cell_id = trace_ray(&g_camera.pos, &ray_dir, g_camera.dof, &hit);
     // store distance (squared) in z-buffer
     z_buf[x] = hit.dist * hit.dist;
 
@@ -434,14 +442,15 @@ static inline void render_scene(void) {
   }
 }
 
-static inline void render_sprites(void) {
+static inline
+void render_sprites(void) {
   vec2f proj, diff, dir_to_s;
   u32 i, j, k, n;
   struct sprite *s, *on_screen_sprites[MAX_SPRITES];
 
   n = 0;
-  for (i = 0; i < sprites.n; ++i) {
-    s = sprites.s + i;
+  for (i = 0; i < g_sprites.n; ++i) {
+    s = g_sprites.s + i;
 
     // do not render disabled sprites
     if (s->disabled)
@@ -449,14 +458,14 @@ static inline void render_sprites(void) {
 
     // do not render the tracked sprite
     // FIXME: find a better way to do this maybe?
-    if (s == tracked_sprite)
+    if (s == g_tracked_sprite_get())
       continue;
 
-    diff = VEC2SUB(&s->pos, &camera.pos);
+    diff = VEC2SUB(&s->pos, &g_camera.pos);
 
     // compute coordinates in camera space
-    proj.x = camera.inv_mat.m11 * diff.x + camera.inv_mat.m12 * diff.y;
-    proj.y = camera.inv_mat.m21 * diff.x + camera.inv_mat.m22 * diff.y;
+    proj.x = g_camera.inv_mat.m11 * diff.x + g_camera.inv_mat.m12 * diff.y;
+    proj.y = g_camera.inv_mat.m21 * diff.x + g_camera.inv_mat.m22 * diff.y;
 
     // sprite is behind the camera, ignore it
     if (proj.y < 0.0f)
@@ -470,7 +479,7 @@ static inline void render_sprites(void) {
     // compute screen width (we divide by two since
     // we always use the half screen width)
     s->screen_halfw =
-      (i32)((f32)sprite_dims[s->desc.type].x * s->inv_depth) >> 1;
+      (i32)((f32)g_sprite_dims[s->desc.type].x * s->inv_depth) >> 1;
 
     // sprite is not on screen, ignore it
     if (s->screen_x + s->screen_halfw < 0 ||
@@ -484,9 +493,10 @@ static inline void render_sprites(void) {
       // only do this for player sprites,
       // since they're the only sprites that need it
       dir_to_s = vec2f_normalized(&diff);
-      s->rel_rot = acos(dir_to_s.x * player.dir.x + dir_to_s.y * player.dir.y);
+      s->rel_rot =
+        acos(dir_to_s.x * g_player.dir.x + dir_to_s.y * g_player.dir.y);
       s->rel_rot *= signf(proj.x);
-      s->rel_rot += player.rot;
+      s->rel_rot += g_player.rot;
     }
 
     // look for index to insert the new sprite
@@ -508,7 +518,8 @@ static inline void render_sprites(void) {
     draw_sprite(on_screen_sprites[i]);
 }
 
-static inline u32 invert_color(u32 color) {
+static inline
+u32 invert_color(u32 color) {
   union {
     u32 u;
     struct {
@@ -526,10 +537,11 @@ static inline u32 invert_color(u32 color) {
   comps.b = 0xFF - comps.b;
   comps.a = 0;
 
-  return comps.u | get_alpha_mask();
+  return comps.u | color_get_alpha_mask();
 }
 
-static inline void render_crosshair(void) {
+static inline
+void render_crosshair(void) {
   u32 i, j;
   u32 x, y;
   u32 px;
@@ -549,77 +561,84 @@ static inline void render_crosshair(void) {
       if (draw_x || draw_y) {
         x = coords.x + i;
         y = coords.y + j;
-        px = get_pixel(x, y);
+        px = fb_get_pixel(x, y);
         px = invert_color(px);
-        set_pixel(x, y, px);
+        fb_set_pixel(x, y, px);
       }
     }
   }
 }
 
-static inline void render_hud(void) {
+static inline
+void render_hud(void) {
   u32 health_bar_w, health_bar_c, x;
   b8 got_damage;
   const char health_lbl[] = "H";
 
   // check if the player received damage
-  got_damage = display_health != player.health;
+  got_damage = display_health != g_player.health;
 
   x = 8 + STRING_WIDTH_IMM(health_lbl) + 4;
   if (got_damage)
     // if the player received damage, draw a rectangle around the health
     // bar to draw the attention of the player
-    draw_rect(4, 4, x + HEALTH_BAR_WIDTH, 8 + STRING_HEIGHT, COLOR(MAGENTA));
+    ui_draw_rect(4, 4, x + HEALTH_BAR_WIDTH, 8 + STRING_HEIGHT, COLOR(MAGENTA));
 
   health_bar_c = COLOR(RED);
-  draw_string_with_color(8, 8, health_lbl, health_bar_c);
+  ui_draw_string_with_color(8, 8, health_lbl, health_bar_c);
 
-  health_bar_w = (f32)(player.health * HEALTH_BAR_WIDTH) / PLAYER_MAX_HEALTH;
-  draw_rect(x, 8, health_bar_w, STRING_HEIGHT - 1, health_bar_c);
+  health_bar_w = (f32)(g_player.health * HEALTH_BAR_WIDTH) / PLAYER_MAX_HEALTH;
+  ui_draw_rect(x, 8, health_bar_w, STRING_HEIGHT - 1, health_bar_c);
 
   if (got_damage) {
     // if the player received damage, animate the health difference
     x += health_bar_w;
-    health_bar_w = (f32)((display_health - player.health) * HEALTH_BAR_WIDTH)
+    health_bar_w = (f32)((display_health - g_player.health) * HEALTH_BAR_WIDTH)
                     / PLAYER_MAX_HEALTH;
-    draw_rect(x, 8, health_bar_w, STRING_HEIGHT - 1, COLOR(WHITE));
+    ui_draw_rect(x, 8, health_bar_w, STRING_HEIGHT - 1, COLOR(WHITE));
 
-    display_health = lerp(HEALTH_BAR_LAG, player.health, display_health);
+    display_health = lerp(HEALTH_BAR_LAG, g_player.health, display_health);
   }
 }
 
-static inline void render_minimap(void) {
+static inline
+void render_minimap(void) {
   u32 minimap_x, minimap_y;
   u32 i, j;
   u32 x, y;
   u8 cell_id;
 
-  if (map.tiles == NULL)
+  if (g_map.tiles == NULL)
     return;
 
-  minimap_x = FB_WIDTH - (map.w * MINIMAP_TILE_W) - 4;
+  minimap_x = FB_WIDTH - (g_map.w * MINIMAP_TILE_W) - 4;
   minimap_y = 4;
 
-  draw_rect(minimap_x, minimap_y, map.w * MINIMAP_TILE_W, map.h * MINIMAP_TILE_H, COLOR(WHITE));
+  ui_draw_rect(minimap_x, minimap_y,
+               g_map.w * MINIMAP_TILE_W, g_map.h * MINIMAP_TILE_H,
+               COLOR(WHITE));
 
-  for (i = 0; i < map.w; ++i) {
-    for (j = 0; j < map.h; ++j) {
-      cell_id = map.tiles[i + j * map.w];
+  for (i = 0; i < g_map.w; ++i) {
+    for (j = 0; j < g_map.h; ++j) {
+      cell_id = g_map.tiles[i + j * g_map.w];
       if (cell_id) {
         x = i * MINIMAP_TILE_W;
         y = j * MINIMAP_TILE_H;
-        draw_rect(minimap_x + x, minimap_y + y, MINIMAP_TILE_W, MINIMAP_TILE_H, COLOR(GRAY));
+        ui_draw_rect(minimap_x + x, minimap_y + y,
+                     MINIMAP_TILE_W, MINIMAP_TILE_H,
+                     COLOR(GRAY));
       }
     }
   }
 
-  draw_rect(minimap_x + player.pos.x * MINIMAP_TILE_W - MINIMAP_TILE_W / 4,
-            minimap_y + player.pos.y * MINIMAP_TILE_H - MINIMAP_TILE_H / 4,
-            MINIMAP_TILE_W / 2, MINIMAP_TILE_H / 2,
+  ui_draw_rect(
+            minimap_x + g_player.pos.x * MINIMAP_TILE_W - (MINIMAP_TILE_W >> 2),
+            minimap_y + g_player.pos.y * MINIMAP_TILE_H - (MINIMAP_TILE_H >> 2),
+            MINIMAP_TILE_W >> 1, MINIMAP_TILE_H >> 1,
             COLOR(RED));
 }
 
-void gloom_render(void) {
+void game_render(void) {
   render_scene();
   render_sprites();
   render_crosshair();
@@ -627,15 +646,15 @@ void gloom_render(void) {
   render_minimap();
 }
 
-void gloom_init(void) {
-  camera.pos = player.pos;
+void game_init(void) {
+  g_camera.pos = g_player.pos;
   // may seem counter intuitive, you should look into
   // the hello packet handler in multiplayer.c
-  set_player_rot(player.rot);
-  display_health = player.health = PLAYER_MAX_HEALTH;
+  game_set_player_rot(g_player.rot);
+  display_health = g_player.health = PLAYER_MAX_HEALTH;
 }
 
-void gloom_tick(f32 delta) {
-  gloom_update(delta);
-  gloom_render();
+void game_tick(f32 delta) {
+  game_update(delta);
+  game_render();
 }

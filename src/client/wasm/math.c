@@ -1,6 +1,7 @@
-#include <math.h>
+#include <gloom/math.h>
+
 #define DECLARE_TABLE
-#include <cos_table.h>
+#include "cos_table.h"
 
 f32 inv_sqrt(f32 n) {
   i32 i;

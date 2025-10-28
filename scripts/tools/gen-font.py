@@ -19,8 +19,8 @@ num_chars = min(len(char_data) // char_size, 256)
 
 # generate defines
 font_h = f"""
-#ifndef __DRAW_H__
-#error "include draw.h instead of font.h"
+#ifndef UI_H_
+#error "include ui.h instead of font.h"
 #endif
 
 #define FONT_WIDTH  8

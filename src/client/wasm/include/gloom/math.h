@@ -1,7 +1,8 @@
-#ifndef __MATH_H__
-#define __MATH_H__
+#ifndef MATH_H_
+#define MATH_H_
 
-#include <types.h>
+#include <gloom/env.h>
+#include <gloom/types.h>
 
 #define SQRT2     1.4142135623730951f
 #define INV_SQRT2 0.7071067811865475f
@@ -77,14 +78,19 @@ static inline vec2f vec2f_normalized(vec2f* vec) {
 }
 
 f32 cos(f32 angle);
-// this should be in env.h, but it feels better to put it here
-f32 acos(f32 value);
 
-static inline f32 sin(f32 angle) {
+static inline
+f32 acos(f32 value) {
+  return platform_acos(value);
+}
+
+static inline
+f32 sin(f32 angle) {
     return cos(angle - HALF_PI);
 }
 
-static inline f32 tan(f32 angle) {
+static inline
+f32 tan(f32 angle) {
     return sin(angle) / cos(angle);
 }
 

@@ -1,4 +1,4 @@
-#include <libc.h>
+#include <gloom/libc.h>
 
 extern void __heap_base;
 
@@ -20,7 +20,7 @@ static inline void buf_putc(struct printf_buf* pb, char c) {
   if (pb->end >= pb->len) {
     if (pb->fd < 0)
       return;
-    write(pb->fd, pb->buf, pb->len);
+    platform_write(pb->fd, pb->buf, pb->len);
     pb->end = 0;
   }
   pb->buf[pb->end++] = c;
@@ -28,7 +28,7 @@ static inline void buf_putc(struct printf_buf* pb, char c) {
 
 static inline void buf_flush(struct printf_buf* pb) {
   if (pb->end > 0 && pb->fd > 0)
-    write(pb->fd, pb->buf, pb->end);
+    platform_write(pb->fd, pb->buf, pb->end);
 }
 
 static inline void buf_putr(struct printf_buf* pb, const char* buf, u32 len) {
@@ -197,7 +197,7 @@ void vfdprintf(int fd, const char* fmt, va_list ap) {
 void* malloc(u32 size) {
   void* ptr = heap_top;
   if (heap_size < size)
-    heap_size += request_mem(size);
+    heap_size += platform_request_mem(size);
   heap_top += size;
   heap_size -= size;
   return ptr;
@@ -206,4 +206,22 @@ void* malloc(u32 size) {
 void free_all(void) {
   heap_size += heap_top - &__heap_base;
   heap_top = &__heap_base;
+}
+
+void memset(void* p, u8 b, u32 l) {
+  u8* sp;
+  u32 bb, l4 = l >> 2, *bp = p;
+
+  if (l4 > 0) {
+    bb = (u32)b << 8 | b;
+    bb |= bb << 16;
+    for (; l4 > 0; --l4)
+      *(bp++) = bb;
+    l &= 3;
+    sp = (u8*)bp;
+  } else
+    sp = p;
+
+  for (; l > 0; --l)
+    *(sp++) = b;
 }

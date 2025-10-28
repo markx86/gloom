@@ -1,16 +1,18 @@
-#include <client.h>
-#include <globals.h>
-#include <ui.h>
+#include <gloom/client.h>
+#include <gloom/globals.h>
+#include <gloom/ui.h>
 
-#define FOREGROUND_COLOR SOLIDCOLOR(YELLOW)
-#define BACKGROUND_COLOR SOLIDCOLOR(BLUE)
+#define FOREGROUND_COLOR SOLID_COLOR(YELLOW)
+#define BACKGROUND_COLOR SOLID_COLOR(BLUE)
 
-static void save_settings(void);
+static
+void save_settings(void);
 
-static void on_back_clicked(void) {
-  apply_settings();
+static
+void on_back_clicked(void) {
+  g_settings_apply();
   save_settings();
-  switch_to_state(in_game() ? STATE_PAUSE : STATE_WAITING);
+  client_switch_state(multiplayer_is_in_game() ? CLIENT_PAUSE : CLIENT_WAITING);
 }
 
 enum option_control {
@@ -29,9 +31,10 @@ static struct component comps[] = {
   [CAMERA_SMOOTHING] = { .type = UICOMP_CHECKBOX, .text = "> camera smoothing" },
 };
 
-static void save_settings(void) {
+static
+void save_settings(void) {
   // save settings to local storage
-  store_settings(comps[DRAWDIST_SLIDER].value,
+  platform_settings_store(comps[DRAWDIST_SLIDER].value,
                  comps[FOV_SLIDER].value,
                  comps[MOUSESENS_SLIDER].value,
                  comps[CAMERA_SMOOTHING].ticked);
@@ -39,39 +42,41 @@ static void save_settings(void) {
 
 // return slider value between min and max
 // FIXME: should this be in the ui module?
-static inline f32 slider_value(enum option_control ctrl, f32 min, f32 max) {
+static inline
+f32 slider_value(enum option_control ctrl, f32 min, f32 max) {
   return min + (max - min) * comps[ctrl].value;
 }
 
-void apply_settings(void) {
-  camera.dof = slider_value(DRAWDIST_SLIDER, MIN_CAMERA_DOF, MAX_CAMERA_DOF);
-  camera.smoothing = comps[CAMERA_SMOOTHING].ticked;
-  set_camera_fov(DEG2RAD(slider_value(FOV_SLIDER, MAX_CAMERA_FOV, MIN_CAMERA_FOV)));
-  mouse_sensitivity = slider_value(MOUSESENS_SLIDER, MIN_MOUSE_SENS, MAX_MOUSE_SENS);
+void g_settings_apply(void) {
+  g_camera.dof = slider_value(DRAWDIST_SLIDER, MIN_CAMERA_DOF, MAX_CAMERA_DOF);
+  g_camera.smoothing = comps[CAMERA_SMOOTHING].ticked;
+  game_set_camera_fov(DEG2RAD(slider_value(FOV_SLIDER, MAX_CAMERA_FOV, MIN_CAMERA_FOV)));
+  g_mouse_sensitivity_set(slider_value(MOUSESENS_SLIDER, MIN_MOUSE_SENS, MAX_MOUSE_SENS));
 }
 
-void load_settings(f32 drawdist, f32 fov, f32 mousesens, b8 camsmooth) {
+void gloom_settings_load(f32 drawdist, f32 fov, f32 mousesens, b8 camsmooth) {
   comps[DRAWDIST_SLIDER].value = drawdist;
   comps[FOV_SLIDER].value = fov;
   comps[MOUSESENS_SLIDER].value = mousesens;
   comps[CAMERA_SMOOTHING].ticked = camsmooth != 0;
-  apply_settings();
+  g_settings_apply();
 }
 
-void load_defaults(void) {
-  load_settings(0.66f, 0.5f, 0.5f, true);
+void gloom_settings_defaults(void) {
+  gloom_settings_load(0.66f, 0.5f, 0.5f, true);
 }
 
-static void on_enter(void) {
+static
+void on_enter(void) {
   u32 i;
   struct component* c;
 
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
-  clear_screen();
-  draw_title(32, 32, "options");
+  ui_clear_screen();
+  ui_draw_title(32, 32, "options");
 
   // initialize ui components
-  component_on_enter(comps, ARRLEN(comps));
+  ui_on_enter(comps, ARRLEN(comps));
   for (i = 1; i < ARRLEN(comps); ++i) {
     c = &comps[i];
     if (c->type != UICOMP_BUTTON)
@@ -79,32 +84,36 @@ static void on_enter(void) {
   }
 }
 
-static void on_tick(f32 delta) {
+static
+void on_tick(f32 delta) {
   u32 i;
 
   UNUSED(delta);
 
   // draw ui components
   for (i = 1; i < ARRLEN(comps); ++i)
-    draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * (i-1), comps + i);
-  draw_component(48, FB_HEIGHT - 32 - STRING_HEIGHT, &comps[BACK_BUTTON]);
+    ui_draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * (i-1), comps + i);
+  ui_draw_component(48, FB_HEIGHT - 32 - STRING_HEIGHT, &comps[BACK_BUTTON]);
 }
 
-static void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
-  component_on_mouse_moved(x, y, dx, dy, comps, ARRLEN(comps));
+static
+void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
+  ui_on_mouse_moved(x, y, dx, dy, comps, ARRLEN(comps));
 }
 
-static void on_mouse_down(u32 x, u32 y, u32 button) {
+static
+void on_mouse_down(u32 x, u32 y, u32 button) {
   UNUSED(button);
-  component_on_mouse_down(x, y, comps, ARRLEN(comps));
+  ui_on_mouse_down(x, y, comps, ARRLEN(comps));
 }
 
-static void on_mouse_up(u32 x, u32 y, u32 button) {
+static
+void on_mouse_up(u32 x, u32 y, u32 button) {
   UNUSED(button);
-  component_on_mouse_up(x, y, comps, ARRLEN(comps));
+  ui_on_mouse_up(x, y, comps, ARRLEN(comps));
 }
 
-const struct state_handlers options_state = {
+const struct state_handlers g_options_state = {
   .on_enter = on_enter,
   .on_tick = on_tick,
   .on_mouse_moved = on_mouse_moved,

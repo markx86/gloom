@@ -1,12 +1,13 @@
 #define DEFINE_FONT
-#include <ui.h>
+#include <gloom/ui.h>
 
 #define SLIDER_THICKNESS 8
 #define PAD              2
 
-u32 __fg_color = 0xFFFFFFFF, __bg_color = 0xFF000000;
+u32 _fg_color = 0xFFFFFFFF, _bg_color = 0xFF000000;
 
-static inline b8 can_draw(u32* x, u32* y, u32* w, u32* h) {
+static inline
+b8 can_draw(u32* x, u32* y, u32* w, u32* h) {
   if (*x >= FB_WIDTH || *y >= FB_HEIGHT)
     return false;
   if (*x + *w >= FB_WIDTH)
@@ -16,7 +17,7 @@ static inline b8 can_draw(u32* x, u32* y, u32* w, u32* h) {
   return true;
 }
 
-void draw_rect(u32 x, u32 y, u32 w, u32 h, u32 color) {
+void ui_draw_rect(u32 x, u32 y, u32 w, u32 h, u32 color) {
   u32 w1;
 
   if (!can_draw(&x, &y, &w, &h))
@@ -24,53 +25,13 @@ void draw_rect(u32 x, u32 y, u32 w, u32 h, u32 color) {
 
   for (; h-- > 0; ++y) {
     for (w1 = 0; w1 < w; ++w1)
-      set_pixel(x + w1, y, color);
+      fb_set_pixel(x + w1, y, color);
   }
 }
 
-/*
-static inline void draw_char(u32 x, u32 y, u32 w, u32 h, u32 scale, u32 color, char c) {
-  u32 w1, h1;
-  char c1;
-  const char* char_data;
-
-  if (!can_draw(&x, &y, &w, &h))
-    return;
-
-  char_data = font[(u8)c];
-  for (h1 = 0; h1 < h; ++h1) {
-    c1 = char_data[h1 / scale];
-    for (w1 = 0; w1 < w; ++w1) {
-      if ((c1 << (w1 / scale)) & (1 << (FONT_WIDTH - 1)))
-        fb[(x + w1) + (y + h1) * FB_WIDTH] = color;
-    }
-  }
-}
-
-void draw_text(u32 x, u32 y, u32 scale, u32 color, const char* text) {
-  u32 w1, w, h, text_w, end, l;
-
-  l = strlen(text);
-
-  h = FONT_HEIGHT * scale;
-  w = FONT_WIDTH * scale;
-
-  text_w = w * l;
-
-  if (!can_draw(&x, &y, &text_w, &h))
-    return;
-
-  end = x + text_w;
-  while (*text && x < end) {
-    w1 = end - x;
-    w1 = MIN(w1, w);
-    draw_char(x, y, w1, h, scale, color, *(text++));
-    x += w;
-  }
-}
-*/
-
-static void write_text_with_color(u32* x, u32* y, u32 scale, u32 color, const char* text) {
+static
+void write_text_with_color(u32* x, u32* y, u32 scale, u32 color,
+                           const char* text) {
   u32 start_x;
   u32 px, py;
   u32 w1, w;
@@ -104,7 +65,7 @@ static void write_text_with_color(u32* x, u32* y, u32 scale, u32 color, const ch
           px = (*x + w1);
           py = (*y + h1);
           if (px < FB_WIDTH && py < FB_HEIGHT)
-            set_pixel(px, py, color);
+            fb_set_pixel(px, py, color);
         }
       }
     }
@@ -112,20 +73,20 @@ static void write_text_with_color(u32* x, u32* y, u32 scale, u32 color, const ch
   }
 }
 
-void draw_component(u32 x, u32 y, struct component* c) {
+void ui_draw_component(u32 x, u32 y, struct component* c) {
   u32 bg_color, fg_color;
   i32 pad;
   char checkbox_tick[] = "[ ]";
 
   if (c->state != UICOMP_IDLE) {
-    bg_color = __fg_color;
-    fg_color = __bg_color;
+    bg_color = _fg_color;
+    fg_color = _bg_color;
   } else {
-    bg_color = __bg_color;
-    fg_color = __fg_color;
+    bg_color = _bg_color;
+    fg_color = _fg_color;
   }
 
-  draw_rect(c->tl.x, c->tl.y, c->br.x - c->tl.x, c->br.y - c->tl.y, bg_color);
+  ui_draw_rect(c->tl.x, c->tl.y, c->br.x - c->tl.x, c->br.y - c->tl.y, bg_color);
 
   c->tl.x = x - PAD;
   c->tl.y = y - PAD;
@@ -147,7 +108,7 @@ void draw_component(u32 x, u32 y, struct component* c) {
     pad = c->pad - SLIDER_WIDTH - PAD;
     pad = MAX(pad, 0) + FONT_WIDTH;
 
-    draw_rect(
+    ui_draw_rect(
       c->br.x + pad, y + ((FONT_HEIGHT - SLIDER_THICKNESS) >> 1),
       SLIDER_WIDTH * c->value, SLIDER_THICKNESS,
       fg_color);
@@ -158,15 +119,15 @@ void draw_component(u32 x, u32 y, struct component* c) {
   c->br.y = y + FONT_HEIGHT + PAD;
 }
 
-void draw_string(u32 x, u32 y, const char* text) {
-  write_text_with_color(&x, &y, 1, __fg_color, text);
+void ui_draw_string(u32 x, u32 y, const char* text) {
+  write_text_with_color(&x, &y, 1, _fg_color, text);
 }
 
-void draw_string_with_color(u32 x, u32 y, const char* text, u32 color) {
+void ui_draw_string_with_color(u32 x, u32 y, const char* text, u32 color) {
   write_text_with_color(&x, &y, 1, color, text);
 }
 
-void draw_title(u32 x, u32 y, const char* text) {
+void ui_draw_title(u32 x, u32 y, const char* text) {
   char pad[32];
   u32 end, xx;
 
@@ -181,17 +142,97 @@ void draw_title(u32 x, u32 y, const char* text) {
   pad[0] = '\xd2';
   pad[end] = '\xd3';
   xx = x;
-  write_text_with_color(&xx, &y, 2, __fg_color, pad);
+  write_text_with_color(&xx, &y, 2, _fg_color, pad);
   y += FONT_HEIGHT << 1;
 
   xx = x;
-  write_text_with_color(&xx, &y, 2, __fg_color, "\xd1 ");
-  write_text_with_color(&xx, &y, 2, __fg_color, text);
-  write_text_with_color(&xx, &y, 2, __fg_color, " \xd1");
+  write_text_with_color(&xx, &y, 2, _fg_color, "\xd1 ");
+  write_text_with_color(&xx, &y, 2, _fg_color, text);
+  write_text_with_color(&xx, &y, 2, _fg_color, " \xd1");
   y += FONT_HEIGHT << 1;
 
   pad[0] = '\xd4';
   pad[end] = '\xd5';
   xx = x;
-  write_text_with_color(&xx, &y, 2, __fg_color, pad);
+  write_text_with_color(&xx, &y, 2, _fg_color, pad);
+}
+
+static inline
+b8 component_is_mouse_over(u32 x, u32 y, struct component* c) {
+  return (x >= c->tl.x && y >= c->tl.y && x <= c->br.x && y <= c->br.y);
+}
+
+void ui_on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy,
+                       struct component* comps, u32 n) {
+  u32 i;
+  b8 interacting;
+  struct component* c;
+
+  UNUSED(dy);
+
+  // if the user is interacting with a ui element, do not process
+  // other hover events
+  interacting = false;
+  for (i = 0; i < n; ++i) {
+    if (comps[i].state == UICOMP_PRESSED) {
+      interacting = true;
+      break;
+    }
+  }
+
+  for (i = 0; i < n; ++i) {
+    c = &comps[i];
+    if (c->state != UICOMP_PRESSED)
+      c->state = !interacting && component_is_mouse_over(x, y, c) ? UICOMP_HOVER : UICOMP_IDLE;
+    else if (c->type == UICOMP_SLIDER) {
+      c->value += (f32)dx / (SLIDER_WIDTH << 1);
+      if (c->value > 1.0f)
+        c->value = 1.0f;
+      else if (c->value < 0.0f)
+        c->value = 0.0f;
+    }
+  }
+}
+
+void ui_on_mouse_down(u32 x, u32 y, struct component* comps, u32 n) {
+  u32 i;
+  struct component* c;
+
+  for (i = 0; i < n; ++i) {
+    c = &comps[i];
+    if (c->state == UICOMP_HOVER && component_is_mouse_over(x, y, c))
+      c->state = UICOMP_PRESSED;
+  }
+}
+
+void ui_on_mouse_up(u32 x, u32 y, struct component* comps, u32 n) {
+  u32 i;
+  struct component* c;
+
+  for (i = 0; i < n; ++i) {
+    c = &comps[i];
+    if (c->state == UICOMP_PRESSED) {
+      if (component_is_mouse_over(x, y, c)) {
+        switch (c->type) {
+          case UICOMP_BUTTON:
+            if (c->on_click)
+              c->on_click();
+            break;
+          case UICOMP_CHECKBOX:
+            c->ticked = !c->ticked;
+            break;
+          case UICOMP_SLIDER:
+            break;
+        }
+        c->state = UICOMP_HOVER;
+      } else
+        c->state = UICOMP_IDLE;
+    }
+  }
+}
+
+void ui_on_enter(struct component* comps, u32 n) {
+  u32 i;
+  for (i = 0; i < n; ++i)
+    comps[i].state = UICOMP_IDLE;
 }

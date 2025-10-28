@@ -135,7 +135,7 @@ static const u8 bullet_texture[BULLET_TEXTURE_W * BULLET_TEXTURE_H] = {
 
 
 sprites_c = f"""
-#include <types.h>
+#include <gloom/types.h>
 {gen_player_spritesheet()}
 {gen_bullet_texture()}
 """

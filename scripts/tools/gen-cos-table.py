@@ -14,7 +14,7 @@ for i in range(samples):
     cos_table.append(math.cos(a))
 cos_arr = "f,".join(str(v) for v in cos_table)
 
-src = f"""#include <types.h>
+src = f"""#include <gloom/types.h>
 
 #define SAMPLES         {samples}
 #define INV_COS_STEP    {1 / STEP}
