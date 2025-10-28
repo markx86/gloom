@@ -22,14 +22,14 @@ mkdir -p $gendir
 ./scripts/tools/gen-sprites.py $gendir
 
 # glob .c files
-srcs=$(find $wasmdir -type f -name '*.c')
+srcs=$(find $wasmdir/gloom-core/src -type f -name '*.c')
 
 # build and link
 clang \
   --target=wasm32 \
   -Wall \
   -Wextra \
-  -I$wasmdir/include \
+  -I$wasmdir/gloom-core/include \
   -I$gendir \
   -O3 \
   -flto \

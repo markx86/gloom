@@ -1,0 +1,3 @@
+[submodule "src/client/wasm/gloom-core"]
+	path = src/client/wasm/gloom-core
+	url = https://github.com/markx86/gloom-core.git
