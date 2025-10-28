@@ -38,7 +38,7 @@ clang \
   -Wl,--lto-O3 \
   -Wl,--no-entry \
   -Wl,--export-all \
-  -Wl,--allow-undefined-file=$wasmdir/env.syms \
+  -Wl,--allow-undefined-file=$wasmdir/platform.syms \
   $extra_flags \
   -o $outpath \
   $srcs

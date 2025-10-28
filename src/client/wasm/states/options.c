@@ -1,5 +1,7 @@
 #include <gloom/client.h>
 #include <gloom/globals.h>
+#include <gloom/game.h>
+#include <gloom/multiplayer.h>
 #include <gloom/ui.h>
 
 #define FOREGROUND_COLOR SOLID_COLOR(YELLOW)
@@ -33,15 +35,16 @@ static struct component comps[] = {
 
 static
 void save_settings(void) {
-  // save settings to local storage
+  /* Save settings to local storage */
   platform_settings_store(comps[DRAWDIST_SLIDER].value,
                  comps[FOV_SLIDER].value,
                  comps[MOUSESENS_SLIDER].value,
                  comps[CAMERA_SMOOTHING].ticked);
 }
 
-// return slider value between min and max
-// FIXME: should this be in the ui module?
+/* Return slider value between min and max.
+ * FIXME: Should this be in the ui module?
+ */
 static inline
 f32 slider_value(enum option_control ctrl, f32 min, f32 max) {
   return min + (max - min) * comps[ctrl].value;
@@ -50,8 +53,8 @@ f32 slider_value(enum option_control ctrl, f32 min, f32 max) {
 void g_settings_apply(void) {
   g_camera.dof = slider_value(DRAWDIST_SLIDER, MIN_CAMERA_DOF, MAX_CAMERA_DOF);
   g_camera.smoothing = comps[CAMERA_SMOOTHING].ticked;
-  game_set_camera_fov(DEG2RAD(slider_value(FOV_SLIDER, MAX_CAMERA_FOV, MIN_CAMERA_FOV)));
-  g_mouse_sensitivity_set(slider_value(MOUSESENS_SLIDER, MIN_MOUSE_SENS, MAX_MOUSE_SENS));
+  g_mouse_sensitivity = slider_value(MOUSESENS_SLIDER, MIN_MOUSE_SENS, MAX_MOUSE_SENS);
+  game_camera_set_fov(DEG2RAD(slider_value(FOV_SLIDER, MAX_CAMERA_FOV, MIN_CAMERA_FOV)));
 }
 
 void gloom_settings_load(f32 drawdist, f32 fov, f32 mousesens, b8 camsmooth) {
@@ -75,7 +78,7 @@ void on_enter(void) {
   ui_clear_screen();
   ui_draw_title(32, 32, "options");
 
-  // initialize ui components
+  /* Initialize UI components */
   ui_on_enter(comps, ARRLEN(comps));
   for (i = 1; i < ARRLEN(comps); ++i) {
     c = &comps[i];
@@ -90,7 +93,7 @@ void on_tick(f32 delta) {
 
   UNUSED(delta);
 
-  // draw ui components
+  /* draw UI components */
   for (i = 1; i < ARRLEN(comps); ++i)
     ui_draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * (i-1), comps + i);
   ui_draw_component(48, FB_HEIGHT - 32 - STRING_HEIGHT, &comps[BACK_BUTTON]);

@@ -1,12 +1,7 @@
 #ifndef CLIENT_H_
 #define CLIENT_H_
 
-#include <gloom/game.h>
-#include <gloom/multiplayer.h>
-#include <gloom/libc.h>
-#include <gloom/color.h>
-#include <gloom/fb.h>
-#include <gloom/gloom.h>
+#include <gloom/types.h>
 
 enum client_state {
   CLIENT_ERROR,

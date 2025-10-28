@@ -1,7 +1,7 @@
 import sys
 from os import path, makedirs
 
-assert len(sys.argv) >= 2, f"USAGE: {sys.argv[1]} OUTPUT_DIR"
+assert len(sys.argv) >= 2, f"USAGE: {sys.argv[0]} OUTPUT_DIR"
 
 SCRIPT_DIR = path.dirname(path.abspath(sys.argv[0]))
 OUTPUT_DIR = path.abspath(sys.argv[1])

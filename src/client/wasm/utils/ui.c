@@ -1,5 +1,6 @@
 #define DEFINE_FONT
 #include <gloom/ui.h>
+#include <gloom/libc.h>
 
 #define SLIDER_THICKNESS 8
 #define PAD              2
@@ -132,7 +133,7 @@ void ui_draw_title(u32 x, u32 y, const char* text) {
   u32 end, xx;
 
   end = strlen(text) + 2;
-  // padding does not fit into buffer, return
+  /* Padding does not fit into buffer, return */
   if (end + 2 >= sizeof(pad))
     return;
   pad[end + 2] = '\0';
@@ -170,8 +171,9 @@ void ui_on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy,
 
   UNUSED(dy);
 
-  // if the user is interacting with a ui element, do not process
-  // other hover events
+  /* If the user is interacting with a ui element, do not process
+   * other hover events.
+   */
   interacting = false;
   for (i = 0; i < n; ++i) {
     if (comps[i].state == UICOMP_PRESSED) {

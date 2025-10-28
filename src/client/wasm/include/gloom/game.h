@@ -1,7 +1,6 @@
 #ifndef GAME_H_
 #define GAME_H_
 
-#include <gloom/types.h>
 #include <gloom/math.h>
 
 #define PLAYER_RUN_SPEED    3.5f
@@ -44,10 +43,10 @@ enum sprite_type {
 };
 
 struct sprite_desc {
-  u32 type  : 8; // sprite type
-  u32 id    : 8; // sprite id
-  u32 owner : 8; // instantiator id
-  u32 field : 8; // generic field used for extra data in requests
+  u32 type  : 8; /* Sprite type */
+  u32 id    : 8; /* Sprite ID */
+  u32 owner : 8; /* Instantiator ID */
+  u32 field : 8; /* Generic field used for extra data in requests */
 };
 
 struct sprite {
@@ -91,19 +90,15 @@ struct hit {
   b8 vertical;
 };
 
-extern struct player g_player;
-extern struct camera g_camera;
-extern struct sprites g_sprites;
-extern struct map g_map;
-extern union keys g_keys;
 extern const f32 g_sprite_radius[SPRITE_MAX];
 extern const vec2i g_sprite_dims[SPRITE_MAX];
 
 #define PLAYER_MAX_HEALTH 100
 #define BULLET_DAMAGE     25
 
-void game_set_camera_fov(f32 new_fov);
-void game_set_player_rot(f32 new_rot);
+void game_camera_set_fov(f32 new_fov);
+void game_player_set_rot(f32 new_rot);
+void game_player_add_rot(f32 delta);
 
 vec2f game_get_player_dir(void);
 b8    game_move_and_collide(vec2f* pos, vec2f* diff, f32 radius);
@@ -112,15 +107,5 @@ void game_init(void);
 void game_tick(f32 delta);
 void game_update(f32 delta);
 void game_render(void);
-
-static inline
-void game_player_add_rot(f32 delta) {
-  f32 new_rot = g_player.rot + delta;
-  if (new_rot >= TWO_PI)
-    new_rot -= TWO_PI;
-  else if (new_rot < 0.0f)
-    new_rot += TWO_PI;
-  game_set_player_rot(new_rot);
-}
 
 #endif

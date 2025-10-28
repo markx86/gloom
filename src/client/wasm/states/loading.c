@@ -1,5 +1,7 @@
-#include <gloom/globals.h>
 #include <gloom/client.h>
+#include <gloom/gloom.h>
+#include <gloom/multiplayer.h>
+#include <gloom/globals.h>
 #include <gloom/ui.h>
 
 #define FOREGROUND_COLOR SOLID_COLOR(LIGHTGRAY)
@@ -32,8 +34,9 @@ void on_tick(f32 delta) {
   enum multiplayer_state conn_state;
 
   if (time_in_state >= SERVER_TIMEOUT)
-    // the connection state has not changed in the last SERVER_TIMEOUT seconds,
-    // assume something went wrong
+    /* The connection state has not changed in the last SERVER_TIMEOUT seconds,
+     * assume something went wrong.
+     */
     multiplayer_set_state(MULTIPLAYER_DISCONNECTED);
 
   ui_draw_component(48, FB_HEIGHT - 32 - STRING_HEIGHT, &back_button);
@@ -46,7 +49,7 @@ void on_tick(f32 delta) {
   last_conn_state = conn_state;
   time_in_state = 0.0f;
 
-  // on connection state changed
+  /* On connection state changed */
   switch (conn_state) {
     case MULTIPLAYER_CONNECTED:
       add_message("> connected to server");
@@ -62,12 +65,12 @@ void on_tick(f32 delta) {
       client_switch_state(CLIENT_WAITING);
       break;
 
-    // NOTE: this should not happen, but just in case
+    /* NOTE: This should not happen, but just in case */
     case MULTIPLAYER_UPDATING:
       client_switch_state(CLIENT_GAME);
       break;
 
-    // invalid state, display error
+    /* Invalid state, display error */
     case MULTIPLAYER_DISCONNECTED:
       client_switch_state(CLIENT_ERROR);
       break;
@@ -76,7 +79,7 @@ void on_tick(f32 delta) {
 
 static
 void on_enter(void) {
-  // if the client is not connected to the server, go to error screen
+  /* If the client is not connected to the server, go to error screen */
   if (multiplayer_is_disconnected()) {
     client_switch_state(CLIENT_ERROR);
     return;
@@ -91,7 +94,7 @@ void on_enter(void) {
   ui_draw_title(32, 32, "loading");
   ui_on_enter(&back_button, 1);
 
-  display_game_id();
+  multiplayer_draw_game_id();
 }
 
 static

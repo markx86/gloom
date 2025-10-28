@@ -1,4 +1,7 @@
 #include <gloom/client.h>
+#include <gloom/gloom.h>
+#include <gloom/game.h>
+#include <gloom/multiplayer.h>
 #include <gloom/ui.h>
 
 #define FOREGROUND_COLOR SOLID_COLOR(LIGHTGRAY)
@@ -45,7 +48,7 @@ void on_tick(f32 delta) {
   for (i = 0; i < ARRLEN(buttons); ++i)
     ui_draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * i, buttons + i);
 
-  display_game_id();
+  multiplayer_draw_game_id();
 }
 
 static
@@ -55,7 +58,7 @@ void on_enter(void) {
 
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
 
-  // darken the screen by decreasing the alpha channel
+  /* Darken the screen by decreasing the alpha channel */
   color_set_alpha(0x7F);
 
   ui_on_enter(buttons, ARRLEN(buttons));

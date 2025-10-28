@@ -1,12 +1,9 @@
 #ifndef LIBC_H_
 #define LIBC_H_
 
-#include <gloom/types.h>
-#include <gloom/env.h>
-
-#define UNUSED(x)         ((void)(x))
-#define ARRLEN(x)         (sizeof(x) / sizeof(x[0]))
-#define REINTERPRET(x, T) (*(T*)&(x))
+#include <gloom/platform.h>
+/* Add include to macros.h, since it's often used with libc.h */
+#include <gloom/macros.h>
 
 static inline
 void strncpy(char* dst, const char* src, u32 len) {
@@ -14,13 +11,7 @@ void strncpy(char* dst, const char* src, u32 len) {
     *(dst++) = *(src++);
 }
 
-static inline
-u32 strlen(const char* s) {
-  u32 l = 0;
-  while (*(s++))
-    ++l;
-  return l;
-}
+u32 strlen(const char* s);
 
 static inline
 void strcpy(char* dst, const char* src) {

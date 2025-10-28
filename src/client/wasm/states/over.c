@@ -1,19 +1,14 @@
 #include <gloom/client.h>
+#include <gloom/gloom.h>
+#include <gloom/game.h>
+#include <gloom/libc.h>
+#include <gloom/globals.h>
 #include <gloom/ui.h>
 
-static struct sprite* tracked_sprite;
 static b8 dead;
 
 #define FOREGROUND_COLOR (dead ? SOLID_COLOR(WHITE) : SOLID_COLOR(BLACK))
 #define BACKGROUND_COLOR (dead ? SOLID_COLOR(RED)   : SOLID_COLOR(GREEN))
-
-void g_tracked_sprite_set(struct sprite* sprite) {
-  tracked_sprite = sprite;
-}
-
-struct sprite* g_tracked_sprite_get(void) {
-  return tracked_sprite;
-}
 
 static
 void on_back_clicked(void) {
@@ -50,9 +45,9 @@ void title(void) {
 
 static
 void on_tick(f32 delta) {
-  if (dead && tracked_sprite != NULL) {
-    g_player.pos = tracked_sprite->pos;
-    game_set_player_rot(tracked_sprite->rot);
+  if (dead && g_tracked_sprite != NULL) {
+    g_player.pos = g_tracked_sprite->pos;
+    game_player_set_rot(g_tracked_sprite->rot);
   }
   game_tick(delta);
 

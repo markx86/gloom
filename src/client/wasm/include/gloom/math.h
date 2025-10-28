@@ -1,14 +1,10 @@
 #ifndef MATH_H_
 #define MATH_H_
 
-#include <gloom/env.h>
-#include <gloom/types.h>
+#include <gloom/platform.h>
 
 #define SQRT2     1.4142135623730951f
 #define INV_SQRT2 0.7071067811865475f
-
-#define MIN(x, y) ((x) < (y) ? (x) : (y))
-#define MAX(x, y) ((x) > (y) ? (x) : (y))
 
 f32 inv_sqrt(f32 n);
 

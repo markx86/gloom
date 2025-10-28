@@ -2,7 +2,6 @@
 #define MULTIPLAYER_H_
 
 #include <gloom/types.h>
-#include <gloom/libc.h>
 
 enum multiplayer_state {
   MULTIPLAYER_DISCONNECTED,
@@ -29,17 +28,10 @@ enum multiplayer_state multiplayer_get_state(void) {
   return _multiplayer_state;
 }
 
-static inline
-void multiplayer_set_state(enum multiplayer_state state) {
-  if (_multiplayer_state != state) {
-    printf("switching connection state from %d to %d\n",
-           _multiplayer_state, state);
-    _multiplayer_state = state;
-  }
-}
+void multiplayer_set_state(enum multiplayer_state state);
 
-void display_game_id(void);
-void queue_key_input(void);
+void multiplayer_draw_game_id(void);
+void multiplayer_queue_key_input(void);
 
 void multiplayer_init(u32 gid, u32 token);
 

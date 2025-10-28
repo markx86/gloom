@@ -1,5 +1,5 @@
-#ifndef ENV_H_
-#define ENV_H_
+#ifndef PLATFORM_H_
+#define PLATFORM_H_
 
 #include <gloom/types.h>
 

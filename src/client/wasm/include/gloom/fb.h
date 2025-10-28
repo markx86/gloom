@@ -2,6 +2,7 @@
 #define FB_H_
 
 #include <gloom/types.h>
+#include <gloom/macros.h>
 
 #define FB_WIDTH  640
 #define FB_HEIGHT 480

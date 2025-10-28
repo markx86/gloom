@@ -1,4 +1,9 @@
 #include <gloom/client.h>
+#include <gloom/gloom.h>
+#include <gloom/game.h>
+#include <gloom/multiplayer.h>
+#include <gloom/math.h>
+#include <gloom/libc.h>
 #include <gloom/ui.h>
 
 #define BACKGROUND_COLOR SOLID_COLOR(BLACK)
@@ -80,7 +85,7 @@ void on_tick(f32 delta) {
     ui_draw_component(48, y + i * 24, comps + i);
   ui_draw_component(48, FB_HEIGHT - 48, comps + 2);
 
-  display_game_id();
+  multiplayer_draw_game_id();
 }
 
 static

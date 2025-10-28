@@ -1,8 +1,12 @@
 #ifndef UI_H_
 #define UI_H_
 
-#include <gloom/client.h>
 #include <gloom/fb.h>
+/* Add include to color.h, since it's often used with ui.h */
+#include <gloom/color.h>
+
+/* Define strlen(..) to avoid including libc.h */
+extern u32 strlen(const char*);
 
 #include "font.h"
 
@@ -24,14 +28,14 @@ struct component {
   vec2u tl, br;
   const char* text;
   union {
-    // button
+    /* Button */
     struct {
       void (*on_click)(void);
     };
     struct {
       union {
-        b8 ticked; // checkbox
-        f32 value; // slider
+        b8 ticked; /* Checkbox */
+        f32 value; /* Slider */
       };
       u32 pad;
     };

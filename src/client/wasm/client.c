@@ -1,5 +1,8 @@
 #include <gloom/client.h>
 #include <gloom/globals.h>
+#include <gloom/game.h>
+#include <gloom/multiplayer.h>
+#include <gloom/libc.h>
 
 static b8 should_tick;
 
@@ -20,7 +23,6 @@ static const struct state_handlers* handlers[CLIENT_STATE_MAX] = {
   } while (0)
 
 b8 _pointer_locked;
-
 enum client_state _client_state;
 
 void client_switch_state(enum client_state new_state) {
@@ -35,13 +37,14 @@ void gloom_set_pointer_locked(b8 locked) {
   _pointer_locked = locked;
   if (!locked) {
     g_keys.all_keys = 0;
-    // dirty hack to pause on lost focus because I refuse to add another
-    // handler just for pointer lock changes
+    /* Dirty hack to pause the game on lost focus, because I refuse to add
+     * another handler just for pointer lock changes.
+     */
     if (client_get_state() == CLIENT_GAME) {
-      // notify the server the player has stopped
-      queue_key_input();
+      /* Notify the server the player has stopped */
+      multiplayer_queue_key_input();
       multiplayer_send_update();
-      // switch to pause menu
+      /* Switch to pause menu */
       client_switch_state(CLIENT_PAUSE);
     }
   }
@@ -76,7 +79,7 @@ b8 gloom_tick(f32 delta) {
 void gloom_init(b8 ws_connected, u32 game_id, u32 player_token) {
   _pointer_locked = false;
   should_tick = true;
-  g_tracked_sprite_set(NULL);
+  g_tracked_sprite = NULL;
   g_settings_apply();
   multiplayer_init(game_id, player_token);
   client_switch_state(ws_connected ? CLIENT_LOADING : CLIENT_ERROR);

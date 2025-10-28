@@ -7,8 +7,9 @@ extern void __heap_base;
 static void* heap_top = &__heap_base;
 static u32 heap_size = 0;
 
-// we use a buffer for printf, so that we're not constantly
-// calling out to JS everytime we need to write a character
+/* We use a buffer for printf, so that we're not constantly calling write
+ * everytime we need to write a character.
+ */
 struct printf_buf {
   u32 end;
   u32 len;
@@ -62,7 +63,7 @@ PRINTFHANDLER(u, u32 n) {
   char tmp[32];
   u32 l;
 
-  // fast path
+  /* Fast path */
   if (n == 0) {
     buf_putc(pb, '0');
     return;
@@ -84,7 +85,7 @@ PRINTFHANDLER(x, u32 n) {
   char tmp[32], c;
   u32 l = 0;
 
-  // fast path
+  /* Fast path */
   if (n == 0) {
     buf_putc(pb, '0');
     return;
@@ -96,7 +97,7 @@ PRINTFHANDLER(x, u32 n) {
     tmp[l++] = c;
     n >>= 4;
   }
-  // pad integers with 8 zeros (not spec compliant, but idgaf)
+  /* Pad integers with 8 zeros (not spec compliant, but idgaf) */
   while (l < 8)
     tmp[l++] = '0';
 
@@ -107,7 +108,7 @@ PRINTFHANDLER(f, f32 v) {
   char tmp[32];
   u32 w, d, l;
 
-  // fast path
+  /* Fast path */
   if (v == 0.0f) {
     buf_puts(pb, "0.0");
     return;
@@ -161,9 +162,9 @@ static void process_fmt(struct printf_buf* pb, const char* fmt, va_list ap) {
         buf_putc(pb, (char)va_arg(ap, i32));
         break;
       default:
-        // ignore unknown specs
+        /* Ignore unknown specs */
         buf_putc(pb, '%');
-        // !!FALL THROUGH!!
+        /* Fall through */
       case '%':
         buf_putc(pb, c);
         break;
@@ -224,4 +225,11 @@ void memset(void* p, u8 b, u32 l) {
 
   for (; l > 0; --l)
     *(sp++) = b;
+}
+
+u32 strlen(const char* s) {
+  u32 l = 0;
+  while (*(s++))
+    ++l;
+  return l;
 }
