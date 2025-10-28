@@ -8,34 +8,41 @@
 
 f32 inv_sqrt(f32 n);
 
-static inline i32 roundf(f32 x) {
+static inline
+i32 roundf(f32 x) {
   const i32 i = (i32)x;
   return (x - (f32)i < 0.5) ? i : i+1;
 }
 
-static inline i32 isposf(f32 x) {
+static inline
+i32 isposf(f32 x) {
   u32 v = *(u32*)&x;
   return !(v & (1U << 31));
 }
 
-static inline f32 signf(f32 x) {
+static inline
+f32 signf(f32 x) {
   return (isposf(x) << 1) - 1;
 }
 
-static inline f32 lerp(f32 weight, f32 v1, f32 v2) {
+static inline
+f32 lerp(f32 weight, f32 v1, f32 v2) {
   return (1.0f - weight) * v1 + weight * v2;
 }
 
-static inline f32 absf(f32 f) {
+static inline
+f32 absf(f32 f) {
   u32 a = (*(u32*)&f) & ~(1U << 31);
   return *(f32*)&a;
 }
 
-static inline f32 modf(f32 val, f32 mod) {
+static inline
+f32 modf(f32 val, f32 mod) {
   return val - (i32)(val / mod) * mod;
 }
 
-static inline u32 abs(i32 v) {
+static inline
+u32 abs(i32 v) {
   return (v > 0) ? v : -v;
 }
 
@@ -65,7 +72,8 @@ static inline u32 abs(i32 v) {
 #define HALF_PI    (PI / 2.0f)
 #define QUARTER_PI (HALF_PI / 2.0f)
 
-static inline vec2f vec2f_normalized(vec2f* vec) {
+static inline
+vec2f vec2f_normalized(vec2f* vec) {
   vec2f v;
   f32 mod = inv_sqrt(VEC2LENGTH2(vec));
   v.x = vec->x * mod;

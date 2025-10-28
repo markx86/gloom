@@ -13,18 +13,23 @@ static f32 g_wait_time, g_timer_start;
 static b8 g_ready;
 
 static void on_ready_click(void);
-static void on_options_click(void) { client_switch_state(CLIENT_OPTIONS); }
-static void on_quit_clicked(void) { gloom_exit(); }
+static void on_options_click(void);
 
-static struct component g_comps[] = {
+static
+void on_quit_clicked(void) {
+  gloom_exit();
+}
+
+static struct component g_buttons[] = {
   [0] = { .type = UICOMP_BUTTON, .on_click = on_ready_click                        },
   [1] = { .type = UICOMP_BUTTON, .on_click = on_options_click, .text = "> options" },
   [2] = { .type = UICOMP_BUTTON, .on_click = on_quit_clicked,  .text = "> quit"    }
 };
 
-void g_ready_set(b8 yes) {
+void set_ready(b8 yes) {
   g_ready = yes;
-  g_comps[0].text = g_ready ? "> ready: yes" : "> ready: no";
+  g_buttons[0].text = g_ready ? "> ready: yes" : "> ready: no";
+  multiplayer_signal_ready(g_ready);
 }
 
 void g_wait_time_set(f32 wtime) {
@@ -34,17 +39,21 @@ void g_wait_time_set(f32 wtime) {
 
 static
 void on_ready_click(void) {
-  g_ready_set(!g_ready);
-  multiplayer_signal_ready(g_ready);
+  set_ready(!g_ready);
+}
+
+static
+void on_options_click(void) {
+  set_ready(false);
+  client_switch_state(CLIENT_OPTIONS);
 }
 
 static inline
 void title(void) {
   const char title[] = "waiting";
-  ui_draw_rect(
-    32, 32 + (FONT_HEIGHT >> 1),
-    TITLE_WIDTH_IMM(title), TITLE_HEIGHT - FONT_HEIGHT,
-    BACKGROUND_COLOR);
+  ui_draw_rect(32, 32 + (FONT_HEIGHT >> 1),
+               TITLE_WIDTH_IMM(title), TITLE_HEIGHT - FONT_HEIGHT,
+               BACKGROUND_COLOR);
   ui_draw_title(32, 32, title);
 }
 
@@ -65,7 +74,8 @@ void on_tick(f32 delta) {
   time_left = g_wait_time - (platform_get_time() - g_timer_start);
 
   if (isposf(time_left)) {
-    snprintf(time_str, sizeof(time_str), "> starting in %ds", roundf(time_left));
+    snprintf(time_str, sizeof(time_str),
+             "> starting in %ds", roundf(time_left));
     text = time_str;
   }
   else if (isposf(g_wait_time))
@@ -78,39 +88,44 @@ void on_tick(f32 delta) {
 
   title();
   y = 32 + TITLE_HEIGHT;
-  ui_draw_rect(48 - 2, y - 2, STRING_WIDTH(text) + 4, STRING_HEIGHT + 4, BACKGROUND_COLOR);
+
+  ui_draw_rect(48 - 2, y - 2,
+               STRING_WIDTH(text) + 4, STRING_HEIGHT + 4,
+               BACKGROUND_COLOR);
   ui_draw_string(48, y, text);
   y += STRING_HEIGHT + 8;
-  for (i = 0; i < ARRLEN(g_comps) - 1; ++i)
-    ui_draw_component(48, y + i * 24, g_comps + i);
-  ui_draw_component(48, FB_HEIGHT - 48, g_comps + 2);
+
+  for (i = 0; i < ARRLEN(g_buttons) - 1; ++i)
+    ui_draw_component(48, y + i * 24, g_buttons + i);
+  ui_draw_component(48, FB_HEIGHT - 48, g_buttons + 2);
 
   multiplayer_draw_game_id();
 }
 
 static
 void on_enter(void) {
+  set_ready(false);
   color_set_alpha(0x7F);
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
-  ui_on_enter(g_comps, ARRLEN(g_comps));
+  ui_on_enter(g_buttons, ARRLEN(g_buttons));
   game_init();
 }
 
 static
 void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
-  ui_on_mouse_moved(x, y, dx, dy, g_comps, ARRLEN(g_comps));
+  ui_on_mouse_moved(x, y, dx, dy, g_buttons, ARRLEN(g_buttons));
 }
 
 static
 void on_mouse_down(u32 x, u32 y, u32 button) {
   UNUSED(button);
-  ui_on_mouse_down(x, y, g_comps, ARRLEN(g_comps));
+  ui_on_mouse_down(x, y, g_buttons, ARRLEN(g_buttons));
 }
 
 static
 void on_mouse_up(u32 x, u32 y, u32 button) {
   UNUSED(button);
-  ui_on_mouse_up(x, y, g_comps, ARRLEN(g_comps));
+  ui_on_mouse_up(x, y, g_buttons, ARRLEN(g_buttons));
 }
 
 const struct state_handlers g_waiting_state = {

@@ -36,10 +36,9 @@ void on_enter(void) {
 static inline
 void title(void) {
   const char* title = g_dead ? "dead" : "you win";
-  ui_draw_rect(
-    32, 32 + (FONT_HEIGHT >> 1),
-    TITLE_WIDTH(title), TITLE_HEIGHT - FONT_HEIGHT,
-    BACKGROUND_COLOR);
+  ui_draw_rect(32, 32 + (FONT_HEIGHT >> 1),
+               TITLE_WIDTH(title), TITLE_HEIGHT - FONT_HEIGHT,
+               BACKGROUND_COLOR);
   ui_draw_title(32, 32, title);
 }
 

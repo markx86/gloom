@@ -17,7 +17,8 @@ struct printf_buf {
   char* buf;
 };
 
-static inline void buf_putc(struct printf_buf* pb, char c) {
+static inline
+void buf_putc(struct printf_buf* pb, char c) {
   if (pb->end >= pb->len) {
     if (pb->fd < 0)
       return;
@@ -27,25 +28,28 @@ static inline void buf_putc(struct printf_buf* pb, char c) {
   pb->buf[pb->end++] = c;
 }
 
-static inline void buf_flush(struct printf_buf* pb) {
+static inline
+void buf_flush(struct printf_buf* pb) {
   if (pb->end > 0 && pb->fd > 0)
     platform_write(pb->fd, pb->buf, pb->end);
 }
 
-static inline void buf_putr(struct printf_buf* pb, const char* buf, u32 len) {
+static inline
+void buf_putr(struct printf_buf* pb, const char* buf, u32 len) {
   for (; len > 0; --len)
     buf_putc(pb, buf[len-1]);
 }
 
-#define PRINTFHANDLER(type, ...) \
+#define PRINTF_HANDLER(type, ...) \
   static void buf_put##type(struct printf_buf* pb, ##__VA_ARGS__)
 
-PRINTFHANDLER(s, const char* s) {
+PRINTF_HANDLER(s, const char* s) {
   while (*s)
     buf_putc(pb, *(s++));
 }
 
-static u32 convert_u32_to_str(u32 n, char* tmp, u32 len) {
+static
+u32 convert_u32_to_str(u32 n, char* tmp, u32 len) {
   char c;
   u32 l = 0;
 
@@ -59,7 +63,7 @@ static u32 convert_u32_to_str(u32 n, char* tmp, u32 len) {
   return l;
 }
 
-PRINTFHANDLER(u, u32 n) {
+PRINTF_HANDLER(u, u32 n) {
   char tmp[32];
   u32 l;
 
@@ -73,7 +77,7 @@ PRINTFHANDLER(u, u32 n) {
   buf_putr(pb, tmp, l);
 }
 
-PRINTFHANDLER(d, i32 n) {
+PRINTF_HANDLER(d, i32 n) {
   if (n < 0) {
     buf_putc(pb, '-');
     n = -n;
@@ -81,7 +85,7 @@ PRINTFHANDLER(d, i32 n) {
   buf_putu(pb, n);
 }
 
-PRINTFHANDLER(x, u32 n) {
+PRINTF_HANDLER(x, u32 n) {
   char tmp[32], c;
   u32 l = 0;
 
@@ -104,7 +108,7 @@ PRINTFHANDLER(x, u32 n) {
   buf_putr(pb, tmp, l);
 }
 
-PRINTFHANDLER(f, f32 v) {
+PRINTF_HANDLER(f, f32 v) {
   char tmp[32];
   u32 w, d, l;
 
@@ -131,7 +135,8 @@ PRINTFHANDLER(f, f32 v) {
   buf_putr(pb, tmp, l);
 }
 
-static void process_fmt(struct printf_buf* pb, const char* fmt, va_list ap) {
+static
+void process_fmt(struct printf_buf* pb, const char* fmt, va_list ap) {
   char c;
 
   while ((c = *(fmt++))) {

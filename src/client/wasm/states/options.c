@@ -51,10 +51,15 @@ f32 slider_value(enum option_control ctrl, f32 min, f32 max) {
 }
 
 void g_settings_apply(void) {
+  f32 new_fov;
+
   g_camera.dof = slider_value(DRAWDIST_SLIDER, MIN_CAMERA_DOF, MAX_CAMERA_DOF);
   g_camera.smoothing = g_comps[CAMERA_SMOOTHING].ticked;
-  g_mouse_sensitivity = slider_value(MOUSESENS_SLIDER, MIN_MOUSE_SENS, MAX_MOUSE_SENS);
-  game_camera_set_fov(DEG2RAD(slider_value(FOV_SLIDER, MAX_CAMERA_FOV, MIN_CAMERA_FOV)));
+  g_mouse_sensitivity =
+    slider_value(MOUSESENS_SLIDER, MIN_MOUSE_SENS, MAX_MOUSE_SENS);
+
+  new_fov = DEG2RAD(slider_value(FOV_SLIDER, MAX_CAMERA_FOV, MIN_CAMERA_FOV));
+  game_camera_set_fov(new_fov);
 }
 
 void gloom_settings_load(f32 drawdist, f32 fov, f32 mousesens, b8 camsmooth) {
@@ -90,12 +95,15 @@ void on_enter(void) {
 static
 void on_tick(f32 delta) {
   u32 i;
+  u32 y;
 
   UNUSED(delta);
 
   /* draw UI components */
-  for (i = 1; i < ARRLEN(g_comps); ++i)
-    ui_draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * (i-1), g_comps + i);
+  for (i = 1; i < ARRLEN(g_comps); ++i) {
+    y = 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * (i-1);
+    ui_draw_component(48, y, g_comps + i);
+  }
   ui_draw_component(48, FB_HEIGHT - 32 - STRING_HEIGHT, &g_comps[BACK_BUTTON]);
 }
 

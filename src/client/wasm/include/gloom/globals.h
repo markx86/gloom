@@ -30,7 +30,7 @@ extern struct sprite* g_tracked_sprite;
 extern f32 g_mouse_sensitivity;
 
 void g_settings_apply(void);
-void g_ready_set(b8 yes);
+void set_ready(b8 yes);
 void g_wait_time_set(f32 wtime);
 
 #endif

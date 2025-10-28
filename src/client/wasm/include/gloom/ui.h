@@ -31,6 +31,8 @@ struct component {
     /* Button */
     struct {
       void (*on_click)(void);
+      /* Padding to make this struct the same size as the one below */
+      char _unused[(sizeof(u32) + sizeof(f32)) - sizeof(void*)];
     };
     struct {
       union {

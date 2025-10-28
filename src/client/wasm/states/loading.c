@@ -61,7 +61,6 @@ void on_tick(f32 delta) {
       break;
 
     case MULTIPLAYER_WAITING:
-      g_ready_set(false);
       client_switch_state(CLIENT_WAITING);
       break;
 
