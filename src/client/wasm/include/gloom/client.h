@@ -14,8 +14,8 @@ enum client_state {
   CLIENT_STATE_MAX,
 };
 
-extern b8 _pointer_locked;
-extern enum client_state _client_state;
+extern b8 _g_pointer_locked;
+extern enum client_state _g_client_state;
 
 struct state_handlers {
   void (*on_tick)(f32);
@@ -29,12 +29,12 @@ struct state_handlers {
 
 static inline
 b8 client_pointer_is_locked(void) {
-  return _pointer_locked;
+  return _g_pointer_locked;
 }
 
 static inline
 enum client_state client_get_state(void) {
-  return _client_state;
+  return _g_client_state;
 }
 
 void client_switch_state(enum client_state new_state);

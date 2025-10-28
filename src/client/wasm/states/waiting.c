@@ -9,33 +9,33 @@
 #define BACKGROUND_COLOR SOLID_COLOR(BLACK)
 #define FOREGROUND_COLOR SOLID_COLOR(LIGHTGRAY)
 
-static f32 wait_time, timer_start;
-static b8 ready;
+static f32 g_wait_time, g_timer_start;
+static b8 g_ready;
 
 static void on_ready_click(void);
 static void on_options_click(void) { client_switch_state(CLIENT_OPTIONS); }
 static void on_quit_clicked(void) { gloom_exit(); }
 
-static struct component comps[] = {
+static struct component g_comps[] = {
   [0] = { .type = UICOMP_BUTTON, .on_click = on_ready_click                        },
   [1] = { .type = UICOMP_BUTTON, .on_click = on_options_click, .text = "> options" },
   [2] = { .type = UICOMP_BUTTON, .on_click = on_quit_clicked,  .text = "> quit"    }
 };
 
 void g_ready_set(b8 yes) {
-  ready = yes;
-  comps[0].text = ready ? "> ready: yes" : "> ready: no";
+  g_ready = yes;
+  g_comps[0].text = g_ready ? "> ready: yes" : "> ready: no";
 }
 
 void g_wait_time_set(f32 wtime) {
-  wait_time = wtime;
-  timer_start = platform_get_time();
+  g_wait_time = wtime;
+  g_timer_start = platform_get_time();
 }
 
 static
 void on_ready_click(void) {
-  g_ready_set(!ready);
-  multiplayer_signal_ready(ready);
+  g_ready_set(!g_ready);
+  multiplayer_signal_ready(g_ready);
 }
 
 static inline
@@ -62,17 +62,17 @@ void on_tick(f32 delta) {
     return;
   }
 
-  time_left = wait_time - (platform_get_time() - timer_start);
+  time_left = g_wait_time - (platform_get_time() - g_timer_start);
 
   if (isposf(time_left)) {
     snprintf(time_str, sizeof(time_str), "> starting in %ds", roundf(time_left));
     text = time_str;
   }
-  else if (isposf(wait_time))
+  else if (isposf(g_wait_time))
     text = "> starting...";
   else {
     text = "> waiting for players...";
-    timer_start = platform_get_time();
+    g_timer_start = platform_get_time();
   }
   game_render();
 
@@ -81,9 +81,9 @@ void on_tick(f32 delta) {
   ui_draw_rect(48 - 2, y - 2, STRING_WIDTH(text) + 4, STRING_HEIGHT + 4, BACKGROUND_COLOR);
   ui_draw_string(48, y, text);
   y += STRING_HEIGHT + 8;
-  for (i = 0; i < ARRLEN(comps) - 1; ++i)
-    ui_draw_component(48, y + i * 24, comps + i);
-  ui_draw_component(48, FB_HEIGHT - 48, comps + 2);
+  for (i = 0; i < ARRLEN(g_comps) - 1; ++i)
+    ui_draw_component(48, y + i * 24, g_comps + i);
+  ui_draw_component(48, FB_HEIGHT - 48, g_comps + 2);
 
   multiplayer_draw_game_id();
 }
@@ -92,25 +92,25 @@ static
 void on_enter(void) {
   color_set_alpha(0x7F);
   ui_set_colors(FOREGROUND_COLOR, BACKGROUND_COLOR);
-  ui_on_enter(comps, ARRLEN(comps));
+  ui_on_enter(g_comps, ARRLEN(g_comps));
   game_init();
 }
 
 static
 void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
-  ui_on_mouse_moved(x, y, dx, dy, comps, ARRLEN(comps));
+  ui_on_mouse_moved(x, y, dx, dy, g_comps, ARRLEN(g_comps));
 }
 
 static
 void on_mouse_down(u32 x, u32 y, u32 button) {
   UNUSED(button);
-  ui_on_mouse_down(x, y, comps, ARRLEN(comps));
+  ui_on_mouse_down(x, y, g_comps, ARRLEN(g_comps));
 }
 
 static
 void on_mouse_up(u32 x, u32 y, u32 button) {
   UNUSED(button);
-  ui_on_mouse_up(x, y, comps, ARRLEN(comps));
+  ui_on_mouse_up(x, y, g_comps, ARRLEN(g_comps));
 }
 
 const struct state_handlers g_waiting_state = {

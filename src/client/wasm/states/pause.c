@@ -22,10 +22,10 @@ void on_quit_clicked(void) {
   gloom_exit();
 }
 
-static struct component buttons[] = {
-  { .type = UICOMP_BUTTON, .text = "> resume", .on_click = on_resume_clicked },
+static struct component g_buttons[] = {
+  { .type = UICOMP_BUTTON, .text = "> resume", .on_click = on_resume_clicked   },
   { .type = UICOMP_BUTTON, .text = "> options", .on_click = on_options_clicked },
-  { .type = UICOMP_BUTTON, .text = "> quit", .on_click = on_quit_clicked }
+  { .type = UICOMP_BUTTON, .text = "> quit", .on_click = on_quit_clicked       }
 };
 
 static
@@ -45,8 +45,8 @@ void on_tick(f32 delta) {
   game_tick(delta);
 
   title();
-  for (i = 0; i < ARRLEN(buttons); ++i)
-    ui_draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * i, buttons + i);
+  for (i = 0; i < ARRLEN(g_buttons); ++i)
+    ui_draw_component(48, 32 + TITLE_HEIGHT + (STRING_HEIGHT + 8) * i, g_buttons + i);
 
   multiplayer_draw_game_id();
 }
@@ -61,24 +61,24 @@ void on_enter(void) {
   /* Darken the screen by decreasing the alpha channel */
   color_set_alpha(0x7F);
 
-  ui_on_enter(buttons, ARRLEN(buttons));
+  ui_on_enter(g_buttons, ARRLEN(g_buttons));
 }
 
 static
 void on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy) {
-  ui_on_mouse_moved(x, y, dx, dy, buttons, ARRLEN(buttons));
+  ui_on_mouse_moved(x, y, dx, dy, g_buttons, ARRLEN(g_buttons));
 }
 
 static
 void on_mouse_down(u32 x, u32 y, u32 button) {
   UNUSED(button);
-  ui_on_mouse_down(x, y, buttons, ARRLEN(buttons));
+  ui_on_mouse_down(x, y, g_buttons, ARRLEN(g_buttons));
 }
 
 static
 void on_mouse_up(u32 x, u32 y, u32 button) {
   UNUSED(button);
-  ui_on_mouse_up(x, y, buttons, ARRLEN(buttons));
+  ui_on_mouse_up(x, y, g_buttons, ARRLEN(g_buttons));
 }
 
 const struct state_handlers g_pause_state = {

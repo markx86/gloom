@@ -29,8 +29,8 @@
 
 #define CAMERA_POS_INTERP 0.66f
 
-static f32 z_buf[FB_WIDTH];
-static i32 display_health;
+static f32 g_zbuf[FB_WIDTH];
+static i32 g_display_health;
 
 const vec2i g_sprite_dims[] = {
   [SPRITE_PLAYER] = { .x = PLAYER_SPRITE_W, .y = PLAYER_SPRITE_H },
@@ -339,8 +339,8 @@ i32 get_y_end(struct sprite* s, u32 screen_h) {
 
 static inline
 const u8* get_player_tile(u32 x, u32 y) {
-  return &player_spritesheet[((y * PLAYER_NTILES_W) + x) *
-                             (PLAYER_TILE_W * PLAYER_TILE_H)];
+  return &g_player_spritesheet[((y * PLAYER_NTILES_W) + x) *
+                               (PLAYER_TILE_W * PLAYER_TILE_H)];
 }
 
 static
@@ -365,14 +365,14 @@ void get_texture_info(struct sprite* s, b8* invert_x, u32* tex_w, u32* tex_h,
     /* Get the pointer to the corresponding sprite texture */
     *tex = get_player_tile((u32)s->anim_frame, abs(rot));
     /* Set the color table pointer */
-    *coltab = player_coltab;
+    *coltab = g_player_coltab;
     /* Set the texture width and height */
     *tex_w = PLAYER_TILE_W;
     *tex_h = PLAYER_TILE_H;
   } else /* s->desc.type == SPRITE_BULLET */ {
     /* Set the bullet sprite data */
-    *tex = bullet_texture;
-    *coltab = bullet_coltab;
+    *tex = g_bullet_texture;
+    *coltab = g_bullet_coltab;
     /* Set bullet texture dimensions */
     *tex_w = BULLET_TEXTURE_W;
     *tex_h = BULLET_TEXTURE_H;
@@ -408,7 +408,7 @@ void draw_sprite(struct sprite* s) {
   /* Draw the sprite */
   for (x = MAX(0, x_start); x < x_end && x < FB_WIDTH; x++) {
     /* Discard stripe if there's a wall closer to the camera */
-    if (z_buf[x] < s->depth2)
+    if (g_zbuf[x] < s->depth2)
       continue;
     /* Compute x texture coordinate */
     uvx = (f32)((x - x_start) * tex_w) / uvw;
@@ -447,7 +447,7 @@ void render_scene(void) {
     /* Trace ray with DDA */
     cell_id = trace_ray(&g_camera.pos, &ray_dir, g_camera.dof, &hit);
     /* Store distance (squared) in z-buffer */
-    z_buf[x] = hit.dist * hit.dist;
+    g_zbuf[x] = hit.dist * hit.dist;
 
     draw_column(cell_id, x, &hit);
   }
@@ -590,7 +590,7 @@ void render_hud(void) {
   const char health_lbl[] = "H";
 
   /* Check if the player received damage */
-  got_damage = display_health != g_player.health;
+  got_damage = g_display_health != g_player.health;
 
   x = 8 + STRING_WIDTH_IMM(health_lbl) + 4;
   if (got_damage)
@@ -608,11 +608,12 @@ void render_hud(void) {
   if (got_damage) {
     /* If the player received damage, animate the health difference */
     x += health_bar_w;
-    health_bar_w = (f32)((display_health - g_player.health) * HEALTH_BAR_WIDTH)
-                    / PLAYER_MAX_HEALTH;
+    health_bar_w =
+      (f32)((g_display_health - g_player.health) * HEALTH_BAR_WIDTH)
+        / PLAYER_MAX_HEALTH;
     ui_draw_rect(x, 8, health_bar_w, STRING_HEIGHT - 1, COLOR(WHITE));
 
-    display_health = lerp(HEALTH_BAR_LAG, g_player.health, display_health);
+    g_display_health = lerp(HEALTH_BAR_LAG, g_player.health, g_display_health);
   }
 }
 
@@ -662,7 +663,7 @@ void game_render(void) {
 }
 
 void game_init(void) {
-  display_health = g_player.health = PLAYER_MAX_HEALTH;
+  g_display_health = g_player.health = PLAYER_MAX_HEALTH;
   g_camera.pos = g_player.pos;
   /* If this seems counter intuitive, you should look into
    * the hello packet handler in multiplayer.c.

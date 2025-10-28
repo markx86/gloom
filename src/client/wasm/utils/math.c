@@ -27,5 +27,5 @@ f32 cos(f32 angle) {
   if (i2 >= SAMPLES)
       i2 = 0;
   w -= (f32)i1;
-  return lerp(w, cos_table[i1], cos_table[i2]);
+  return lerp(w, g_cos_table[i1], g_cos_table[i2]);
 }

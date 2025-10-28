@@ -11,21 +11,21 @@ enum multiplayer_state {
   MULTIPLAYER_UPDATING
 };
 
-extern enum multiplayer_state _multiplayer_state;
+extern enum multiplayer_state _g_multiplayer_state;
 
 static inline
 b8 multiplayer_is_disconnected(void) {
-  return _multiplayer_state == MULTIPLAYER_DISCONNECTED;
+  return _g_multiplayer_state == MULTIPLAYER_DISCONNECTED;
 }
 
 static inline
 b8 multiplayer_is_in_game(void) {
-  return _multiplayer_state == MULTIPLAYER_UPDATING;
+  return _g_multiplayer_state == MULTIPLAYER_UPDATING;
 }
 
 static inline
 enum multiplayer_state multiplayer_get_state(void) {
-  return _multiplayer_state;
+  return _g_multiplayer_state;
 }
 
 void multiplayer_set_state(enum multiplayer_state state);

@@ -11,7 +11,7 @@ void on_enter(void) {
 
   ui_draw_title(32, 32, "disconnected");
   ui_draw_string(48, 32 + TITLE_HEIGHT,
-              "a fatal error occurred, you've been disconnected");
+                 "a fatal error occurred, you've been disconnected");
 }
 
 const struct state_handlers g_error_state = {

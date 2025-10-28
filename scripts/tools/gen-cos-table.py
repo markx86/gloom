@@ -21,7 +21,7 @@ src = f"""#include <gloom/types.h>
 
 #ifdef DECLARE_TABLE
 
-static const f32 cos_table[] = {{
+static const f32 g_cos_table[] = {{
   {cos_arr}
 }};
 

@@ -4,8 +4,8 @@ extern void __heap_base;
 
 #define BUFSZ 128
 
-static void* heap_top = &__heap_base;
-static u32 heap_size = 0;
+static void* g_heap_top = &__heap_base;
+static u32 g_heap_size = 0;
 
 /* We use a buffer for printf, so that we're not constantly calling write
  * everytime we need to write a character.
@@ -196,17 +196,17 @@ void vfdprintf(int fd, const char* fmt, va_list ap) {
 }
 
 void* malloc(u32 size) {
-  void* ptr = heap_top;
-  if (heap_size < size)
-    heap_size += platform_request_mem(size);
-  heap_top += size;
-  heap_size -= size;
+  void* ptr = g_heap_top;
+  if (g_heap_size < size)
+    g_heap_size += platform_request_mem(size);
+  g_heap_top += size;
+  g_heap_size -= size;
   return ptr;
 }
 
 void free_all(void) {
-  heap_size += heap_top - &__heap_base;
-  heap_top = &__heap_base;
+  g_heap_size += g_heap_top - &__heap_base;
+  g_heap_top = &__heap_base;
 }
 
 void memset(void* p, u8 b, u32 l) {

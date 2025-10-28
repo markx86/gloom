@@ -67,7 +67,7 @@ def gen_player_spritesheet():
 
 #define PLAYER_COLTAB_LEN {len(color_table)}
 
-static const u32 player_coltab[PLAYER_COLTAB_LEN] = {{
+static const u32 g_player_coltab[PLAYER_COLTAB_LEN] = {{
 """
 
     # generate color table for the spritesheet
@@ -78,7 +78,7 @@ static const u32 player_coltab[PLAYER_COLTAB_LEN] = {{
     csrc += """
 };
 
-static const u8 player_spritesheet[PLAYER_NTILES * PLAYER_TILE_W * PLAYER_TILE_H] = {
+static const u8 g_player_spritesheet[PLAYER_NTILES * PLAYER_TILE_W * PLAYER_TILE_H] = {
   """
 
     # generate image data
@@ -112,7 +112,7 @@ def gen_bullet_texture():
 
 #define BULLET_COLTAB_LEN {len(color_table)}
 
-static const u32 bullet_coltab[BULLET_COLTAB_LEN] = {{
+static const u32 g_bullet_coltab[BULLET_COLTAB_LEN] = {{
 """
 
     # generate color table for bullet texture
@@ -123,7 +123,7 @@ static const u32 bullet_coltab[BULLET_COLTAB_LEN] = {{
     csrc += """
 };
 
-static const u8 bullet_texture[BULLET_TEXTURE_W * BULLET_TEXTURE_H] = {
+static const u8 g_bullet_texture[BULLET_TEXTURE_W * BULLET_TEXTURE_H] = {
   """
 
     # generate image data for bullet texture

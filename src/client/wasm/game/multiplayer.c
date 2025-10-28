@@ -109,65 +109,65 @@ struct input_log {
   vec2f vel;
 };
 
-#define RING_SIZE 128
+#define IRING_SIZE 128
+
+static u8 g_player_id;
+static u32 g_game_id, g_player_token;
+static u32 g_client_seq, g_server_seq;
+static f32 g_game_start;
+static char g_pkt_buf[0x1000];
 
 struct {
-  struct input_log *_tail, *_head;
-  struct input_log _buffer[RING_SIZE];
-} iring;
+  struct input_log *tail, *head;
+  struct input_log buffer[IRING_SIZE];
+} g_iring;
 
 static
 void iring_init(void) {
-  iring._tail = iring._buffer;
-  iring._head = iring._buffer;
+  g_iring.tail = g_iring.buffer;
+  g_iring.head = g_iring.buffer;
 }
 
 static
 void iring_push_elem(f32 ts, vec2f* vel) {
-  iring._head->ts = ts;
-  iring._head->vel = *vel;
-  if (++iring._head >= iring._buffer + RING_SIZE)
-    iring._head = iring._buffer;
-  if (iring._head == iring._tail)
-    ++iring._tail;
+  g_iring.head->ts = ts;
+  g_iring.head->vel = *vel;
+  if (++g_iring.head >= g_iring.buffer + IRING_SIZE)
+    g_iring.head = g_iring.buffer;
+  if (g_iring.head == g_iring.tail)
+    ++g_iring.tail;
 }
 
 static
 void iring_set_tail(struct input_log* ilog) {
-  if ((u32)(ilog - iring._buffer) < RING_SIZE)
-    iring._tail = ilog;
+  if ((u32)(ilog - g_iring.buffer) < IRING_SIZE)
+    g_iring.tail = ilog;
 }
 
 static
 struct input_log* iring_get_next(void) {
   struct input_log* ilog;
-  if (iring._tail == iring._head)
+  if (g_iring.tail == g_iring.head)
     return NULL;
-  ilog = iring._tail;
-  if (++iring._tail >= iring._buffer + RING_SIZE)
-    iring._tail = iring._buffer;
+  ilog = g_iring.tail;
+  if (++g_iring.tail >= g_iring.buffer + IRING_SIZE)
+    g_iring.tail = g_iring.buffer;
   return ilog;
 }
 
 static
 struct input_log* iring_get_after(struct input_log* ilog) {
-  if (++ilog >= iring._buffer + RING_SIZE)
-    ilog = iring._buffer;
-  return ilog == iring._head ? NULL : ilog;
+  if (++ilog >= g_iring.buffer + IRING_SIZE)
+    ilog = g_iring.buffer;
+  return ilog == g_iring.head ? NULL : ilog;
 }
 
-static u8 player_id;
-static u32 game_id, player_token;
-static u32 client_seq, server_seq;
-static f32 game_start;
-static char pkt_buf[0x1000];
-
 void* gloom_packet_buffer(void) {
-  return pkt_buf;
+  return g_pkt_buf;
 }
 
 u32 gloom_packet_buffer_size(void) {
-  return sizeof(pkt_buf);
+  return sizeof(g_pkt_buf);
 }
 
 /* Draw game id in the bottom-right corner */
@@ -175,28 +175,28 @@ void multiplayer_draw_game_id(void) {
   char gids[32];
   u32 x, w;
   const u32 y = FB_HEIGHT - STRING_HEIGHT - 32;
-  snprintf(gids, sizeof(gids), "GAME ID: %x", game_id);
+  snprintf(gids, sizeof(gids), "GAME ID: %x", g_game_id);
   w = STRING_WIDTH(gids);
   x = FB_WIDTH - 32 - w;
   ui_draw_rect(x - 2, y - 2, w + 4, STRING_HEIGHT + 2, SOLID_COLOR(DARKRED));
   ui_draw_string_with_color(x, y, gids, SOLID_COLOR(LIGHTGRAY));
 }
 
-enum multiplayer_state _multiplayer_state;
+enum multiplayer_state _g_multiplayer_state;
 
 typedef void (*serv_pkt_handler_t)(void*, u32);
 
 static inline
 f32 get_ts(void) {
-  return platform_get_time() - game_start;
+  return platform_get_time() - g_game_start;
 }
 
 static
 void init_game_pkt(void* hdrp, enum game_pkt_type type) {
   struct game_pkt_hdr* hdr = hdrp;
   hdr->type = type;
-  hdr->seq = client_seq++;
-  hdr->player_token = player_token;
+  hdr->seq = g_client_seq++;
+  hdr->player_token = g_player_token;
 }
 
 static
@@ -206,19 +206,19 @@ void send_packet_checked(void* pkt, u32 size) {
 }
 
 void multiplayer_init(u32 gid, u32 token) {
-  game_id = gid;
-  player_token = token;
+  g_game_id = gid;
+  g_player_token = token;
   /* Reset game packet sequence */
-  client_seq = server_seq = 0;
+  g_client_seq = g_server_seq = 0;
   iring_init();
   multiplayer_set_state(MULTIPLAYER_CONNECTED);
 }
 
 void multiplayer_set_state(enum multiplayer_state state) {
-  if (_multiplayer_state != state) {
+  if (_g_multiplayer_state != state) {
     printf("switching connection state from %d to %d\n",
-           _multiplayer_state, state);
-    _multiplayer_state = state;
+           _g_multiplayer_state, state);
+    _g_multiplayer_state = state;
   }
 }
 
@@ -398,7 +398,7 @@ void serv_hello_handler(void* buf, u32 len) {
   g_map.tiles = malloc(map_size);
 
   /* Set player ID */
-  player_id = pkt->player_id;
+  g_player_id = pkt->player_id;
 
   s = (struct sprite_init*)pkt->data;
   m = pkt->data + sizeof(*s) * n_sprites;
@@ -408,7 +408,7 @@ void serv_hello_handler(void* buf, u32 len) {
     for (; n_sprites > 0; --n_sprites) {
       if (len < sizeof(*s))
         break;
-      if (s->desc.id != player_id)
+      if (s->desc.id != g_player_id)
         init_sprite(s);
       else {
         /* Init data refers to the player */
@@ -492,7 +492,7 @@ void serv_update_handler(void* buf, u32 len) {
 
   /* Process update data */
   t = &pkt->transform;
-  if (pkt->id == player_id)
+  if (pkt->id == g_player_id)
     /* Update data refers to the player */
     reconcile(pkt->ts, &t->pos, &t->vel);
   else if ((s = get_sprite(pkt->id, false)))
@@ -537,7 +537,7 @@ void serv_destroy_handler(void* buf, u32 len) {
     return;
   }
 
-  if (pkt->desc.id == player_id) {
+  if (pkt->desc.id == g_player_id) {
     /* Destroy packet refers to the player */
     client_switch_state(CLIENT_OVER);
     /* Make sprite tracker follow the player sprite that "killed" the player */
@@ -545,7 +545,7 @@ void serv_destroy_handler(void* buf, u32 len) {
     /* Clear the player sprite ID, since once the player is dead the server will
      * reuse they're sprite id for other sprites
      */
-    player_id = 0;
+    g_player_id = 0;
     return;
   } else if (g_tracked_sprite != NULL &&
              pkt->desc.id == g_tracked_sprite->desc.id)
@@ -556,9 +556,9 @@ void serv_destroy_handler(void* buf, u32 len) {
 
   /* Handle bullet points and damage */
   if (pkt->desc.type == SPRITE_BULLET && pkt->desc.field != 0) {
-    if (pkt->desc.owner == player_id)
+    if (pkt->desc.owner == g_player_id)
       ; /* TODO: add player reward */
-    else if (pkt->desc.field == player_id)
+    else if (pkt->desc.field == g_player_id)
       g_player.health -= BULLET_DAMAGE;
   }
 
@@ -598,7 +598,7 @@ void serv_wait_handler(void* buf, u32 len) {
      * and the seconds left to wait are 0, switch to game state.
      */
     multiplayer_set_state(MULTIPLAYER_UPDATING);
-    game_start = platform_get_time(); /* Set the game start time */
+    g_game_start = platform_get_time(); /* Set the game start time */
   }
   else
     /* If the wait flag is true (the game has not reached the minimum amount of
@@ -643,13 +643,13 @@ void gloom_on_recv_packet(u32 len) {
   struct serv_pkt_hdr* hdr;
 
   /* Check that the packet fits inside the packet buffer */
-  if (len > sizeof(pkt_buf)) {
+  if (len > sizeof(g_pkt_buf)) {
     eprintf("packet too big! (max. packet size is %u bytes, but got %u)\n",
-            sizeof(pkt_buf), len);
+            sizeof(g_pkt_buf), len);
     return;
   }
 
-  hdr = (struct serv_pkt_hdr*)pkt_buf;
+  hdr = (struct serv_pkt_hdr*)g_pkt_buf;
   if (!hdr)
     return; /* No message received or recv error */
   if (len < sizeof(*hdr)) {
@@ -658,11 +658,11 @@ void gloom_on_recv_packet(u32 len) {
   }
 
   /* Ensure sequence number is within margin of error */
-  if (abs(hdr->seq - server_seq) < MAX_PACKET_DROP)
-    server_seq = hdr->seq + 1;
+  if (abs(hdr->seq - g_server_seq) < MAX_PACKET_DROP)
+    g_server_seq = hdr->seq + 1;
   else {
     eprintf("invalid sequence number (expected %u got %u)\n",
-            server_seq, hdr->seq);
+            g_server_seq, hdr->seq);
     return;
   }
 

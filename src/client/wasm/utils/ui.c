@@ -5,7 +5,7 @@
 #define SLIDER_THICKNESS 8
 #define PAD              2
 
-u32 _fg_color = 0xFFFFFFFF, _bg_color = 0xFF000000;
+u32 _g_fg_color = 0xFFFFFFFF, _g_bg_color = 0xFF000000;
 
 static inline
 b8 can_draw(u32* x, u32* y, u32* w, u32* h) {
@@ -58,7 +58,7 @@ void write_text_with_color(u32* x, u32* y, u32 scale, u32 color,
     } else if (*x >= FB_WIDTH)
       continue;
 
-    char_data = font[(u8)c];
+    char_data = g_font[(u8)c];
     for (h1 = 0; h1 < h; ++h1) {
       c1 = char_data[h1 / scale];
       for (w1 = 0; w1 < w; ++w1) {
@@ -80,11 +80,11 @@ void ui_draw_component(u32 x, u32 y, struct component* c) {
   char checkbox_tick[] = "[ ]";
 
   if (c->state != UICOMP_IDLE) {
-    bg_color = _fg_color;
-    fg_color = _bg_color;
+    bg_color = _g_fg_color;
+    fg_color = _g_bg_color;
   } else {
-    bg_color = _bg_color;
-    fg_color = _fg_color;
+    bg_color = _g_bg_color;
+    fg_color = _g_fg_color;
   }
 
   ui_draw_rect(c->tl.x, c->tl.y, c->br.x - c->tl.x, c->br.y - c->tl.y, bg_color);
@@ -121,7 +121,7 @@ void ui_draw_component(u32 x, u32 y, struct component* c) {
 }
 
 void ui_draw_string(u32 x, u32 y, const char* text) {
-  write_text_with_color(&x, &y, 1, _fg_color, text);
+  write_text_with_color(&x, &y, 1, _g_fg_color, text);
 }
 
 void ui_draw_string_with_color(u32 x, u32 y, const char* text, u32 color) {
@@ -143,19 +143,19 @@ void ui_draw_title(u32 x, u32 y, const char* text) {
   pad[0] = '\xd2';
   pad[end] = '\xd3';
   xx = x;
-  write_text_with_color(&xx, &y, 2, _fg_color, pad);
+  write_text_with_color(&xx, &y, 2, _g_fg_color, pad);
   y += FONT_HEIGHT << 1;
 
   xx = x;
-  write_text_with_color(&xx, &y, 2, _fg_color, "\xd1 ");
-  write_text_with_color(&xx, &y, 2, _fg_color, text);
-  write_text_with_color(&xx, &y, 2, _fg_color, " \xd1");
+  write_text_with_color(&xx, &y, 2, _g_fg_color, "\xd1 ");
+  write_text_with_color(&xx, &y, 2, _g_fg_color, text);
+  write_text_with_color(&xx, &y, 2, _g_fg_color, " \xd1");
   y += FONT_HEIGHT << 1;
 
   pad[0] = '\xd4';
   pad[end] = '\xd5';
   xx = x;
-  write_text_with_color(&xx, &y, 2, _fg_color, pad);
+  write_text_with_color(&xx, &y, 2, _g_fg_color, pad);
 }
 
 static inline

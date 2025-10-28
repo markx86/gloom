@@ -42,7 +42,7 @@ struct component {
   };
 };
 
-extern u32 _fg_color, _bg_color;
+extern u32 _g_fg_color, _g_bg_color;
 
 #define TITLE_HEIGHT       (FONT_HEIGHT * 2 * 3)
 #define TITLE_WIDTH(s)     ((strlen(s) + 4) * FONT_WIDTH * 2)
@@ -56,8 +56,8 @@ extern u32 _fg_color, _bg_color;
 
 static inline
 void ui_set_colors(u32 fg, u32 bg) {
-  _fg_color = fg;
-  _bg_color = bg;
+  _g_fg_color = fg;
+  _g_bg_color = bg;
 }
 
 void ui_draw_rect(u32 x, u32 y, u32 w, u32 h, u32 color);
@@ -75,7 +75,7 @@ void ui_clear_screen_with_color(u32 color) {
 
 static inline
 void ui_clear_screen(void) {
-  ui_clear_screen_with_color(_bg_color);
+  ui_clear_screen_with_color(_g_bg_color);
 }
 
 void ui_on_mouse_moved(u32 x, u32 y, i32 dx, i32 dy,
