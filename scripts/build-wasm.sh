@@ -10,16 +10,6 @@ shift
 extra_flags="$@"
 outfile=$(basename $outpath)
 wasmdir="./src/client/wasm"
-gendir=$(mktemp --directory)
-
-mkdir -p $gendir
-
-# generate font.h file
-./scripts/tools/gen-font.py $gendir
-# generate cosine table
-./scripts/tools/gen-cos-table.py $gendir
-# generate sprites.c file
-./scripts/tools/gen-sprites.py $gendir
 
 # glob .c files
 srcs=$(find $wasmdir/gloom-core/src -type f -name '*.c')
@@ -30,7 +20,7 @@ clang \
   -Wall \
   -Wextra \
   -I$wasmdir/gloom-core/include \
-  -I$gendir \
+  -I$wasmdir/gloom-core/gen \
   -O3 \
   -flto \
   -fno-builtin \
