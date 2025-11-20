@@ -8,6 +8,7 @@ cd $(dirname $(realpath $0))/../
 esbuild \
   --sourcemap \
   --bundle \
+  --minify \
   --platform=node \
   --target=node10 \
   --outfile=build/server.js \

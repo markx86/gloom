@@ -401,6 +401,7 @@ export class Game {
         id = randomInt(2 ** 32);
       }
       Game.games.set(id, new Game(id, creator, map));
+      Logger.trace("User '%s' created game with ID %s", creator, id.toString(16));
       return id;
     }
   }
@@ -408,6 +409,7 @@ export class Game {
   public static destroy(game: Game) {
     game.broadcastGroup.send(new TerminatePacket());
     Game.games.delete(game.id);
+    Logger.trace("Destroyed game with ID %s", game.id.toString(16))
   }
 
   public static getById(id: number): Game | null {
@@ -494,7 +496,6 @@ export class Game {
 
       case GameState.OVER: {
         if (this.numOfPlayers == 0 || this.waitTime <= 0) {
-          Logger.trace("Destroying game with ID: %s", this.id.toString(16));
           Game.destroy(this);
         } else {
           this.waitTime -= delta;
@@ -532,7 +533,7 @@ export class Game {
       const id = this.nextEntityId();
       const pos = this.map.getSpawnPositionForPlayer(id - 1, this.numOfPlayers);
       if (pos != null) {
-        Logger.trace("Spawining player %s (ID: %d) @ (x = %f, y = %f, r = %f)", token.toString(16), id, pos.x, pos.y, pos.rot);
+        Logger.trace("Spawning player %s (ID: %d) @ (x = %f, y = %f, r = %f)", token.toString(16), id, pos.x, pos.y, pos.rot);
         return this.addSprite(new PlayerSprite(token, this, id, pos.x, pos.y, pos.rot));
       }
       Logger.warning("No place to spawn player with token %s", token);

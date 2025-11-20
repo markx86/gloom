@@ -216,7 +216,7 @@ app.get("/api/session/refresh", (_, res) => {
     const newSessionId = generateSessionId();
     refreshSession(currentSessionId, newSessionId, expirationTimestamp);
     setSessionCookie(res, newSessionId);
-    res.status(200).send();
+    res.status(200).send({ username: res.locals.username });
   } catch (e) {
     Logger.error(e.message);
     res.status(500).send();
