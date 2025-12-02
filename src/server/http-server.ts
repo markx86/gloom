@@ -10,7 +10,7 @@ import {
   refreshSession
 } from "./database.ts";
 import Logger from "./logger.ts";
-import Maps from "./maps.ts"
+import { Maps } from "./map.ts"
 import { Game } from "./game.ts";
 import { getEnvStringOrDefault } from "./util.ts";
 
@@ -162,17 +162,19 @@ app.post("/api/login", (req, res) => {
     return;
   }
 
+  const errorResponse = { message: "Invalid credentials" };
+
   // basic username validation
   const username = data.username.trim();
   if (checkUsernameLength(username) !== 0) {
-    res.status(401).send();
+    res.status(401).send(errorResponse);
     return;
   }
 
   // basic password validation
   const password = data.password;
   if (checkPasswordLength(password) !== 0) {
-    res.status(401).send();
+    res.status(401).send(errorResponse);
     return;
   }
 
@@ -189,7 +191,7 @@ app.post("/api/login", (req, res) => {
         setSessionCookie(res, sessionId);
         res.status(200).send();
       } else {
-        res.status(401).send();
+        res.status(401).send(errorResponse);
       }
     });
   } catch (e) {

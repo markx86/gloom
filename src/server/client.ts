@@ -1,6 +1,6 @@
 import Logger from "./logger";
 import { WebSocket } from "ws";
-import { PlayerSprite } from "./game";
+import { PlayerSprite } from "./sprite";
 import { GamePacketType, ServerPacket, HelloPacket, UpdatePacket, DestroyPacket, GamePacket, WaitPacket } from "./packet";
 import { Peer } from "./broadcast";
 
@@ -113,9 +113,10 @@ export class Client extends Peer {
 
     // handle WebSocket close event
     this.ws.on("close", () => {
-      Logger.success("Removing player with ID %d from game %s", this.player.id, this.player.game.id.toString(16));
-      this.player.game.removePlayer(this.player);
-      this.broadcastPacket(new DestroyPacket(this.player), false);
+      const game = this.player.game;
+      if (game.isWaiting() || game.isReady()) {
+        game.removePlayer(this.player);
+      }
       this.removeFromBroadcastGroup();
     });
 
@@ -126,19 +127,24 @@ export class Client extends Peer {
       if (!isBinary || !(data instanceof Buffer)) {
         return;
       }
-      const packet = new GamePacket(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+      try {
+        const packet = new GamePacket(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
 
-      const typeAndSeq = packet.popU32();
-      const type = (typeAndSeq >> 30) & 3;
-      const sequence = (typeAndSeq & 0x3FFFFFFF);
+        const typeAndSeq = packet.popU32();
+        const type = (typeAndSeq >> 30) & 3;
+        const sequence = (typeAndSeq & 0x3FFFFFFF);
 
-      const playerToken = packet.popU32();
+        const playerToken = packet.popU32();
 
-      Logger.trace("Packet type: %s", type.toString(16));
-      Logger.trace("Sequence number: %s", sequence);
-      Logger.trace("Player token: %s", playerToken.toString(16));
+        Logger.trace("Packet type: %s", type.toString(16));
+        Logger.trace("Sequence number: %s", sequence);
+        Logger.trace("Player token: %s", playerToken.toString(16));
 
-      this.handlePacket(type, sequence, playerToken, packet);
+        this.handlePacket(type, sequence, playerToken, packet);
+      } catch (e) {
+        Logger.error("Unhandled exception when parsing packet for player #%s", this.player.id.toString(16));
+        Logger.error(e);
+      }
     });
 
     this.registerToBroadcastGroup(this.player.game.id);

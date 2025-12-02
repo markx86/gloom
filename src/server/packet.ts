@@ -1,4 +1,5 @@
-import { BulletSprite, Game, GameSprite, PlayerSprite } from "./game";
+import { Game } from "./game";
+import { BulletSprite, GameSprite, PlayerSprite } from "./sprite";
 
 export enum GamePacketType {
   READY,

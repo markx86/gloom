@@ -30,7 +30,7 @@ function createClient(ws: WebSocket, playerToken: number, gameId: number): boole
 wss.on("connection", ws => {
   Logger.trace("Player connected");
   ws.on("message", (data, isBinary) => {
-    if (!isBinary || !(data instanceof Buffer)) {
+    if (!isBinary || !(data instanceof Buffer) || data.byteLength !== 12 /* Handshake packet is 12 bytes big */) {
       return;
     }
     ws.removeAllListeners();

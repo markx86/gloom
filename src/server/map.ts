@@ -1,5 +1,74 @@
-import { GameMap, SpawnPosition } from "./game";
 import { randomInt } from "node:crypto";
+
+export class SpawnPosition {
+  readonly x: number;
+  readonly y: number;
+  readonly rot: number;
+
+  constructor(x: number, y: number, rot: number) {
+    this.x = x + 0.5;
+    this.y = y + 0.5;
+    this.rot = -rot * Math.PI / 180.0;
+  }
+}
+
+export class GameMap {
+  private spawnPositions: Array<SpawnPosition>;
+  private compressed: Uint8Array | undefined;
+  private tiles: Uint8Array;
+  readonly width: number;
+  readonly height: number;
+
+  public constructor(width: number, height: number, tiles: ArrayLike<number>, spawns: Array<SpawnPosition>) {
+    if (width * height != tiles.length) {
+      throw new Error(`Trying to create map of size ${width}x${height} with only ${tiles.length} tiles!`);
+    }
+    this.width = width;
+    this.height = height;
+    this.tiles = new Uint8Array(tiles);
+    this.spawnPositions = spawns;
+  }
+
+  public getCompressedData(): Uint8Array {
+    if (!this.compressed) {
+      const compressed = this.tiles.reduce((running, tileValue, tileIndex) => {
+        tileValue &= 1;
+        const bitPos = tileIndex & 7;
+        if (bitPos === 0) {
+          running.push(tileValue);
+        } else {
+          running[tileIndex >> 3] |= tileValue << bitPos;
+        }
+        return running;
+      }, new Array<number>())
+      this.compressed = new Uint8Array(compressed);
+    }
+    return this.compressed;
+  }
+
+  public getSizeInBytes(): number {
+    return ((this.tiles.length + 7) & ~7) >> 3;
+  }
+
+  public testBlockAt(x: number, y: number) {
+    x = Math.floor(x);
+    if (x >= this.width || x < 0) {
+      return true;
+    }
+    y = Math.floor(y);
+    if (y >= this.height || y < 0) {
+      return true;
+    }
+    return (this.tiles[x + y * this.width] & 1) !== 0;
+  }
+
+  public getSpawnPositionForPlayer(id: number, numPlayers: number): SpawnPosition | undefined {
+    if (numPlayers < this.spawnPositions.length) {
+      const index = id % this.spawnPositions.length;
+      return this.spawnPositions[index];
+    }
+  }
+}
 
 const mapLabyrinth = new GameMap(32, 32, [
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -162,7 +231,7 @@ const mapCrazyCurves = new GameMap(32, 32, [
   new SpawnPosition(1, 32 - 2, 45)
 ]);
 
-export default class Maps {
+export class Maps {
   private static allMaps = [
     mapLabyrinth, mapBigFan, mapSpirals, mapCrazyCurves
   ];
