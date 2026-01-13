@@ -1,15 +1,9 @@
 // NOTE: this scripts requires reactive.js
 
 export async function loadGloom() {
-  const FB_WIDTH = 640;
-  const FB_HEIGHT = 480;
-  const FB_STRIDE = FB_WIDTH;
-  const FB_SIZE = 4 * FB_STRIDE * FB_HEIGHT; // frame-buffer size
-  const ZB_SIZE = 4 * FB_STRIDE * 1; // depth-buffer size
-
   const textDecoder = new TextDecoder("utf-8");
-  const canvasDefaultWidth = FB_WIDTH;
-  const canvasDefaultHeight = FB_HEIGHT;
+  const canvasDefaultWidth = 640;
+  const canvasDefaultHeight = 480;
 
   let canvasContainer = null, canvas = null, ctx = null, fb = null;
   let originTime = 0;
@@ -58,19 +52,27 @@ export async function loadGloom() {
     return (bytes + ((1 << 16) - 1)) >> 16;
   }
 
-  function allocateBuffer() {
-    memory.grow(getPages(FB_SIZE + ZB_SIZE));
+  function getFramebufferSizes() {
+    return [instance.exports.gloom_framebuffer_width(), instance.exports.gloom_framebuffer_height()];
+  }
+
+  function allocateFrameBuffer() {
+    const [width, height] = getFramebufferSizes();
+    const fbStride = width;
+    const fbSize = 4 * fbStride * height;
+    const zbSize = 4 * width;
     const fbAddress = instance.exports.__heap_base;
-    instance.exports.gloom_set_framebuffer(fbAddress, fbAddress + FB_SIZE, FB_WIDTH, FB_HEIGHT, FB_STRIDE);
-    return fbAddress;
+    memory.grow(getPages(fbSize + zbSize));
+    instance.exports.gloom_framebuffer_set(fbAddress, fbAddress + fbSize, fbStride);
+    return [fbAddress, width, height, fbSize];
   }
   
   function createFramebuffer() {
-    const fbMemory = allocateBuffer();
-    const fbArray = new Uint8ClampedArray(memory.buffer, fbMemory, FB_SIZE);
-    fb = new ImageData(fbArray, FB_WIDTH, FB_HEIGHT);
-    canvas.width = FB_WIDTH;
-    canvas.height = FB_HEIGHT;
+    const [fbAddress, fbWidth, fbHeight, fbSize] = allocateFrameBuffer();
+    const fbArray = new Uint8ClampedArray(memory.buffer, fbAddress, fbSize);
+    fb = new ImageData(fbArray, fbWidth, fbHeight);
+    canvas.width = fbWidth;
+    canvas.height = fbHeight;
     updateViewportSize();
   }
   
