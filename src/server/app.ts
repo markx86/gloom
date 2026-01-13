@@ -12,6 +12,8 @@ import { HTTP_PORT, HTTPS_PORT } from "./ports.ts";
 import { app } from "./http-server.ts"
 import { wss } from "./game-server.ts"
 
+const INADDR_ANY = "0.0.0.0";
+
 const httpsOptions = {
   key: readFileSync(getEnvStringOrDefault("HTTPS_KEY", "./cert.key")),
   cert: readFileSync(getEnvStringOrDefault("HTTPS_CERT", "./cert.pem"))
@@ -31,9 +33,9 @@ function handleUpgrade(request: http.IncomingMessage, socket: Stream.Duplex, hea
 }
 
 const httpServer = http.createServer(app);
-httpServer.listen(HTTP_PORT);
+httpServer.listen(HTTP_PORT, INADDR_ANY);
 httpServer.on("upgrade", handleUpgrade);
 
 const httpsServer = https.createServer(httpsOptions, app);
-httpsServer.listen(HTTPS_PORT);
+httpsServer.listen(HTTPS_PORT, INADDR_ANY);
 httpsServer.on("upgrade", handleUpgrade);

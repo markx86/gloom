@@ -1,12 +1,17 @@
 // NOTE: this scripts requires reactive.js
 
 export async function loadGloom() {
-  const textDecoder = new TextDecoder("utf-8");
-  const canvasDefaultWidth = 640;
-  const canvasDefaultHeight = 480;
+  const FB_WIDTH = 640;
+  const FB_HEIGHT = 480;
+  const FB_STRIDE = FB_WIDTH;
+  const FB_SIZE = 4 * FB_STRIDE * FB_HEIGHT; // frame-buffer size
+  const ZB_SIZE = 4 * FB_STRIDE * 1; // depth-buffer size
 
-  let canvasContainer = null, canvas = null, ctx = null;
-  let fbArray = null, fb = null;
+  const textDecoder = new TextDecoder("utf-8");
+  const canvasDefaultWidth = FB_WIDTH;
+  const canvasDefaultHeight = FB_HEIGHT;
+
+  let canvasContainer = null, canvas = null, ctx = null, fb = null;
   let originTime = 0;
   let ws = null;
   let settingsKey = null;
@@ -48,26 +53,24 @@ export async function loadGloom() {
         break;
     }
   }
-  
-  // u32 platform_request_mem(u32 size);
-  function platform_request_mem(sz) {
-    const pages = (sz + (1 << 16) - 1) >> 16;
-    const fbAddress = fbArray.byteOffset;
-    const fbSize = fbArray.byteLength;
-    const fbWidth = fb.width;
-    const fbHeight = fb.height;
-    memory.grow(pages);
-    // re-register framebuffer, because it gets detached every time we
-    // call memory.grow(..)
-    setFramebuffer(fbAddress, fbWidth, fbHeight, fbSize);
-    return pages << 16;
+
+  function getPages(bytes) {
+    return (bytes + ((1 << 16) - 1)) >> 16;
+  }
+
+  function allocateBuffer() {
+    memory.grow(getPages(FB_SIZE + ZB_SIZE));
+    const fbAddress = instance.exports.__heap_base;
+    instance.exports.gloom_set_framebuffer(fbAddress, fbAddress + FB_SIZE, FB_WIDTH, FB_HEIGHT, FB_STRIDE);
+    return fbAddress;
   }
   
-  function setFramebuffer(addr, width, height, size) {
-    fbArray = new Uint8ClampedArray(memory.buffer, addr, size);
-    fb = new ImageData(fbArray, width, height);
-    canvas.width = width;
-    canvas.height = height;
+  function createFramebuffer() {
+    const fbMemory = allocateBuffer();
+    const fbArray = new Uint8ClampedArray(memory.buffer, fbMemory, FB_SIZE);
+    fb = new ImageData(fbArray, FB_WIDTH, FB_HEIGHT);
+    canvas.width = FB_WIDTH;
+    canvas.height = FB_HEIGHT;
     updateViewportSize();
   }
   
@@ -127,7 +130,6 @@ export async function loadGloom() {
       platform_write,
       platform_pointer_lock,
       platform_pointer_release,
-      platform_request_mem,
       platform_send_packet,
       platform_settings_store,
       platform_get_time,
@@ -279,12 +281,7 @@ export async function loadGloom() {
         }
       }
 
-      setFramebuffer(
-        instance.exports.gloom_framebuffer(),
-        instance.exports.gloom_framebuffer_width(),
-        instance.exports.gloom_framebuffer_height(),
-        instance.exports.gloom_framebuffer_size()
-      );
+      createFramebuffer();
       instance.exports.gloom_init(online, gameId, playerToken);
 
       window.requestAnimationFrame((timestamp) => {

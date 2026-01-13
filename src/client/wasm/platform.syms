@@ -1,7 +1,6 @@
 platform_write
 platform_pointer_lock
 platform_pointer_release
-platform_request_mem
 platform_send_packet
 platform_settings_store
 platform_get_time
