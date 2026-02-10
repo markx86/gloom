@@ -193,6 +193,17 @@ export class Game {
     return id + 1;
   }
 
+  private trySpawnPlayer(token: number, handle: PlayerHandle): PlayerSprite | undefined {
+    const id = this.nextEntityId();
+    const pos = this.map.getSpawnPositionForPlayer(id - 1, this.numOfPlayers);
+    if (pos != null) {
+      Logger.trace("Spawning player %s (ID: %d) @ (x = %f, y = %f, r = %f)", token.toString(16), id, pos.x, pos.y, pos.rot);
+      this.numOfPlayers++;
+      handle.sprite = new PlayerSprite(token, this, id, pos.x, pos.y, pos.rot);
+      return this.addSprite(handle.sprite);
+    }
+  }
+
   public newPlayer(token: number): PlayerSprite | undefined {
     const handle = this.players.get(token);
     if (this.numOfPlayers >= MAX_PLAYERS) {
@@ -203,15 +214,11 @@ export class Game {
       return handle.sprite;
     } else {
       // try to spawn player
-      const id = this.nextEntityId();
-      const pos = this.map.getSpawnPositionForPlayer(id - 1, this.numOfPlayers);
-      if (pos != null) {
-        Logger.trace("Spawning player %s (ID: %d) @ (x = %f, y = %f, r = %f)", token.toString(16), id, pos.x, pos.y, pos.rot);
-        this.numOfPlayers++;
-        handle.sprite = new PlayerSprite(token, this, id, pos.x, pos.y, pos.rot);
-        return this.addSprite(handle.sprite);
+      const playerSprite = this.trySpawnPlayer(token, handle);
+      if (playerSprite == null) {
+        Logger.warning("No place to spawn player with token %s", token);
       }
-      Logger.warning("No place to spawn player with token %s", token);
+      return playerSprite;
     }
   }
 

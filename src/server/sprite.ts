@@ -5,6 +5,7 @@ import { GameMap } from "./map";
 const PLAYER_HEALTH = 100;
 const PLAYER_RUN_SPEED = 3.5;
 const PLAYER_RELOAD_TIME = 0.5;
+const PLAYER_RADIUS = 0.15;
 
 const BULLET_DAMAGE = 25;
 const BULLET_INITIAL_SPEED = 10;
@@ -166,7 +167,7 @@ export class PlayerSprite extends GameSprite {
 
   public constructor(token: number, game: Game, id: number,
                      x: number, y: number, r: number = 0) {
-    super(game, id, GameSpriteType.PLAYER, 0.15, x, y, 0, r);
+    super(game, id, GameSpriteType.PLAYER, PLAYER_RADIUS, x, y, 0, r);
     this.token = token;
     this.health = PLAYER_HEALTH;
     this.reloadTime = 0;
