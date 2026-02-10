@@ -4,11 +4,15 @@ window.$assert = function (condition, message = undefined) {
   }
 };
 
-const $_routerArgs = new Map();
+const $_globalState = {
+  routerArgs: new Map(),
+  timeouts: new Set(),
+  intervals: new Set()
+};
 
 function $_getArgsForRoute(location) {
-  const args = $_routerArgs.get(location);
-  $_routerArgs.delete(location);
+  const args = $_globalState.routerArgs.get(location);
+  $_globalState.routerArgs.delete(location);
   return args;
 }
 
@@ -113,15 +117,62 @@ window.$tag = function (name, ...children) {
 
 window.$ = function (ident) {
   $assert(typeof(ident) === "string", "identifier must be a string");
-  const type = ident.charAt(0);
-  if (type === '#') {
-    return document.getElementById(ident.substring(1));
-  } else if (type === '.') {
-    return document.getElementsByClassName(ident.substring(1));
+  const results = document.querySelectorAll(ident);
+  if (results.length === 1) {
+    return results[0];
   } else {
-    return document.getElementsByTagName(ident);
+    return [...results];
   }
 };
+
+function $_removeTimeout(timeoutId) {
+  if ($_globalState.timeouts.has(timeoutId)) {
+    clearTimeout(timeoutId);
+    $_globalState.timeouts.delete(timeoutId);
+  }
+}
+
+window.$timeout = function (delay, callback, ...args) {
+  if (callback == null) {
+    $assert(typeof(delay) === "number", "timeoutId must be a number");
+    $_removeTimeout(delay);
+  } else {
+    $assert(typeof(delay) === "number", "delay must be a number");
+    const id = setTimeout((...args) => {
+      callback(...args);
+      $_removeTimeout(id);
+    }, delay, ...args);
+    $_globalState.timeouts.add(id);
+  }
+}
+
+function $_removeInterval(intervalId) {
+  if ($_globalState.intervals.has(intervalId)) {
+    clearInterval(intervalId);
+    $_globalState.intervals.delete(intervalId);
+  }
+}
+
+window.$interval = function(period, callback, ...args) {
+  if (callback == null) {
+    $assert(typeof(period) === "number", "intervalId must be a number");
+    $_removeInterval(period);
+  } else {
+    $assert(typeof(period) === "number", "period must be a number");
+    const id = setInterval((...args) => {
+      callback(...args);
+      $_removeInterval(id);
+    }, period, ...args);
+    $_globalState.intervals.add(id);
+  }
+}
+
+function $_clearAllTimers() {
+  $_globalState.timeouts.forEach(timeoutId => clearTimeout(timeoutId));
+  $_globalState.intervals.forEach(intervalId => clearInterval(intervalId));
+  $_globalState.timeouts.clear();
+  $_globalState.intervals.clear();
+}
 
 window.$img = function (src, width, height) {
   $assert(typeof(src) === "string", "src must be a string");
@@ -133,16 +184,17 @@ window.$img = function (src, width, height) {
 window.$goto = function (route, ...args) {
   $assert(typeof(route) === "string", "route must be a string");
   if (args.length > 0) {
-    $_routerArgs.set(route, args);
+    $_globalState.routerArgs.set(route, args);
   }
+  $_clearAllTimers();
   document.location.hash = route.replace('/', '$').replace(/\//, '-');
 };
 
-window.$route = function () {
-  return document.location.hash
-      .replace('#', '')
-      .replace('$', '/') // replace root character
-      .replace(/-/, '/'); // replace separator character
+window.$route = function (hash = document.location.hash) {
+  return hash?.replace('#', '')
+              .replace('$', '/') // replace root character
+              .replace(/-/, '/') // replace separator character
+         ?? "/";
 };
 
 [
@@ -163,23 +215,54 @@ window.$root = function (node) {
   }
 }
 
+window.$defer = function (callback) {
+  new Promise(resolve => resolve())
+    .then(callback);
+}
+
 window.$router = function (routes, callbacks) {
-  const result = $root();
-  $assert(result != null, "no root node found!");
+  const root = $root();
+  $assert(root != null, "no root node found!");
   const errorHandler = callbacks?.onError ?? console.error;
 
-  function _route() {
+  function _route(event) {
     const location = $route();
+    const prevLocation = $route(event?.oldURL?.split("#").pop());
     if (location.length === 0) {
       $goto(routes.$default ?? "/");
     } else {
       $assert(location.charAt(0) === '/', "route must start with a /");
       $assert(location in routes, `unknown route ${location}`);
-      $assert(routes[location] instanceof Function, "routes must be functions");
 
-      if (callbacks?.onBeforeRoute) callbacks.onBeforeRoute();
+      const route = routes[location];
+
+      // call onLeave callback
+      if (prevLocation in routes) {
+        const prevRoute = routes[prevLocation];
+        // per route callback
+        if (prevRoute.onLeave != null && !prevRoute.onLeave(location, prevLocation)) {
+          // global callback
+          if (callbacks?.onLeave) callbacks.onLeave(location, prevLocation);
+        }
+      }
+
+      let routeFn;
+      if (typeof(route) === "function") {
+        routeFn = route;
+      } else if (typeof(route) === "object") {
+        $assert(route.onRoute != null, "route.onRoute cannot be null/undefined");
+        routeFn = route.onRoute;
+      } else {
+        $assert(false, `routes must be either functions or objects (got ${typeof(route)})`);
+      }
+
+      // per route callback
+      if (route.onBeforeRoute == null || !route.onBeforeRoute(location, prevLocation)) {
+        // global callback
+        if (callbacks?.onBeforeRoute) callbacks.onBeforeRoute(location, prevLocation);
+      }
+
       const args = $_getArgsForRoute(location);
-      const routeFn = routes[location];
       $assert(
         (routeFn.length === 0 && args == null) ||
         (args != null && routeFn.length === args.length),
@@ -187,16 +270,22 @@ window.$router = function (routes, callbacks) {
       );
 
       const content = args == null ? routeFn() : routeFn(...args);
-      if (callbacks?.onAfterRoute) callbacks.onAfterRoute();
+
+      // per route callback
+      if (route.onAfterRoute == null || !route.onAfterRoute(location, prevLocation)) {
+        // global callback
+        if (callbacks?.onAfterRoute) callbacks.onAfterRoute(location, prevLocation);
+      }
+
       if (content != null) {
-        result.replaceChildren(content);
+        root.replaceChildren(content);
       }
     }
   }
 
-  function route() {
+  function route(evt) {
     try {
-      _route();
+      _route(evt);
     } catch (e) {
       errorHandler(e);
     }
@@ -207,7 +296,7 @@ window.$router = function (routes, callbacks) {
   }
   route();
   window.addEventListener("hashchange", route);
-  result.$refresh = route;
+  root.$refresh = route;
 
-  return result;
+  return root;
 };
