@@ -36,7 +36,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS sessions (
     session_id BINARY(${SESSION_ID_LEN}) PRIMARY KEY,
     username VARCHAR(${USERNAME_MAX_LEN}) NOT NULL UNIQUE,
-    expiration_timestamp BIGINT NOT NULL
+    expiration_timestamp BIGINT NOT NULL,
+    FOREIGN KEY (username) REFERENCES users(username)
   )
 `);
 
