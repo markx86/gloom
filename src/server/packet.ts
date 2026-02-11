@@ -66,7 +66,7 @@ export abstract class ServerPacket {
     if (type >= ServerPacketType.MAX) {
       throw new Error("Invalid server packet type: " + type);
     }
-    this.bytes = new Uint8Array(extraSize + 4); // 4 is the size of the header in bytes
+    this.bytes = new Uint8Array(extraSize + 4); // 4 is the size of the header in bytes.
     this.view = new DataView(this.bytes.buffer);
     this.offset = 4;
     this.header = (type & 7) << 29;
@@ -146,28 +146,28 @@ export abstract class ServerPacket {
 }
 
 const SIZEOF_STRUCT_SPRITE_INIT =
-    1      // type
-  + 1      // id
-  + 1      // owner
-  + 1      // generic field
-  + 4      // rotation
-  + 4 * 2  // position
-  + 4 * 2; // velocity
+    1      // Type.
+  + 1      // ID.
+  + 1      // Owner.
+  + 1      // Generic field.
+  + 4      // Rotation.
+  + 4 * 2  // Position.
+  + 4 * 2; // Velocity.
 const SIZEOF_STRUCT_SPRITE_UPDATE =
-    1      // sprite id
-  + 4      // rotation
-  + 4 * 2  // position
-  + 4 * 2; // velocity
+    1      // Sprite ID.
+  + 4      // Rotation.
+  + 4 * 2  // Position.
+  + 4 * 2; // Velocity.
 
 export class HelloPacket extends ServerPacket {
   public constructor(player: PlayerSprite) {
     const game = player.game;
     const size =
-        1                                                // number of sprites
-      + 1                                                // this sprite id
-      + 4 * 2                                            // map size (width and height)
-      + game.map.getSizeInBytes()                        // size of map data
-      + game.sprites.length * SIZEOF_STRUCT_SPRITE_INIT; // size of sprite data
+        1                                                // Number of sprites.
+      + 1                                                // This sprite id.
+      + 4 * 2                                            // Map size (width and height).
+      + game.map.getSizeInBytes()                        // Size of map data.
+      + game.sprites.length * SIZEOF_STRUCT_SPRITE_INIT; // Size of sprite data.
     super(ServerPacketType.HELLO, size)
     this.pushU8(game.sprites.length);
     this.pushU8(player.id);

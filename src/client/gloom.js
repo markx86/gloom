@@ -14,7 +14,7 @@ export async function loadGloom() {
     const aspectRatio = fb == null ? (canvasDefaultWidth / canvasDefaultHeight) : (fb.width / fb.height);
     const parentWidth = window.innerWidth;
     const parentHeight = window.innerHeight;
-    // resize the canvas container
+    // Resize the canvas container.
     let containerWidth, containerHeight;
     if (parentWidth < parentHeight) {
       containerWidth = parentWidth * 0.75;
@@ -25,7 +25,7 @@ export async function loadGloom() {
     }
     canvasContainer.style.width = `${containerWidth}px`;
     canvasContainer.style.height = `${containerHeight}px`;
-    // shamelessly stolen from
+    // Shamelessly stolen from
     // https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Optimizing_canvas#scaling_canvas_using_css_transforms
     const xScale = containerWidth / canvas.width;
     const yScale = containerHeight / canvas.height;
@@ -225,7 +225,7 @@ export async function loadGloom() {
     canvas.width = canvasDefaultWidth;
     canvas.height = canvasDefaultHeight;
     canvas.style.transformOrigin = "top left";
-    // TODO: maybe use 'crisp-edges' instead of 'pixelated' on Firefox
+    // TODO: Maybe use 'crisp-edges' instead of 'pixelated' on Firefox.
     canvas.style.imageRendering = "pixelated";
     canvas.style.background = "black";
 
@@ -267,18 +267,18 @@ export async function loadGloom() {
       }
     }
 
-    // init game
+    // Init game.
     function startGame(online) {
       ws.removeEventListener("error", wsErrorHandler);
       ws.removeEventListener("open", wsOpenHandler);
       if (online) {
-        // send handshake
+        // Send handshake.
         {
           data = new ArrayBuffer(12);
           view = new DataView(data);
           view.setUint32(0, playerToken, true);
           view.setUint32(4, gameId, true);
-          view.setUint32(8, 0xBADC0FFE, true); // handshake magic
+          view.setUint32(8, 0xBADC0FFE, true); // Handshake magic.
           ws.send(data);
         }
       }

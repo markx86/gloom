@@ -49,7 +49,7 @@ wss.on("connection", ws => {
   });
 });
 
-// update loop
+// Update loop.
 let timestamp = performance.now();
 setInterval(() => {
   const newTimestamp = performance.now();

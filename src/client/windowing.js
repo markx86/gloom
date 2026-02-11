@@ -94,7 +94,7 @@ export function createWindow(options, ...children) {
      .$style("position", "absolute")
      .$style("width", width)
      .$style("height", height)
-     // always make windows centered
+     // Always make windows centered.
      .$style("left", "50%")
      .$style("top", "50%")
      .$style("transform-origin", "center")

@@ -9,7 +9,7 @@ import {
 } from "./windowing.js";
 
 $root($("#root"));
-// disable scroll bars
+// Disable scroll bars.
 document.body.style.overflow = "hidden";
 
 function updateRootNodeSize() {
@@ -127,8 +127,8 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     const [_, wndDisable] = getWindowControls(event.target);
     wndDisable();
     api.get("/logout").finally(_ => {
-      // on success we redirect to the login page
-      // an error (403) means the user does not have a valid session anyway, so redirect to login again
+      // On success we redirect to the login page.
+      // An error (403) means the user does not have a valid session anyway, so redirect to login again.
       $goto("/login");
     });
   }
@@ -172,7 +172,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     }
   }
 
-  // we store the game ID in the #game-id label, this is a great idea and
+  // We store the game ID in the #game-id label, this is a great idea and
   // absolutely nothing can go wrong with it :)
   
   function setMyGameId(gameId) {
@@ -216,7 +216,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
         showWindow(data.message, button.$enable);
       } else {
         setMyGameId(data.gameId);
-        // keep the create button disabled
+        // Keep the create button disabled.
         button.$disable();
       }
     } catch {
@@ -320,8 +320,8 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
           ).$class("field-row"),
           $div(
             $label("Password:").$for("field-password"),
-            // bump the field by one pixel, to align it with the username field
-            // (very hacky, but it works also I hate css :D)
+            // Bump the field by one pixel, to align it with the username field
+            // (very hacky, but it works also I hate css :D).
             $input().$type("password").$id("field-password").$style("margin-left", "7px")
           ).$class("field-row")
         ).$style("padding", "0px 8px"),
@@ -420,9 +420,9 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       })
       .catch(() => $goto("/login"));
 
-    // do not use a parameter to avoid headaches
+    // Do not use a parameter to avoid headaches.
     refreshGameId();
-    $interval(5000, refreshGameId); // refresh game id every 5 seconds
+    $interval(5000, refreshGameId); // Refresh game id every 5 seconds.
 
     return createWindow(
       {
@@ -474,7 +474,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       typeof(currentUser) == "string"
     );
   
-    // NOTE: this queues the task to be executed later
+    // NOTE: This queues the task to be executed later.
     $defer(() => gameWs = gloomLaunch(currentUser, gameId, playerToken, gotoHome));
   
     return createWindow(
@@ -505,7 +505,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
         "/signup": signup,
         "/game": {
           onRoute: game,
-          onLeave: () => {
+          onBeforeRoute: () => {
             if (gameWs != null && gameWs.readyState !== WebSocket.CLOSED) {
               gameWs.close();
             }

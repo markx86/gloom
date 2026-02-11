@@ -1,4 +1,4 @@
-// for $assert(..)
+// For $assert(..)
 import "./reactive.js";
 
 function apiRequest(endpoint, method, body) {

@@ -29,13 +29,13 @@ function $_setFunctions(tag) {
   tag.$attribute = function (name, value) {
     $assert(typeof(name) === "string", "attribute name must be a string");
     if (value === undefined) {
-      // function used as a getter
+      // Function used as a getter.
       return this.getAttribute(name);
     } else if (value === null) {
-      // function used to remove an attribute
+      // Function used to remove an attribute.
       this.removeAttribute(name);
     } else {
-      // function used to set an attribute
+      // Function used to set an attribute.
       $assert(typeof(value) === "string", "attribute value must be string");
       this.setAttribute(name, value);
     }
@@ -192,8 +192,8 @@ window.$goto = function (route, ...args) {
 
 window.$route = function (hash = document.location.hash) {
   return hash?.replace('#', '')
-              .replace('$', '/') // replace root character
-              .replace(/-/, '/') // replace separator character
+              .replace('$', '/') // Replace root character.
+              .replace(/-/, '/') // Replace separator character.
          ?? "/";
 };
 
@@ -205,11 +205,11 @@ window.$route = function (hash = document.location.hash) {
 
 window.$root = function (node) {
   if (node === undefined) {
-    // used as a getter
+    // Used as a getter.
     $assert(window.$_root != null, "no root node defined");
     return window.$_root;
   } else {
-    // used as a setter
+    // Used as a setter.
     $_setFunctions(node);
     window.$_root = node;
   }
@@ -236,13 +236,13 @@ window.$router = function (routes, callbacks) {
 
       const route = routes[location];
 
-      // call onLeave callback
+      // Call onBeforeRoute callback.
       if (prevLocation in routes) {
         const prevRoute = routes[prevLocation];
-        // per route callback
-        if (prevRoute.onLeave != null && !prevRoute.onLeave(location, prevLocation)) {
-          // global callback
-          if (callbacks?.onLeave) callbacks.onLeave(location, prevLocation);
+        // Per route onBeforeRoute callback.
+        if (prevRoute.onBeforeRoute == null || !prevRoute.onBeforeRoute(location, prevLocation)) {
+          // Global onBeforeRoute callback.
+          if (callbacks?.onBeforeRoute) callbacks.onBeforeRoute(location, prevLocation);
         }
       }
 
@@ -256,12 +256,6 @@ window.$router = function (routes, callbacks) {
         $assert(false, `routes must be either functions or objects (got ${typeof(route)})`);
       }
 
-      // per route callback
-      if (route.onBeforeRoute == null || !route.onBeforeRoute(location, prevLocation)) {
-        // global callback
-        if (callbacks?.onBeforeRoute) callbacks.onBeforeRoute(location, prevLocation);
-      }
-
       const args = $_getArgsForRoute(location);
       $assert(
         (routeFn.length === 0 && args == null) ||
@@ -271,9 +265,9 @@ window.$router = function (routes, callbacks) {
 
       const content = args == null ? routeFn() : routeFn(...args);
 
-      // per route callback
+      // Per route onAfterRoute callback.
       if (route.onAfterRoute == null || !route.onAfterRoute(location, prevLocation)) {
-        // global callback
+        // Global onAfterRoute callback.
         if (callbacks?.onAfterRoute) callbacks.onAfterRoute(location, prevLocation);
       }
 

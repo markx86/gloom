@@ -107,7 +107,9 @@ export abstract class GameSprite {
     const vDistMax = traceRay(
       x, y,
       0, signDirY,
-      this.game.map);
+      this.game.map
+    );
+
     if (vDistMax < vDist + this.radius) {
       vDist = vDistMax - this.radius;
       collided = true;

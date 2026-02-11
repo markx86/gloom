@@ -19,7 +19,7 @@ export class Client extends Peer {
 
   private checkPacket(type: GamePacketType, sequence: number, playerToken: number): boolean {
     if (type >= GamePacketType.MAX) {
-      // invalid packet type
+      // Invalid packet type.
       Logger.error("Invalid client packet type");
       return false;
     }
@@ -27,7 +27,7 @@ export class Client extends Peer {
     if (sequence >= this.clientSequence && sequence - this.clientSequence < MAX_PACKET_DROP) {
       this.clientSequence = sequence + 1;
     } else {
-      // invalid packet sequence
+      // Invalid packet sequence.
       Logger.error("Expected sequence number %d, got %d", this.clientSequence, sequence);
       return false;
     }
@@ -54,12 +54,12 @@ export class Client extends Peer {
   }
 
   private handleUpdatePacket(packet: GamePacket) {
-    // discard update packets if the player is dead
+    // Discard update packets if the player is dead.
     if (this.player.getHealth() <= 0) {
       Logger.trace("Player is dead %d (token: %s), discarding update packet", this.player.id, this.player.token.toString(16));
       return;
     }
-    // discard update packets if the game hasn't started
+    // Discard update packets if the game hasn't started.
     if (!this.player.game.isPlaying()) {
       Logger.trace("Game hasn't started, discarding update packet for player %d (token: %s)", this.player.id, this.player.token.toString(16));
       return;
@@ -87,8 +87,8 @@ export class Client extends Peer {
     switch (type) {
       case GamePacketType.READY:  {
         this.handleReadyPacket(packet);
-        // if this is the first ready packet we receive from the client,
-        // assume that they're ready to receive map data
+        // If this is the first ready packet we receive from the client,
+        // assume that they're ready to receive map data.
         if (sequence === 0) {
           Logger.trace("Sending HELLO to player %s", this.player.token.toString(16));
           this.sendPacket(new HelloPacket(this.player));
@@ -111,7 +111,7 @@ export class Client extends Peer {
 
     this.ws.on("error", Logger.error);
 
-    // handle WebSocket close event
+    // Handle WebSocket close event.
     this.ws.on("close", () => {
       const game = this.player.game;
       if (game.isWaiting() || game.isReady()) {
@@ -120,7 +120,7 @@ export class Client extends Peer {
       this.removeFromBroadcastGroup();
     });
 
-    // handle WebSocket message event
+    // Handle WebSocket message event.
     this.ws.on("message", (data, isBinary) => {
       Logger.trace("Data is binary: %s", isBinary);
       Logger.trace("Data is: %O", data);

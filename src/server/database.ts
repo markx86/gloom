@@ -21,9 +21,10 @@ export const closeDb = () => {
   db.close(() => {})
 };
 
-// Log unhandled exceptions
+// Log unhandled exceptions.
 db.on("error", Logger.error);
 
+// Users table.
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(${USERNAME_MAX_LEN}) PRIMARY KEY,
@@ -32,6 +33,7 @@ db.exec(`
   )
 `);
 
+// Sessions table.
 db.exec(`
   CREATE TABLE IF NOT EXISTS sessions (
     session_id BINARY(${SESSION_ID_LEN}) PRIMARY KEY,
@@ -41,7 +43,31 @@ db.exec(`
   )
 `);
 
-// cleanup sessions every 15 minutes
+// Scoreboard table.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS scoreboard (
+    username VARCHAR(${USERNAME_MAX_LEN}) PRIMARY KEY,
+    points BIGINT NOT NULL,
+    kills BIGINT NOT NULL,
+    deaths BIGINT NOT NULL,
+    FOREIGN KEY (username) REFERENCES (users.username)
+  )
+`);
+
+// TODO
+/*
+db.exec(`
+  CREATE TABLE IF NOT EXISTS maps (
+    map_id BIGINT PRIMARY KEY,
+    map_name VARCHAR(${0}) NOT NULL,
+    corner TINYBLOB NOT NULL,
+    creator VARCHAR(${USERNAME_MAX_LEN}) NOT NULL,
+    FOREIGN KEY (username) REFERENCES (users.username)
+  )
+`);
+*/
+
+// Cleanup sessions every 15 minutes.
 setInterval(() => {
   db.run(
     `
@@ -116,7 +142,7 @@ export function checkUserCrendentials(username: string, password: string, callba
       if (err != null) {
         throw err;
       } else if (row != null) {
-        // check if the passwords match
+        // Check if the passwords match.
         const storedHash = row.password;
         const salt = row.salt;
         const passwordHash = computePasswordHash(password, salt);

@@ -151,13 +151,14 @@ export class Game {
       }
 
       case GameState.PLAYING: {
-        // FIXME: add a maximum game duration
+        // FIXME: Add a maximum game duration.
         if (this.numOfPlayers <= 1) {
           this.waitTime = OVER_TIME;
           this.state = GameState.OVER;
           break;
         }
-        this.sprites.forEach(sprite => sprite.tick(delta)); // tick the game world
+        // Tick the game world.
+        this.sprites.forEach(sprite => sprite.tick(delta));
         break;
       }
 
@@ -174,15 +175,15 @@ export class Game {
   }
 
   public getSpriteById(id: number): GameSprite | undefined {
+    // This is decently fast, because this.sprites cannot have more than 255 entries at any
+    // given time.
     return this.sprites.filter(sprite => sprite.id === id).pop();
   }
 
-  // NOTE: entity IDs start from 1 and go up to 255
+  // NOTE: Entity IDs start from 1 and go up to 255.
   private nextEntityId(): number {
     let id = 0;
-    const sortedIds = this.sprites
-      .flatMap(sprite => sprite.id)
-      .sort();
+    const sortedIds = this.sprites.map(sprite => sprite.id).sort();
     for (let i = 0; i < sortedIds.length; i++) {
       const spriteId = sortedIds[i];
       if (spriteId - id > 1) {
@@ -213,7 +214,7 @@ export class Game {
     } else if (handle.sprite != null) {
       return handle.sprite;
     } else {
-      // try to spawn player
+      // Try to spawn player.
       const playerSprite = this.trySpawnPlayer(token, handle);
       if (playerSprite == null) {
         Logger.warning("No place to spawn player with token %s", token);
@@ -237,7 +238,7 @@ export class Game {
   public allocatePlayer(username: string): number | string {
     const token = this.getTokenForUsername(username);
     if (token != null && this.state !== GameState.OVER) {
-      // the player may be attempting to rejoin the game
+      // The player may be attempting to rejoin the game.
       return token;
     } else if (this.state !== GameState.WAITING && this.state !== GameState.READY) {
       return "That game has already started.";

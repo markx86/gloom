@@ -33,14 +33,14 @@ app.use("/api", (req, res, next) => {
     return;
   }
 
-  // get session cookie
+  // Get session cookie.
   const sessionCookie = req.signedCookies.session;
   if (sessionCookie == null || typeof(sessionCookie) !== "string") {
     res.status(401).send();
     return;
   }
 
-  // retrieve session data
+  // Retrieve session data.
   const sessionId = Buffer.from(sessionCookie, "base64url");
   try {
     getUsernameBySessionId(sessionId, (username) => {
@@ -112,7 +112,7 @@ app.post("/api/register", (req, res) => {
     return;
   }
 
-  // do username validation
+  // Do username validation.
   const username = data.username.trim();
   rc = checkUsernameLength(username);
   if (rc > 0) {
@@ -123,7 +123,7 @@ app.post("/api/register", (req, res) => {
     return;
   }
 
-  // do password validation
+  // Do password validation.
   const password = data.password;
   rc = checkPasswordLength(password);
   if (rc > 0) {
@@ -164,14 +164,14 @@ app.post("/api/login", (req, res) => {
 
   const errorResponse = { message: "Invalid credentials" };
 
-  // basic username validation
+  // Basic username validation.
   const username = data.username.trim();
   if (checkUsernameLength(username) !== 0) {
     res.status(401).send(errorResponse);
     return;
   }
 
-  // basic password validation
+  // Basic password validation.
   const password = data.password;
   if (checkPasswordLength(password) !== 0) {
     res.status(401).send(errorResponse);
@@ -182,12 +182,12 @@ app.post("/api/login", (req, res) => {
     checkUserCrendentials(username, password, (success) => {
       if (success) {
         Logger.trace("Logging in user: %s", username);
-        // generate session id and compute expiry date
+        // Generate session id and compute expiry date.
         const sessionId = generateSessionId();
         const expirationTimestamp = getSessionCookieExpirationTimestamp();
-        // store session
+        // Store session.
         setUserSession(username, sessionId, expirationTimestamp);
-        // set session cookie
+        // Set session cookie.
         setSessionCookie(res, sessionId);
         res.status(200).send();
       } else {
@@ -210,7 +210,7 @@ app.get("/api/logout", (_, res) => {
 app.get("/api/session/validate", (_, res) => { res.status(200).send({ username: res.locals.username }); });
 
 app.get("/api/session/refresh", (_, res) => {
-  // if got here that means the session cookie is valid
+  // If got here that means the session cookie is valid.
   try {
     Logger.trace("Refreshing session for user: %s", res.locals.username);
     const expirationTimestamp = getSessionCookieExpirationTimestamp();
