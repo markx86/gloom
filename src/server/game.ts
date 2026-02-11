@@ -196,7 +196,7 @@ export class Game {
 
   private trySpawnPlayer(token: number, handle: PlayerHandle): PlayerSprite | undefined {
     const id = this.nextEntityId();
-    const pos = this.map.getSpawnPositionForPlayer(id - 1, this.numOfPlayers);
+    const pos = this.map.getSpawnPositionForPlayer(this.numOfPlayers);
     if (pos != null) {
       Logger.trace("Spawning player %s (ID: %d) @ (x = %f, y = %f, r = %f)", token.toString(16), id, pos.x, pos.y, pos.rot);
       this.numOfPlayers++;

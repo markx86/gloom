@@ -62,9 +62,9 @@ export class GameMap {
     return (this.tiles[x + y * this.width] & 1) !== 0;
   }
 
-  public getSpawnPositionForPlayer(id: number, numPlayers: number): SpawnPosition | undefined {
-    if (numPlayers < this.spawnPositions.length) {
-      const index = id % this.spawnPositions.length;
+  public getSpawnPositionForPlayer(numOfPlayers: number): SpawnPosition | undefined {
+    if (numOfPlayers < this.spawnPositions.length) {
+      const index = numOfPlayers % this.spawnPositions.length;
       return this.spawnPositions[index];
     }
   }
