@@ -159,10 +159,7 @@ window.$interval = function(period, callback, ...args) {
     $_removeInterval(period);
   } else {
     $assert(typeof(period) === "number", "period must be a number");
-    const id = setInterval((...args) => {
-      callback(...args);
-      $_removeInterval(id);
-    }, period, ...args);
+    const id = setInterval(callback, period, ...args);
     $_globalState.intervals.add(id);
   }
 }
