@@ -1,6 +1,7 @@
 import Logger from "./logger";
 import { Game } from "./game";
 import { GameMap } from "./map";
+import { Player, PlayerStats } from "./player";
 
 const PLAYER_HEALTH = 100;
 const PLAYER_RUN_SPEED = 3.5;
@@ -77,8 +78,10 @@ export abstract class GameSprite {
   protected dirX: number;
   protected dirY: number;
 
-  public constructor(game: Game, id: number, type: GameSpriteType, radius: number,
-                     x: number, y: number, velocity: number, rotation: number = 0) {
+  public constructor(
+    game: Game, id: number, type: GameSpriteType, radius: number,
+    x: number, y: number, velocity: number, rotation: number = 0
+  ) {
     this.id = id;
     this.type = type;
     this.x = x;
@@ -161,16 +164,18 @@ export abstract class GameSprite {
 }
 
 export class PlayerSprite extends GameSprite {
-  readonly token: number;
+  readonly player: Player;
 
   private health: number;
   private reloadTime: number;
   private ready: boolean;
 
-  public constructor(token: number, game: Game, id: number,
-                     x: number, y: number, r: number = 0) {
+  public constructor(
+    player: Player, game: Game,
+    id: number, x: number, y: number, r: number = 0
+  ) {
     super(game, id, GameSpriteType.PLAYER, PLAYER_RADIUS, x, y, 0, r);
-    this.token = token;
+    this.player = player;
     this.health = PLAYER_HEALTH;
     this.reloadTime = 0;
     this.ready = false;
@@ -191,6 +196,10 @@ export class PlayerSprite extends GameSprite {
       this.game.removeSprite(other, this);
       this.health -= BULLET_DAMAGE;
       if (this.health <= 0) {
+        // Update stats.
+        this.player.stats?.isDead(true);
+        other.owner.player.stats?.addKill();
+        // Remove player from game.
         Logger.trace("Player %d killed by player %d", this.id, other.owner.id);
         this.game.removePlayer(this, other.owner);
       }

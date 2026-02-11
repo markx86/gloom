@@ -7,7 +7,7 @@ import { Peer } from "./broadcast";
 const MAX_PACKET_DROP = 10;
 
 export class Client extends Peer {
-  private player: PlayerSprite;
+  private sprite: PlayerSprite;
   private ws: WebSocket;
   private clientSequence: number;
   private serverSequence: number;
@@ -32,8 +32,8 @@ export class Client extends Peer {
       return false;
     }
 
-    if (this.player.token !== playerToken) {
-      Logger.error("Invalid player token! Got %s expected %s", playerToken.toString(16), this.player.token.toString(16));
+    if (this.sprite.player.token !== playerToken) {
+      Logger.error("Invalid player token! Got %s expected %s", playerToken.toString(16), this.sprite.player.token.toString(16));
       return false;
     } else if (type !== GamePacketType.READY && !this.inBroadcastGroup()) {
       Logger.error("Player is not in any game!");
@@ -45,7 +45,7 @@ export class Client extends Peer {
 
   private handleReadyPacket(packet: GamePacket) {
     const ready = packet.popU8() != 0;
-    this.player.setReady(ready);
+    this.sprite.setReady(ready);
   }
 
   private handleLeavePacket(_packet: GamePacket) {
@@ -55,13 +55,13 @@ export class Client extends Peer {
 
   private handleUpdatePacket(packet: GamePacket) {
     // Discard update packets if the player is dead.
-    if (this.player.getHealth() <= 0) {
-      Logger.trace("Player is dead %d (token: %s), discarding update packet", this.player.id, this.player.token.toString(16));
+    if (this.sprite.getHealth() <= 0) {
+      Logger.trace("Player is dead %d (token: %s), discarding update packet", this.sprite.id, this.sprite.player.token.toString(16));
       return;
     }
     // Discard update packets if the game hasn't started.
-    if (!this.player.game.isPlaying()) {
-      Logger.trace("Game hasn't started, discarding update packet for player %d (token: %s)", this.player.id, this.player.token.toString(16));
+    if (!this.sprite.game.isPlaying()) {
+      Logger.trace("Game hasn't started, discarding update packet for player %d (token: %s)", this.sprite.id, this.sprite.player.token.toString(16));
       return;
     }
 
@@ -70,13 +70,13 @@ export class Client extends Peer {
     const ts = packet.popF32();
     Logger.trace("keys = %s, rot = %f, ts = %f", keys.toString(16), rot, ts);
 
-    this.player.processUpdatePacket(keys, rot);
-    this.broadcastPacket(new UpdatePacket(this.player, ts), true);
+    this.sprite.processUpdatePacket(keys, rot);
+    this.broadcastPacket(new UpdatePacket(this.sprite, ts), true);
   }
 
   private handleFirePacket(_packet: GamePacket) {
     Logger.trace("Got fire packet");
-    this.player.fireBullet();
+    this.sprite.fireBullet();
   }
 
   private handlePacket(type: GamePacketType, sequence: number, playerToken: number, packet: GamePacket) {
@@ -90,9 +90,9 @@ export class Client extends Peer {
         // If this is the first ready packet we receive from the client,
         // assume that they're ready to receive map data.
         if (sequence === 0) {
-          Logger.trace("Sending HELLO to player %s", this.player.token.toString(16));
-          this.sendPacket(new HelloPacket(this.player));
-          this.sendPacket(new WaitPacket(this.player.game));
+          Logger.trace("Sending HELLO to player %s", this.sprite.player.token.toString(16));
+          this.sendPacket(new HelloPacket(this.sprite));
+          this.sendPacket(new WaitPacket(this.sprite.game));
         }
         break;
       }
@@ -106,16 +106,16 @@ export class Client extends Peer {
     super();
 
     this.ws = ws;
-    this.player = player;
+    this.sprite = player;
     this.serverSequence = this.clientSequence = 0;
 
     this.ws.on("error", Logger.error);
 
     // Handle WebSocket close event.
     this.ws.on("close", () => {
-      const game = this.player.game;
+      const game = this.sprite.game;
       if (game.isWaiting() || game.isReady()) {
-        game.removePlayer(this.player);
+        game.removePlayer(this.sprite);
       }
       this.removeFromBroadcastGroup();
     });
@@ -142,11 +142,11 @@ export class Client extends Peer {
 
         this.handlePacket(type, sequence, playerToken, packet);
       } catch (e) {
-        Logger.error("Unhandled exception when parsing packet for player #%s", this.player.id.toString(16));
+        Logger.error("Unhandled exception when parsing packet for player #%s", this.sprite.id.toString(16));
         Logger.error(e);
       }
     });
 
-    this.registerToBroadcastGroup(this.player.game.id);
+    this.registerToBroadcastGroup(this.sprite.game.id);
   }
 }

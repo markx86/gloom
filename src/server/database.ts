@@ -47,10 +47,10 @@ db.exec(`
 db.exec(`
   CREATE TABLE IF NOT EXISTS scoreboard (
     username VARCHAR(${USERNAME_MAX_LEN}) PRIMARY KEY,
-    points BIGINT NOT NULL,
+    wins BIGINT NOT NULL,
     kills BIGINT NOT NULL,
     deaths BIGINT NOT NULL,
-    FOREIGN KEY (username) REFERENCES (users.username)
+    FOREIGN KEY (username) REFERENCES users(username)
   )
 `);
 
@@ -62,7 +62,7 @@ db.exec(`
     map_name VARCHAR(${0}) NOT NULL,
     corner TINYBLOB NOT NULL,
     creator VARCHAR(${USERNAME_MAX_LEN}) NOT NULL,
-    FOREIGN KEY (username) REFERENCES (users.username)
+    FOREIGN KEY (username) REFERENCES users(username)
   )
 `);
 */
@@ -120,7 +120,7 @@ export function registerUser(username: string, password: string, callback: (succ
           rv = false;
         } else {
           Logger.error(
-            "An error occurred when creating a user (username = %s, password = %s, salt = %s)",
+            "An error occurred when creating a user (username = '%s', password = %s, salt = %s)",
             username, passwordHash.toString("hex"), salt.toString("hex")
           );
           throw err;
@@ -200,6 +200,21 @@ export function refreshSession(currentSessionId: Buffer, newSessionId: Buffer, e
         throw err;
       } else if (this.changes === 0) {
         throw new Error("Could not update session ID");
+      }
+    }
+  );
+}
+
+export function updateUserStats(username: string, kills: number, isDead: boolean) {
+  db.run(
+    `
+    INSERT INTO scoreboard (username, wins, kills, deaths)
+    VALUES ($username, $wins, $kills, $deaths)
+    ON CONFLICT(username) DO UPDATE SET wins = wins + $wins, kills = kills + $kills, deaths = deaths + $deaths
+    `, { $username: username, $wins: !isDead ? 1 : 0, $kills: kills, $deaths: isDead ? 1 : 0 },
+    function (err) {
+      if (err != null) {
+        throw err;
       }
     }
   );

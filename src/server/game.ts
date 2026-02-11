@@ -4,7 +4,7 @@ import { BroadcastGroup } from "./broadcast";
 import { CreatePacket, DestroyPacket, TerminatePacket, WaitPacket } from "./packet";
 import { BulletSprite, GameSprite, PlayerSprite } from "./sprite";
 import { genUniqueIntForArray } from "./util";
-import { PlayerHandle } from "./player";
+import { Player } from "./player";
 
 export const DT = 1000 / 60;
 
@@ -28,7 +28,6 @@ function nowTime(): number {
   return Date.now() / 1e3;
 }
 
-
 export class Game {
   readonly id: number;
   readonly creator: string;
@@ -36,7 +35,7 @@ export class Game {
   readonly sprites: Array<GameSprite>;
   readonly broadcastGroup: BroadcastGroup;
 
-  private players: Map<number, PlayerHandle>;
+  private players: Map<number, Player>;
   private numOfPlayers: number;
   private startTime: number;
   private waitTime: number;
@@ -52,7 +51,7 @@ export class Game {
 
     this.sprites = new Array<GameSprite>();
     this.deadSprites = new Set<number>();
-    this.players = new Map<number, PlayerHandle>();
+    this.players = new Map<number, Player>();
     this.numOfPlayers = 0;
     this.startTime = 0;
     this.waitTime = IDLE_TIME;
@@ -155,6 +154,8 @@ export class Game {
         if (this.numOfPlayers <= 1) {
           this.waitTime = OVER_TIME;
           this.state = GameState.OVER;
+          // Save stats for all remaining players.
+          this.players.forEach(player => player.saveStats());
           break;
         }
         // Tick the game world.
@@ -177,7 +178,7 @@ export class Game {
   public getSpriteById(id: number): GameSprite | undefined {
     // This is decently fast, because this.sprites cannot have more than 255 entries at any
     // given time.
-    return this.sprites.filter(sprite => sprite.id === id).pop();
+    return this.sprites.find(sprite => sprite.id === id);
   }
 
   // NOTE: Entity IDs start from 1 and go up to 255.
@@ -194,28 +195,28 @@ export class Game {
     return id + 1;
   }
 
-  private trySpawnPlayer(token: number, handle: PlayerHandle): PlayerSprite | undefined {
+  private trySpawnPlayer(player: Player): PlayerSprite | undefined {
     const id = this.nextEntityId();
     const pos = this.map.getSpawnPositionForPlayer(this.numOfPlayers);
     if (pos != null) {
-      Logger.trace("Spawning player %s (ID: %d) @ (x = %f, y = %f, r = %f)", token.toString(16), id, pos.x, pos.y, pos.rot);
+      Logger.trace("Spawning player %s (ID: %d) @ (x = %f, y = %f, r = %f)", player.token.toString(16), id, pos.x, pos.y, pos.rot);
       this.numOfPlayers++;
-      handle.sprite = new PlayerSprite(token, this, id, pos.x, pos.y, pos.rot);
-      return this.addSprite(handle.sprite);
+      player.sprite = new PlayerSprite(player, this, id, pos.x, pos.y, pos.rot);
+      return this.addSprite(player.sprite);
     }
   }
 
   public newPlayer(token: number): PlayerSprite | undefined {
-    const handle = this.players.get(token);
+    const player = this.players.get(token);
     if (this.numOfPlayers >= MAX_PLAYERS) {
       Logger.warning("Max players reached in game %s", this.id.toString(16));
-    } else if (handle == null) {
+    } else if (player == null) {
       Logger.error("No player with that token");
-    } else if (handle.sprite != null) {
-      return handle.sprite;
+    } else if (player.sprite != null) {
+      return player.sprite;
     } else {
       // Try to spawn player.
-      const playerSprite = this.trySpawnPlayer(token, handle);
+      const playerSprite = this.trySpawnPlayer(player);
       if (playerSprite == null) {
         Logger.warning("No place to spawn player with token %s", token);
       }
@@ -228,9 +229,9 @@ export class Game {
   }
 
   private getTokenForUsername(username: string): number | undefined {
-    for (const [token, handle] of this.players.entries()) {
-      if (handle.username === username) {
-        return token;
+    for (const player of this.players.values()) {
+      if (player.username === username) {
+        return player.token;
       }
     }
   }
@@ -244,15 +245,16 @@ export class Game {
       return "That game has already started.";
     } else {
       const token = genUniqueIntForArray([...this.players.keys()]);
-      this.players.set(token, new PlayerHandle(username));
+      this.players.set(token, new Player(username, token));
       Logger.trace("Allocated player with token %s", token.toString(16));
       return token;
     }
   }
 
-  public deallocatePlayer(token: number) {
-    if (this.players.delete(token)) {
-      Logger.trace("Deallocated player with token %s", token.toString(16));
+  public deallocatePlayer(player: Player) {
+    if (this.players.delete(player.token)) {
+      player.saveStats();
+      Logger.trace("Deallocated player with token %s (username = '%s')", player.token.toString(16), player.username);
     }
   }
 
@@ -269,10 +271,10 @@ export class Game {
     this.deadSprites.clear();
   }
 
-  public removePlayer(player: PlayerSprite, actor: PlayerSprite | undefined = undefined) {
-    if (this.removeSprite(player, actor)) {
+  public removePlayer(playerSprite: PlayerSprite, actorSprite: PlayerSprite | undefined = undefined) {
+    if (this.removeSprite(playerSprite, actorSprite)) {
       --this.numOfPlayers;
-      this.deallocatePlayer(player.token);
+      this.deallocatePlayer(playerSprite.player);
     }
   }
 
