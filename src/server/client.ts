@@ -50,6 +50,7 @@ export class Client extends Peer {
 
   private handleLeavePacket(_packet: GamePacket) {
     Logger.trace("Got request to leave game");
+    this.sprite.game.removePlayerWithoutSavingStats(this.sprite);
     this.ws.close();
   }
 

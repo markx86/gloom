@@ -155,11 +155,11 @@ export class Game {
           this.waitTime = OVER_TIME;
           this.state = GameState.OVER;
           // Save stats for all remaining players.
-          this.players.forEach(player => player.saveStats());
-          break;
+          this.players.forEach(player => player.stats.save());
+        } else {
+          // Tick the game world.
+          this.sprites.forEach(sprite => sprite.tick(delta));
         }
-        // Tick the game world.
-        this.sprites.forEach(sprite => sprite.tick(delta));
         break;
       }
 
@@ -251,9 +251,11 @@ export class Game {
     }
   }
 
-  public deallocatePlayer(player: Player) {
+  public deallocatePlayer(player: Player, saveStats: boolean = true) {
     if (this.players.delete(player.token)) {
-      player.saveStats();
+      if (saveStats) {
+        player.stats.save();
+      }
       Logger.trace("Deallocated player with token %s (username = '%s')", player.token.toString(16), player.username);
     }
   }
@@ -271,14 +273,25 @@ export class Game {
     this.deadSprites.clear();
   }
 
-  public removePlayer(playerSprite: PlayerSprite, actorSprite: PlayerSprite | undefined = undefined) {
-    if (this.removeSprite(playerSprite, actorSprite)) {
+  private removePlayerWithOptions(
+    playerSprite: PlayerSprite,
+    options: { actor: PlayerSprite | undefined, saveStats: boolean }
+  ) {
+    if (this.removeSprite(playerSprite, options.actor)) {
       --this.numOfPlayers;
-      this.deallocatePlayer(playerSprite.player);
+      this.deallocatePlayer(playerSprite.player, options.saveStats);
     }
   }
 
-  public removeSprite(sprite: GameSprite, actor: GameSprite | undefined = undefined): boolean {
+  public removePlayer(playerSprite: PlayerSprite, actorSprite?: PlayerSprite) {
+    this.removePlayerWithOptions(playerSprite, { actor: actorSprite, saveStats: true });
+  }
+
+  public removePlayerWithoutSavingStats(playerSprite: PlayerSprite) {
+    this.removePlayerWithOptions(playerSprite, { actor: undefined, saveStats: false });
+  }
+
+  public removeSprite(sprite: GameSprite, actor?: GameSprite): boolean {
     const index = this.sprites.indexOf(sprite);
     if (index < 0) {
       return false;

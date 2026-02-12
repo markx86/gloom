@@ -1,47 +1,40 @@
 import { PlayerSprite } from "./sprite";
 import { updateUserStats } from "./database";
-import Logger from "./logger";
 
 export class Player {
   readonly username: string;
   readonly token: number;
   readonly stats: PlayerStats;
 
-  public sprite: PlayerSprite | undefined;
+  public sprite?: PlayerSprite;
 
   constructor(username: string, token: number) {
     this.username = username;
     this.token = token;
-    this.stats = new PlayerStats();
-  }
-
-  public saveStats() {
-    updateUserStats(this.username, this.stats?.getKills(), this.stats.isDead())
+    this.stats = new PlayerStats(username);
   }
 }
 
 export class PlayerStats {
   private dead: boolean;
   private kills: number;
+  private username: string;
 
-  constructor() {
+  constructor(username: string) {
     this.dead = false;
     this.kills = 0;
+    this.username = username;
   }
 
   public addKill() {
     ++this.kills;
   }
 
-  public getKills(): number {
-    return this.kills;
+  public setDead(value: boolean) {
+    this.dead = value;
   }
 
-  public isDead(value: boolean | undefined = undefined): boolean {
-    const prevValue = this.dead;
-    if (value != null) {
-      this.dead = value;
-    }
-    return prevValue;
+  public save() {
+    updateUserStats(this.username, this.kills, this.dead);
   }
 };

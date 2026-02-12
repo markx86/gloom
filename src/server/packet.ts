@@ -133,7 +133,7 @@ export abstract class ServerPacket {
     this.pushSpriteTransform(sprite);
   }
 
-  protected pushSpriteDescriptor(sprite: GameSprite, actor: GameSprite | undefined = undefined) {
+  protected pushSpriteDescriptor(sprite: GameSprite, actor?: GameSprite) {
     const owner = (sprite instanceof BulletSprite) ? sprite.owner.id : 0;
     const coll = actor?.id ?? 0;
     const desc =
@@ -193,7 +193,7 @@ export class CreatePacket extends ServerPacket {
 }
 
 export class DestroyPacket extends ServerPacket {
-  public constructor(sprite: GameSprite, actor: GameSprite | undefined = undefined) {
+  public constructor(sprite: GameSprite, actor?: GameSprite) {
     super(ServerPacketType.DESTROY, 4);
     this.pushSpriteDescriptor(sprite, actor);
   }

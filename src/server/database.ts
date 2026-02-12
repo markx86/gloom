@@ -1,7 +1,7 @@
 import { Database } from "sqlite3";
 import { randomBytes, hash } from "node:crypto";
-import { getEnvStringOrDefault } from "./util.ts";
-import Logger from "./logger.ts";
+import { getEnvStringOrDefault } from "./util";
+import Logger from "./logger";
 
 export const USERNAME_MAX_LEN = 24;
 export const USERNAME_MIN_LEN = 3;
@@ -50,6 +50,7 @@ db.exec(`
     wins BIGINT NOT NULL,
     kills BIGINT NOT NULL,
     deaths BIGINT NOT NULL,
+    games BIGINT NOT NULL,
     FOREIGN KEY (username) REFERENCES users(username)
   )
 `);
@@ -208,9 +209,9 @@ export function refreshSession(currentSessionId: Buffer, newSessionId: Buffer, e
 export function updateUserStats(username: string, kills: number, isDead: boolean) {
   db.run(
     `
-    INSERT INTO scoreboard (username, wins, kills, deaths)
-    VALUES ($username, $wins, $kills, $deaths)
-    ON CONFLICT(username) DO UPDATE SET wins = wins + $wins, kills = kills + $kills, deaths = deaths + $deaths
+    INSERT INTO scoreboard (username, wins, kills, deaths, games)
+    VALUES ($username, $wins, $kills, $deaths, 1)
+    ON CONFLICT(username) DO UPDATE SET wins = wins + $wins, kills = kills + $kills, deaths = deaths + $deaths, games = games + 1
     `, { $username: username, $wins: !isDead ? 1 : 0, $kills: kills, $deaths: isDead ? 1 : 0 },
     function (err) {
       if (err != null) {

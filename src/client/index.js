@@ -8,7 +8,7 @@ import {
   MSGWND_HELP, showMessageWindow
 } from "./windowing.js";
 
-$root($("#root"));
+const root = $root($("#root"));
 // Disable scroll bars.
 document.body.style.overflow = "hidden";
 
@@ -22,7 +22,11 @@ window.addEventListener("resize", updateRootNodeSize);
 
 
 gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
-  let gameWs;
+  const Globals = {
+    gameWs: null,
+    myGameId: null,
+    myUsername: null
+  };
 
   function validateInput(event) {
     const inputBox = event.target;
@@ -133,28 +137,28 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     });
   }
   
-  function refreshGameId() {
+  function refreshMyGameId() {
     api.get("/game/id")
       .then(res => {
         if (res.status === 200) {
           return res.json();
-        } else if (res.status === 404) {
-          $("#game-id").textContent = "No running game";
-          $("#btn-create").$enable();
         } else {
-          $("#game-id").textContent = "Could not fetch game ID";
+          return { gameId: null };
         }
-        $("#field-game-id").placeholder = "Enter game ID";
-        return null;
       })
       .then(data => {
-        if (typeof(data?.gameId) === "number") {
-          setMyGameId(data.gameId);
+        if (data.gameId !== Globals.myGameId) {
+          Globals.myGameId = data.gameId;
+          root.$refresh();
         }
       })
-      .catch(_ => $("#game-id").textContent = "Could not fetch game ID");
+      .catch(e => {
+        // Should've used $refresh()
+        $("#game-id").textContent = "Could not fetch game ID";
+        console.error(e);
+      });
   }
-  
+
   function zeroPadL(s, w) {
     if (s.length >= w) {
       return s;
@@ -166,38 +170,38 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   }
 
   function parseGameIdString(gameIdString) {
-    const gameId = parseInt(gameIdString, 16);
-    if (isFinite(gameId) && !isNaN(gameId)) {
-      return gameId;
+    if (gameIdString != null) {
+      const gameId = parseInt(gameIdString, 16);
+      if (isFinite(gameId) && !isNaN(gameId)) {
+        return gameId;
+      }
     }
   }
 
-  // We store the game ID in the #game-id label, this is a great idea and
-  // absolutely nothing can go wrong with it :)
-  
-  function setMyGameId(gameId) {
-    const gameIdString = zeroPadL(gameId.toString(16), 8).toUpperCase();
-    const gameIdTextInput = $("#game-id");
-    if (gameIdString !== gameIdTextInput.textContent) {
-      $("#game-id").textContent = gameIdString;
-      $("#field-game-id").placeholder = `Enter game ID (default: ${gameIdString})`;
-      $("#btn-create").$disable();
-    }
-  }
-  
-  function getMyGameId() {
-    const gameIdString = $("#game-id")?.textContent;
-    if (gameIdString != null && gameIdString.length === 8) {
-      return parseGameIdString(gameIdString);
+  function gameIdToString(gameId) {
+    if (gameId != null) {
+      return zeroPadL(gameId.toString(16), 8).toUpperCase();
     }
   }
 
   function getGameId() {
     const gameIdString = $("#field-game-id")?.value;
     if (gameIdString?.length === 0) {
-      return getMyGameId();
+      return Globals.myGameId;
     } else if (gameIdString?.length === 8) {
       return parseGameIdString(gameIdString);
+    }
+  }
+
+  async function doValidateSession() {
+    try {
+      const res = await api.get("/session/validate")
+      if (res.status !== 200) throw Error("Not authenticated")
+      const data = await res.json();
+      Globals.myUsername = data?.username ?? "player";
+      return true;
+    } catch(e) {
+      return false;
     }
   }
   
@@ -215,9 +219,8 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
         const showWindow = response.status > 500 ? showWarningWindow : showErrorWindow;
         showWindow(data.message, button.$enable);
       } else {
-        setMyGameId(data.gameId);
-        // Keep the create button disabled.
-        button.$disable();
+        Globals.myGameId = data.gameId;
+        root.$refresh();
       }
     } catch {
       showWarningWindow("An unknown error occurred while trying to create your game. Please try again later", button.$enable);
@@ -298,12 +301,6 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   }
   
   const login = () => {
-    api.get("/session/validate")
-      .then(res => {
-        if (res.status === 200) {
-          $goto("/");
-        }
-      });
     return createWindow(
       {
         title: "Welcome to Gloom",
@@ -404,29 +401,16 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   };
   
   const home = () => {
-    let currentUser = undefined;
-
-    api.get("/session/validate")
-      .then(res => {
-        if (res.status !== 200) {
-          throw Error("Not authenticated")
-        } else {
-          return res.json();
-        }
-      })
-      .then(data => {
-        currentUser = data?.username ?? "player";
-        $("#home-title").textContent = `Welcome back ${currentUser}`;
-      })
-      .catch(() => $goto("/login"));
-
-    // Do not use a parameter to avoid headaches.
-    refreshGameId();
-    $interval(5000, refreshGameId); // Refresh game id every 5 seconds.
+    const myGameIdString = gameIdToString(Globals.myGameId) ?? "No game running.";
+    const usernameString = Globals.myUsername ?? "player";
+    const currentGameId = $("#field-game-id")?.value ?? null;
+    const placeholderString = Globals.myGameId == null
+                              ? "Enter a game ID"
+                              : `Enter a game ID (default: ${myGameIdString})`;
 
     return createWindow(
       {
-        title: $span("Welcome back player").$id("home-title"),
+        title: $span(`Welcome back ${usernameString}`).$id("home-title"),
         width: "300px",
         buttons: {
           close: doLogout,
@@ -438,13 +422,13 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
                              .$style("font-weight", "bold")
                              .$style("margin-bottom", "8px"),
           $div(
-            $p("Fetching game ID...").$id("game-id")
-                                     .$style("margin", "0px")
-                                     .$style("flex-grow", "1"),
+            $p(myGameIdString).$id("game-id")
+                              .$style("margin", "0px")
+                              .$style("flex-grow", "1"),
             $button("Create").$id("btn-create")
                              .$style("margin-left", "12px")
                              .$onclick(doCreateGame)
-                             .$disable()
+                             .$enable(Globals.myGameId == null)
           ).$style("display", "flex")
            .$style("align-items", "center")
         ),
@@ -455,11 +439,12 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
           $div(
             $input().$id("field-game-id")
                     .$type("text")
-                    .$attribute("placeholder", "Enter a game ID")
+                    .$attribute("placeholder", placeholderString)
+                    .$attribute("value", currentGameId)
                     .$style("flex-grow", "1")
                     .$on("input", validateInput),
             $button("Join").$style("margin", "0px 0px 0px 8px")
-                           .$onclick((event) => doJoinGame(event, currentUser))
+                           .$onclick((event) => doJoinGame(event, Globals.myUsername))
           ).$style("display", "flex")
            .$style("align-items", "center")
         ).$class("field-row-stacked")
@@ -475,7 +460,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     );
   
     // NOTE: This queues the task to be executed later.
-    $defer(() => gameWs = gloomLaunch(currentUser, gameId, playerToken, gotoHome));
+    $defer(() => Globals.gameWs = gloomLaunch(currentUser, gameId, playerToken, gotoHome));
   
     return createWindow(
       {
@@ -499,17 +484,39 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       {
         $first: initialRoute,
         $default: "/login",
-        "/": home,
-        "/login": login,
+        "/": {
+          onRoute: home,
+          onEnter: () => {
+            doValidateSession()
+              .then(success => {
+                if (success) {
+                  refreshMyGameId();
+                  $interval(5000, refreshMyGameId); // Refresh game id every 5 seconds.
+                  root.$refresh();
+                } else {
+                  $goto("/login");
+                }
+              });
+          }
+        },
+        "/login": {
+          onRoute: login,
+          onEnter: () => {
+            doValidateSession()
+              .then(success => {
+                if (success) $goto("/");
+              });
+          }
+        },
         "/login/help": loginHelp,
         "/signup": signup,
         "/game": {
           onRoute: game,
-          onBeforeRoute: () => {
-            if (gameWs != null && gameWs.readyState !== WebSocket.CLOSED) {
-              gameWs.close();
+          onLeave: () => {
+            if (Globals.gameWs != null && Globals.gameWs.readyState !== WebSocket.CLOSED) {
+              Globals.gameWs.close();
             }
-            gameWs = undefined;
+            Globals.gameWs = undefined;
           }
         }
       },

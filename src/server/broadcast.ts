@@ -1,7 +1,7 @@
 import { ServerPacket } from "./packet"
 
 export abstract class Peer {
-  private broadcastGroup: BroadcastGroup | undefined;
+  private broadcastGroup?: BroadcastGroup;
 
   protected registerToBroadcastGroup(gameId: number) {
     this.broadcastGroup = BroadcastGroup.get(gameId);

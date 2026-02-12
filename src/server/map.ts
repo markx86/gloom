@@ -14,7 +14,7 @@ export class SpawnPosition {
 
 export class GameMap {
   private spawnPositions: Array<SpawnPosition>;
-  private compressed: Uint8Array | undefined;
+  private compressed?: Uint8Array;
   private tiles: Uint8Array;
   readonly width: number;
   readonly height: number;

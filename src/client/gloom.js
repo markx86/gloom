@@ -242,7 +242,7 @@ export async function loadGloom() {
     setupGame(username);
 
     const proto = window.location.protocol.replace("http", "ws");
-    const url = `${proto}//${window.location.host}`;
+    const url = `${proto}//${window.location.host}/game`;
     ws = new WebSocket(url);
 
     function exitGame() {

@@ -1,7 +1,7 @@
 import Logger from "./logger";
 import { Game } from "./game";
 import { GameMap } from "./map";
-import { Player, PlayerStats } from "./player";
+import { Player } from "./player";
 
 const PLAYER_HEALTH = 100;
 const PLAYER_RUN_SPEED = 3.5;
@@ -197,7 +197,7 @@ export class PlayerSprite extends GameSprite {
       this.health -= BULLET_DAMAGE;
       if (this.health <= 0) {
         // Update stats.
-        this.player.stats?.isDead(true);
+        this.player.stats?.setDead(true);
         other.owner.player.stats?.addKill();
         // Remove player from game.
         Logger.trace("Player %d killed by player %d", this.id, other.owner.id);

@@ -8,11 +8,11 @@ import {
   setUserSession,
   invalidateSession,
   refreshSession
-} from "./database.ts";
-import Logger from "./logger.ts";
-import { Maps } from "./map.ts"
-import { Game } from "./game.ts";
-import { getEnvStringOrDefault } from "./util.ts";
+} from "./database";
+import Logger from "./logger";
+import { Maps } from "./map"
+import { Game } from "./game";
+import { getEnvStringOrDefault } from "./util";
 
 import { randomBytes } from "node:crypto";
 import express from "express";
@@ -207,7 +207,9 @@ app.get("/api/logout", (_, res) => {
   res.status(200).send();
 });
 
-app.get("/api/session/validate", (_, res) => { res.status(200).send({ username: res.locals.username }); });
+app.get("/api/session/validate", (_, res) => {
+  res.status(200).send({ username: res.locals.username });
+});
 
 app.get("/api/session/refresh", (_, res) => {
   // If got here that means the session cookie is valid.

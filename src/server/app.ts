@@ -5,12 +5,12 @@ import https from "node:https";
 import Stream from "node:stream";
 import { readFileSync } from "node:fs";
 
-import Logger from "./logger.ts";
-import { closeDb } from "./database.ts";
-import { getEnvStringOrDefault } from "./util.ts";
-import { HTTP_PORT, HTTPS_PORT } from "./ports.ts";
-import { app } from "./http-server.ts"
-import { wss } from "./game-server.ts"
+import Logger from "./logger";
+import { closeDb } from "./database";
+import { getEnvStringOrDefault } from "./util";
+import { HTTP_PORT, HTTPS_PORT } from "./ports";
+import { app } from "./http-server";
+import { wss } from "./game-server";
 
 const INADDR_ANY = "0.0.0.0";
 
@@ -29,7 +29,11 @@ process.on("uncaughtException", (e) => {
 });
 
 function handleUpgrade(request: http.IncomingMessage, socket: Stream.Duplex, head: Buffer) {
-  wss.handleUpgrade(request, socket, head, (ws, request) => wss.emit("connection", ws, request));
+  if (request.url === "/game") {
+    wss.handleUpgrade(request, socket, head, (ws, request) => wss.emit("connection", ws, request));
+  } else {
+    socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+  }
 }
 
 const httpServer = http.createServer(app);

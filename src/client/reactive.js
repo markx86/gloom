@@ -66,12 +66,16 @@ function $_setFunctions(tag) {
     this.setAttribute("class", name);
     return this;
   };
-  tag.$disable = function () {
-    this.setAttribute("disabled", "");
+  tag.$disable = function (yes) {
+    $assert(yes === undefined || typeof(yes) === "boolean", "value must be a boolean")
+    if (yes === undefined || yes) this.setAttribute("disabled", "");
+    else this.$enable();
     return this;
   };
-  tag.$enable = function () {
-    this.removeAttribute("disabled");
+  tag.$enable = function (yes) {
+    $assert(yes === undefined || typeof(yes) === "boolean", "value must be a boolean")
+    if (yes === undefined || yes) this.removeAttribute("disabled");
+    else this.$disable();
     return this;
   };
   tag.$onclick = function (callback) {
@@ -118,7 +122,9 @@ window.$tag = function (name, ...children) {
 window.$ = function (ident) {
   $assert(typeof(ident) === "string", "identifier must be a string");
   const results = document.querySelectorAll(ident);
-  if (results.length === 1) {
+  if (results.length === 0) {
+    return;
+  } else if (results.length === 1) {
     return results[0];
   } else {
     return [...results];
@@ -126,9 +132,8 @@ window.$ = function (ident) {
 };
 
 function $_removeTimeout(timeoutId) {
-  if ($_globalState.timeouts.has(timeoutId)) {
+  if ($_globalState.timeouts.delete(timeoutId)) {
     clearTimeout(timeoutId);
-    $_globalState.timeouts.delete(timeoutId);
   }
 }
 
@@ -147,9 +152,8 @@ window.$timeout = function (delay, callback, ...args) {
 }
 
 function $_removeInterval(intervalId) {
-  if ($_globalState.intervals.has(intervalId)) {
+  if ($_globalState.intervals.delete(intervalId)) {
     clearInterval(intervalId);
-    $_globalState.intervals.delete(intervalId);
   }
 }
 
@@ -204,12 +208,12 @@ window.$root = function (node) {
   if (node === undefined) {
     // Used as a getter.
     $assert(window.$_root != null, "no root node defined");
-    return window.$_root;
   } else {
     // Used as a setter.
     $_setFunctions(node);
     window.$_root = node;
   }
+  return window.$_root;
 }
 
 window.$defer = function (callback) {
@@ -233,13 +237,13 @@ window.$router = function (routes, callbacks) {
 
       const route = routes[location];
 
-      // Call onBeforeRoute callback.
+      // Call onLeave callback.
       if (prevLocation in routes) {
         const prevRoute = routes[prevLocation];
-        // Per route onBeforeRoute callback.
-        if (prevRoute.onBeforeRoute == null || !prevRoute.onBeforeRoute(location, prevLocation)) {
-          // Global onBeforeRoute callback.
-          if (callbacks?.onBeforeRoute) callbacks.onBeforeRoute(location, prevLocation);
+        // Per route onLeave callback.
+        if (prevRoute.onLeave == null || !prevRoute.onLeave(location, prevLocation)) {
+          // Global onLeave callback.
+          if (callbacks?.onLeave) callbacks.onLeave(location, prevLocation);
         }
       }
 
@@ -253,23 +257,26 @@ window.$router = function (routes, callbacks) {
         $assert(false, `routes must be either functions or objects (got ${typeof(route)})`);
       }
 
-      const args = $_getArgsForRoute(location);
+      const args = $_getArgsForRoute(location) ?? [];
       $assert(
-        (routeFn.length === 0 && args == null) ||
-        (args != null && routeFn.length === args.length),
+        routeFn.length === args.length,
         `invalid parameters passed to route ${location}`
       );
 
-      const content = args == null ? routeFn() : routeFn(...args);
+      const boundRouteFn = routeFn.bind(undefined, ...args);
 
-      // Per route onAfterRoute callback.
-      if (route.onAfterRoute == null || !route.onAfterRoute(location, prevLocation)) {
-        // Global onAfterRoute callback.
-        if (callbacks?.onAfterRoute) callbacks.onAfterRoute(location, prevLocation);
+      root.$refresh = function () {
+        const content = boundRouteFn();
+        if (content != null) {
+          this.replaceChildren(content);
+        }
       }
+      root.$refresh();
 
-      if (content != null) {
-        root.replaceChildren(content);
+      // Per route onEnter callback.
+      if (route.onEnter == null || !route.onEnter (location, prevLocation)) {
+        // Global onEnter callback.
+        if (callbacks?.onEnter ) callbacks.onEnter (location, prevLocation);
       }
     }
   }
@@ -287,7 +294,6 @@ window.$router = function (routes, callbacks) {
   }
   route();
   window.addEventListener("hashchange", route);
-  root.$refresh = route;
 
   return root;
 };
