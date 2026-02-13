@@ -13,19 +13,25 @@ const root = $root($("#root"));
 document.body.style.overflow = "hidden";
 
 function updateRootNodeSize() {
-  $root().style.width = `${window.innerWidth}px`;
-  $root().style.height = `${window.innerHeight}px`;
+  root.style.width = `${window.innerWidth}px`;
+  root.style.height = `${window.innerHeight}px`;
 }
 
 updateRootNodeSize();
 window.addEventListener("resize", updateRootNodeSize);
 
+const HOME_TAB_PLAY = 0;
+const HOME_TAB_STATS = 1;
+const HOME_TAB_LEADERBOARD = 2;
 
 gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   const Globals = {
     gameWs: null,
     myGameId: null,
-    myUsername: null
+    myUsername: null,
+    myStats: null,
+    leaderboard: null,
+    homePageTab: HOME_TAB_PLAY
   };
 
   function validateInput(event) {
@@ -154,9 +160,35 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       })
       .catch(e => {
         // Should've used $refresh()
-        $("#game-id").textContent = "Could not fetch game ID";
+        const gameIdLabel = $("#game-id");
+        if (gameIdLabel != null) {
+          gameIdLabel.textContent = "Could not fetch game ID";
+        }
         console.error(e);
       });
+  }
+
+  function refreshStats() {
+    api.get("/stats")
+      .then(res => {
+        if (res.status === 200) {
+          return res.json();
+        } else {
+          throw Error(`HTTP error ${res.status}`);
+        }
+      })
+      .then(data => {
+        Globals.myStats = data.userStats;
+        Globals.leaderboard = data.leaderboard;
+        // Maybe refresh scoreboard screen.
+        if ($route() === "/" && Globals.homePageTab) {
+          root.$refresh();
+        }
+      })
+      .catch(e => {
+        console.error("Could not refresh scoreboard");
+        console.error(e);
+      })
   }
 
   function zeroPadL(s, w) {
@@ -227,7 +259,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     }
   }
   
-  async function doJoinGame(event, currentUser) {
+  async function doJoinGame(event) {
     const createButton = $("#btn-create");
     const createButtonDisabled = createButton.$attribute("disabled") != null;
     const [_wndEnable, wndDisable] = getWindowControls(event.target);
@@ -246,7 +278,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       const response = await api.post("/game/join", { gameId });
       const data = await response.json();
       if (response.status === 200) {
-        $goto("/game", gameId, data.playerToken, currentUser);
+        $goto("/game", gameId, data.playerToken, Globals.myUsername);
       } else {
         showErrorWindow(data.message, wndEnable);
       }
@@ -255,8 +287,8 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     }
   }
   
-  function controlHelp(key, help) {
-    return $p($strong(key), " ► ", help);
+  function listEntry(entry, desc) {
+    return $p($strong(entry), " ► ", desc);
   }
   
   function showGameHelp(event) {
@@ -267,13 +299,13 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
         $h5("Controls").$style("margin", "12px 0px")
                        .$style("font-size", "20px"),
         $ul(
-          $li(controlHelp("W", "Move forwards")),
-          $li(controlHelp("S", "Move backwards")),
-          $li(controlHelp("A", "Strage left")),
-          $li(controlHelp("D", "Strage right")),
-          $li(controlHelp("P", "Pauses the game")),
-          $li(controlHelp("Mouse movement", "Move the camera left and right")),
-          $li(controlHelp("Mouse buttons", "Shoot"))
+          $li(listEntry("W", "Move forwards")),
+          $li(listEntry("S", "Move backwards")),
+          $li(listEntry("A", "Strage left")),
+          $li(listEntry("D", "Strage right")),
+          $li(listEntry("P", "Pauses the game")),
+          $li(listEntry("Mouse movement", "Move the camera left and right")),
+          $li(listEntry("Mouse buttons", "Shoot"))
         ).$style("padding-left", "12px")
       ).$style("padding-left", "4px"),
       MSGWND_HELP, wndEnable
@@ -399,14 +431,138 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       )
     );
   };
-  
-  const home = () => {
+
+  const homeSeparator = () => separator().$style("margin", "12px 0px").$style("width", "100%");
+  const homeTitle = title => $h4(title).$style("margin", "4px 0px 0px 0px");
+
+  const homePlay = () => {
     const myGameIdString = gameIdToString(Globals.myGameId) ?? "No game running.";
-    const usernameString = Globals.myUsername ?? "player";
     const currentGameId = $("#field-game-id")?.value ?? null;
     const placeholderString = Globals.myGameId == null
                               ? "Enter a game ID"
                               : `Enter a game ID (default: ${myGameIdString})`;
+
+    return $div(
+      $div(
+        $label("Your game").$for("game-id")
+                           .$style("font-weight", "bold")
+                           .$style("margin-bottom", "8px"),
+        $div(
+          $p(myGameIdString).$id("game-id")
+                            .$style("margin", "0px")
+                            .$style("flex-grow", "1"),
+          $button("Create").$id("btn-create")
+                           .$style("margin-left", "12px")
+                           .$onclick(doCreateGame)
+                           .$enable(Globals.myGameId == null)
+        ).$style("display", "flex")
+         .$style("align-items", "center")
+      ),
+      homeSeparator(),
+      $div(
+        $label("Join a game").$for("field-game-id").$style("font-weight", "bold"),
+        $div(
+          $input().$id("field-game-id")
+                  .$type("text")
+                  .$attribute("placeholder", placeholderString)
+                  .$attribute("value", currentGameId)
+                  .$style("flex-grow", "1")
+                  .$on("input", validateInput),
+          $button("Join").$style("margin", "0px 0px 0px 8px")
+                         .$onclick(doJoinGame)
+        ).$style("display", "flex")
+         .$style("align-items", "center")
+      ).$class("field-row-stacked")
+    );
+  }
+
+  const homeStats = () => {
+    if (Globals.myStats == null) {
+      return $div(
+        $p($strong("Error fetching statistics data.")).$style("color", "red")
+      );
+    }
+
+    const myStats = Globals.myStats;
+
+    return $div(
+      homeTitle(`${myStats.username} stats:`),
+      homeSeparator(),
+      listEntry("Total score", myStats.score.toString()),
+      listEntry("Wins", myStats.wins.toString()),
+      listEntry("Kills", myStats.kills.toString()),
+      listEntry("Deaths", myStats.deaths.toString()),
+      listEntry("Games played", myStats.games.toString()),
+      listEntry("Avg. kills per game", (myStats.kills / myStats.games).toPrecision(2)),
+      listEntry("K/D", (myStats.kills / myStats.deaths).toPrecision(2)),
+    );
+  }
+
+  const homeLeaderboard = () => {
+    if (Globals.leaderboard == null) {
+      return $div(
+        $p($strong("Error fetching leader data.")).$style("color", "red")
+      );
+    }
+
+    const rows = Globals.leaderboard.map(stats => {
+      const row = $tr(
+        $td(stats.username),
+        $td(stats.score.toString()),
+        $td(stats.wins.toString()),
+        $td(stats.kills.toString()),
+        $td(stats.deaths.toString()),
+        $td(stats.games.toString())
+      );
+      if (stats.username === Globals.myUsername) {
+        row.$class("highlighted");
+      }
+      return row;
+    });
+
+    return $div(
+      homeTitle("Leaderboard"),
+      homeSeparator(),
+      $div(
+        $table(
+          $thead(
+            $tr(
+              $th("Username"),
+              $th("Total score"),
+              $th("Wins"),
+              $th("Kills"),
+              $th("Deaths"),
+              $th("Games played"),
+            )
+          ),
+          $tbody(...rows)
+        ),
+      ).$class("sunken-panel")
+    );
+  }
+
+  function showHomeTab(homeTab) {
+    if (Globals.homePageTab !== homeTab) {
+      Globals.homePageTab = homeTab;
+      root.$refresh();
+    }
+  }
+
+  const home = () => {
+    const usernameString = Globals.myUsername ?? "player";
+    const homeTab = (id, name) => {
+      return $li(
+        $a(name)
+      ).$role("tab")
+       .$attribute("aria-selected", (Globals.homePageTab === id).toString())
+       .$style("cursor", "pointer")
+       .$onclick(() => showHomeTab(id));
+    }
+    const homeTabs = [
+      homePlay,
+      homeStats,
+      homeLeaderboard
+    ];
 
     return createWindow(
       {
@@ -417,38 +573,17 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
         }
       },
       $div(
+        $menu(
+          homeTab(HOME_TAB_PLAY, "Play"),
+          homeTab(HOME_TAB_STATS, "Statistics"),
+          homeTab(HOME_TAB_LEADERBOARD, "Leaderboard"),
+        ).$role("tablist"),
         $div(
-          $label("Your game").$for("game-id")
-                             .$style("font-weight", "bold")
-                             .$style("margin-bottom", "8px"),
-          $div(
-            $p(myGameIdString).$id("game-id")
-                              .$style("margin", "0px")
-                              .$style("flex-grow", "1"),
-            $button("Create").$id("btn-create")
-                             .$style("margin-left", "12px")
-                             .$onclick(doCreateGame)
-                             .$enable(Globals.myGameId == null)
-          ).$style("display", "flex")
-           .$style("align-items", "center")
-        ),
-        separator().$style("margin", "12px 0px")
-                   .$style("width", "100%"),
-        $div(
-          $label("Join a game").$for("field-game-id").$style("font-weight", "bold"),
-          $div(
-            $input().$id("field-game-id")
-                    .$type("text")
-                    .$attribute("placeholder", placeholderString)
-                    .$attribute("value", currentGameId)
-                    .$style("flex-grow", "1")
-                    .$on("input", validateInput),
-            $button("Join").$style("margin", "0px 0px 0px 8px")
-                           .$onclick((event) => doJoinGame(event, Globals.myUsername))
-          ).$style("display", "flex")
-           .$style("align-items", "center")
-        ).$class("field-row-stacked")
-      ).$style("padding", "12px")
+          homeTabs[Globals.homePageTab]()
+        ).$role("tabpanel")
+         .$class("window")
+         .$style("padding", "12px")
+      ).$class("window-body")
     );
   };
   
@@ -490,7 +625,9 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
             doValidateSession()
               .then(success => {
                 if (success) {
+                  refreshStats();
                   refreshMyGameId();
+                  $interval(300000, refreshStats); // Refresh scoreboard every 5 minutes.
                   $interval(5000, refreshMyGameId); // Refresh game id every 5 seconds.
                   root.$refresh();
                 } else {

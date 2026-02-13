@@ -7,7 +7,8 @@ import {
   checkUserCrendentials,
   setUserSession,
   invalidateSession,
-  refreshSession
+  refreshSession,
+  getStatsAndLeaderboard
 } from "./database";
 import Logger from "./logger";
 import { Maps } from "./map"
@@ -108,7 +109,7 @@ app.post("/api/register", (req, res) => {
 
   const data = req.body;
   if (data == null || typeof(data.username) !== "string" || typeof(data.password) !== "string") {
-    res.status(400).send({ message: "Invalid request body!" });
+    res.status(400).json({ message: "Invalid request body!" });
     return;
   }
 
@@ -116,10 +117,10 @@ app.post("/api/register", (req, res) => {
   const username = data.username.trim();
   rc = checkUsernameLength(username);
   if (rc > 0) {
-    res.status(400).send({ message: `Username too long! The maximum length is ${USERNAME_MAX_LEN} characters.` });
+    res.status(400).json({ message: `Username too long! The maximum length is ${USERNAME_MAX_LEN} characters.` });
     return;
   } else if (rc < 0) {
-    res.status(400).send({ message: `Username too short! The minimum length is ${USERNAME_MIN_LEN} characters.` });
+    res.status(400).json({ message: `Username too short! The minimum length is ${USERNAME_MIN_LEN} characters.` });
     return;
   }
 
@@ -127,26 +128,26 @@ app.post("/api/register", (req, res) => {
   const password = data.password;
   rc = checkPasswordLength(password);
   if (rc > 0) {
-    res.status(400).send({ message: `Password too long! The maximum length is ${PASSWORD_MAX_LEN} characters.` });
+    res.status(400).json({ message: `Password too long! The maximum length is ${PASSWORD_MAX_LEN} characters.` });
     return;
   } else if (rc < 0) {
-    res.status(400).send({ message: `Password too short! The minimum length is ${PASSWORD_MIN_LEN} characters.` });
+    res.status(400).json({ message: `Password too short! The minimum length is ${PASSWORD_MIN_LEN} characters.` });
     return;
   } else if (
     !(password.match(/[!'"£$%&/()=?^\-\.+#@\\|~]/g)?.length > 0) ||
     !(password.match(/[0-9]/g).length > 0)
   ) {
-    res.status(400).send({ message: "The password must contain at least one special character and one number." });
+    res.status(400).json({ message: "The password must contain at least one special character and one number." });
     return;
   }
 
   try {
     registerUser(username, password, (success) => {
       if (success) {
-        Logger.trace("Registered user: %s", username);
+        Logger.trace("Registered user %s", username);
         res.status(200).send();
       } else {
-        res.status(400).send({ message: "That username is already taken!" });
+        res.status(400).json({ message: "That username is already taken!" });
       }
     });
   } catch (e) {
@@ -158,7 +159,7 @@ app.post("/api/register", (req, res) => {
 app.post("/api/login", (req, res) => {
   const data = req.body;
   if (data == null || typeof(data.username) !== "string" || typeof(data.password) !== "string") {
-    res.status(400).send({ message: "Invalid request body!" });
+    res.status(400).json({ message: "Invalid request body!" });
     return;
   }
 
@@ -181,7 +182,7 @@ app.post("/api/login", (req, res) => {
   try {
     checkUserCrendentials(username, password, (success) => {
       if (success) {
-        Logger.trace("Logging in user: %s", username);
+        Logger.trace("Logging in user %s", username);
         // Generate session id and compute expiry date.
         const sessionId = generateSessionId();
         const expirationTimestamp = getSessionCookieExpirationTimestamp();
@@ -201,26 +202,37 @@ app.post("/api/login", (req, res) => {
 });
 
 app.get("/api/logout", (_, res) => {
-  Logger.trace("Logging out user: %s", res.locals.username);
+  Logger.trace("Logging out user %s", res.locals.username);
   invalidateSession(res.locals.sessionId);
   clearSessionCookie(res);
   res.status(200).send();
 });
 
+app.get("/api/stats", (_, res) => {
+  const username = res.locals.username;
+  Logger.trace("Fetching leaderboard for user %s", username);
+  getStatsAndLeaderboard(username, (userStats, leaderboard) => {
+    res.status(200).json({
+      userStats,
+      leaderboard
+    });
+  });
+});
+
 app.get("/api/session/validate", (_, res) => {
-  res.status(200).send({ username: res.locals.username });
+  res.status(200).json({ username: res.locals.username });
 });
 
 app.get("/api/session/refresh", (_, res) => {
   // If got here that means the session cookie is valid.
   try {
-    Logger.trace("Refreshing session for user: %s", res.locals.username);
+    Logger.trace("Refreshing session for user %s", res.locals.username);
     const expirationTimestamp = getSessionCookieExpirationTimestamp();
     const currentSessionId = res.locals.sessionId;
     const newSessionId = generateSessionId();
     refreshSession(currentSessionId, newSessionId, expirationTimestamp);
     setSessionCookie(res, newSessionId);
-    res.status(200).send({ username: res.locals.username });
+    res.status(200).json({ username: res.locals.username });
   } catch (e) {
     Logger.error(e.message);
     res.status(500).send();
@@ -233,14 +245,14 @@ app.get("/api/game/id", (_, res) => {
   if (game == null) {
     res.status(404).send();
   } else {
-    res.status(200).send({ gameId: game.id });
+    res.status(200).json({ gameId: game.id });
   }
 });
 
 app.get("/api/game/create", (_, res) => {
   const creator = res.locals.username;
   if (Game.getByCreator(creator) != null) {
-    res.status(403).send({
+    res.status(403).json({
       message: "You already have a game running.",
     });
     return;
@@ -248,32 +260,32 @@ app.get("/api/game/create", (_, res) => {
   
   const gameId = Game.create(creator, Maps.random());
   if (gameId == null) {
-    res.status(503).send({
+    res.status(503).json({
       message: "The server is overloaded. Please try again later."
     });
   } else {
-    res.status(200).send({ gameId });
+    res.status(200).json({ gameId });
   }
 });
 
 app.post("/api/game/join", (req, res) => {
   const data = req.body;
   if (data == null || typeof(data.gameId) !== "number") {
-    res.status(400).send({ message: "Invalid request body." });
+    res.status(400).json({ message: "Invalid request body." });
     return;
   }
 
   const gameId = data.gameId;
   const game = Game.getById(gameId);
   if (game == null) {
-    res.status(404).send({ message: "No game found." });
+    res.status(404).json({ message: "No game found." });
     return;
   }
 
   const playerToken = game.allocatePlayer(res.locals.username);
   if (typeof(playerToken) === "string") {
-    res.status(403).send({ message: playerToken });
+    res.status(403).json({ message: playerToken });
   } else {
-    res.status(200).send({ playerToken });
+    res.status(200).json({ playerToken });
   }
 });

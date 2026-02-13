@@ -16,6 +16,8 @@ const DATABASE_PATH = getEnvStringOrDefault("DATABASE", ":memory:");
 
 const db = new Database(DATABASE_PATH);
 
+export type UserStats = { username: string, wins: number, kills: number, deaths: number, games: number, score: number };
+
 export const closeDb = () => {
   Logger.trace("Closing database...");
   db.close(() => {})
@@ -219,4 +221,27 @@ export function updateUserStats(username: string, kills: number, isDead: boolean
       }
     }
   );
+}
+
+export function getStatsAndLeaderboard(
+  username: string,
+  callback: (userStats: UserStats, scoreboard: Array<UserStats>) => void
+) {
+  db.all<UserStats>(
+    `
+    SELECT username, wins, kills, deaths, games, ((wins * kills * 1000) / (deaths * games)) as score
+    FROM scoreboard
+    ORDER BY username = ?, score DESC
+    LIMIT 11
+    `, username,
+    function (err, rows) {
+      if (err != null) {
+        throw err;
+      } else {
+        const userStats = rows.find(stats => stats.username === username)!;
+        const leaderBoard = rows.sort((statsA, statsB) => statsB.score - statsA.score).slice(0, 10);
+        callback(userStats, leaderBoard);
+      }
+    }
+  )
 }

@@ -1,4 +1,4 @@
-// NOTE: this scripts requires reactive.js
+// NOTE: this script requires reactive.js
 
 export async function loadGloom() {
   const textDecoder = new TextDecoder("utf-8");

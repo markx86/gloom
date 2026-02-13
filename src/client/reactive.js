@@ -47,10 +47,15 @@ function $_setFunctions(tag) {
     return this;
   };
   tag.$for = function (_for) {
-    $assert(typeof(_for) === "string", "for's id must be a string");
+    $assert(typeof(_for) === "string", "id for attribute 'for' must be a string");
     this.setAttribute("for", _for);
     return this;
   };
+  tag.$role = function (role) {
+    $assert(typeof(role) === "string", "id for attribute 'role' must be a string");
+    this.setAttribute("role", role);
+    return this;
+  }
   tag.$type = function (type) {
     $assert(typeof(type) === "string", "type must be a string");
     this.setAttribute("type", type);
@@ -99,11 +104,11 @@ function $_setFunctions(tag) {
     $assert(options === undefined || typeof(options) === "object" || typeof(options) === "boolean", "options must be either a boolean or an object");
     this.addEventListener(event, callback, options);
     return this;
-  }
+  };
   tag.$add = function (...children) {
     children.forEach(child => tag.appendChild(typeof(child) === "string" ? document.createTextNode(child) : child));
     return this;
-  }
+  };
   tag.$destroy = function () {
     $_callOnDestroy(this);
     if (this.isConnected) {
@@ -201,7 +206,7 @@ window.$route = function (hash = document.location.hash) {
 [
   "div", "h1", "h2", "h3", "h4", "h5", "h6", "p", "a",
   "br", "hr", "canvas", "button", "input", "label", "ul", "li",
-  "strong", "code", "span"
+  "strong", "code", "span", "menu", "table", "th", "td", "tr", "thead", "tbody"
 ].forEach(tag => window[`$${tag}`] = (...children) => $tag(tag, ...children));
 
 window.$root = function (node) {

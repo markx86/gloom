@@ -21,7 +21,7 @@ function setDisabledRecursive(obj, yes) {
 export function getWindow(component) {
   $assert(component != null, "component cannot be null or undefined");
   while (component != null) {
-    if (component.getAttribute("class") === "window") {
+    if (component.classList?.contains("wnd-toplevel")) {
       return component;
     } else {
       component = component.parentElement;
@@ -90,7 +90,7 @@ export function createWindow(options, ...children) {
         ).$class("title-bar-controls")
       ).$class("title-bar"),
       ...children
-    ).$class("window")
+    ).$class("window wnd-toplevel")
      .$style("position", "absolute")
      .$style("width", width)
      .$style("height", height)
