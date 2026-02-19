@@ -3,9 +3,10 @@ import * as gloom from "./gloom.js";
 import "./reactive.js";
 import {
   showErrorWindow, showInfoWindow, showWarningWindow,
+  showMessageWindow, showYesNoWindow,
   createWindow, getWindowControls,
   helpLink, windowIcon, separator,
-  MSGWND_HELP, showMessageWindow
+  MSGWND_HELP, MSGWND_WARN
 } from "./windowing.js";
 
 const root = $root($("#root"));
@@ -23,6 +24,26 @@ window.addEventListener("resize", updateRootNodeSize);
 const HOME_TAB_PLAY = 0;
 const HOME_TAB_STATS = 1;
 const HOME_TAB_LEADERBOARD = 2;
+const HOME_TAB_MAPS = 3;
+
+const MAP_SIZE = 32;
+const MAP_CANVAS_SCALE = 16;
+
+const MAP_DRAW_CLEAR = 0;
+const MAP_DRAW_WALL = 1;
+const MAP_DRAW_PLAYER1 = 2;
+const MAP_DRAW_PLAYER2 = 3;
+const MAP_DRAW_PLAYER3 = 4;
+const MAP_DRAW_PLAYER4 = 5;
+
+const MAP_COLORS = [
+  "white",
+  "black",
+  "blue",
+  "red",
+  "green",
+  "magenta"
+];
 
 gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   const Globals = {
@@ -142,7 +163,11 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       $goto("/login");
     });
   }
-  
+
+  function doSaveMap(event) {
+    // TODO
+  }
+
   function refreshMyGameId() {
     api.get("/game/id")
       .then(res => {
@@ -290,6 +315,17 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   function listEntry(entry, desc) {
     return $p($strong(entry), " ► ", desc);
   }
+
+  function showMapEditorHelp(event) {
+    const [wndEnable, wndDisable] = getWindowControls(event.target);
+    wndDisable();
+    showMessageWindow(
+      $div(
+        $h5("TODO")
+      ),
+      MSGWND_HELP, wndEnable
+    );
+  };
   
   function showGameHelp(event) {
     const [wndEnable, wndDisable] = getWindowControls(event.target);
@@ -362,7 +398,6 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
          .$style("margin-top", "6px")
       ).$style("padding", "8px 12px 20px 12px")
        .$style("display", "flex")
-       .$style("align-items", "center top")
     );
   };
   
@@ -474,7 +509,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
          .$style("align-items", "center")
       ).$class("field-row-stacked")
     );
-  }
+  };
 
   const homeStats = () => {
     if (Globals.myStats == null) {
@@ -496,7 +531,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       listEntry("Avg. kills per game", (myStats.kills / myStats.games).toPrecision(2)),
       listEntry("K/D", (myStats.kills / myStats.deaths).toPrecision(2)),
     );
-  }
+  };
 
   const homeLeaderboard = () => {
     if (Globals.leaderboard == null) {
@@ -539,7 +574,13 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
         ),
       ).$class("sunken-panel")
     );
-  }
+  };
+
+  const homeMaps = () => {
+    return $div(
+      $button("Create").$onclick(() => $goto("/map"))
+    );
+  };
 
   function showHomeTab(homeTab) {
     if (Globals.homePageTab !== homeTab) {
@@ -561,7 +602,8 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     const homeTabs = [
       homePlay,
       homeStats,
-      homeLeaderboard
+      homeLeaderboard,
+      homeMaps
     ];
 
     return createWindow(
@@ -575,8 +617,9 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       $div(
         $menu(
           homeTab(HOME_TAB_PLAY, "Play"),
+          homeTab(HOME_TAB_MAPS, "Maps"),
           homeTab(HOME_TAB_STATS, "Statistics"),
-          homeTab(HOME_TAB_LEADERBOARD, "Leaderboard"),
+          homeTab(HOME_TAB_LEADERBOARD, "Leaderboard")
         ).$role("tablist"),
         $div(
           homeTabs[Globals.homePageTab]()
@@ -607,9 +650,160 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       },
       $div(
         $canvas().$id("viewport")
-      ).$style("box-shadow", "inset -1px -1px #fff, inset 1px 1px grey, inset -2px -2px #dfdfdf, inset 2px 2px #0a0a0a")
+      ).$class("sunken")
        .$style("padding", "2px")
        .$style("margin", "2px")
+    );
+  };
+
+  function renderMapCanvas() {
+    const ctx = this._ctx;
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, this.width, this.height);
+    ctx.strokeStyle = "gray";
+    ctx.lineWidth = 0.5;
+    this._map.forEach((cell, index) => {
+      const x = (index % MAP_SIZE) * MAP_CANVAS_SCALE;
+      const y = Math.floor(index / MAP_SIZE) * MAP_CANVAS_SCALE;
+      if (cell !== MAP_DRAW_CLEAR) {
+        ctx.fillStyle = MAP_COLORS[cell];
+        ctx.fillRect(x, y, MAP_CANVAS_SCALE, MAP_CANVAS_SCALE);
+      }
+      ctx.strokeRect(x, y, MAP_CANVAS_SCALE, MAP_CANVAS_SCALE);
+    });
+  }
+
+  function mapEditorSwitchMode(mode) {
+    if (mode === this._drawMode || mode == null) {
+      return;
+    }
+    if (this._drawMode != null) {
+      this._drawButtons[this._drawMode].$attribute("class", null);
+    }
+    this._drawButtons[mode].$attribute("class", "active");
+    this._prevDrawMode = this._drawMode;
+    this._drawMode = mode;
+  }
+
+  function mapEditorOnMouseEvent(event) {
+    if (event.buttons > 0) {
+      if (event.buttons === 2) {
+        this._switchMode(MAP_DRAW_CLEAR);
+      }
+      const x = Math.floor(event.offsetX / MAP_CANVAS_SCALE);
+      const y = Math.floor(event.offsetY / MAP_CANVAS_SCALE);
+      const index = x + y * MAP_SIZE;
+      // NOTE: This check makes sure that border pixels cannot be modified
+      if (x < MAP_SIZE-1 && x > 0 && y < MAP_SIZE-1 && y > 0) {
+        if (this._map[index] !== this._drawMode) {
+          if (this._drawMode >= MAP_DRAW_PLAYER1 && this._map.find(cell => cell === this._drawMode) != null) {
+            return;
+          }
+          this._dirty = true;
+          this._map[index] = this._drawMode;
+          // Only redraw if we change the map
+          this._redraw();
+        }
+      }
+    }
+  }
+
+  function mapEditorOnMouseUp(event) {
+    if (event.button === 2) {
+      this._switchMode(this._prevDrawMode);
+    }
+  }
+
+  function mapEditorOnClose(event) {
+    if ($("#map-editor")?._dirty === true) {
+      const [wndEnable, wndDisable] = getWindowControls(event.target);
+      wndDisable();
+      showYesNoWindow(
+        "The map was changed. Are you sure you want to quit without saving?",
+        MSGWND_WARN, wndEnable,
+        () => $goto("/"), () => {}
+      );
+    } else {
+      $goto("/");
+    }
+  }
+
+  function preventContextMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  const map = () => {
+    const canvasSize = MAP_SIZE * MAP_CANVAS_SCALE;
+    const canvas = $canvas().$id("map-editor")
+                            .$attribute("width", canvasSize.toString())
+                            .$attribute("height", canvasSize.toString())
+                            .$on("mousemove", mapEditorOnMouseEvent)
+                            .$on("mousedown", mapEditorOnMouseEvent)
+                            .$on("mouseup", mapEditorOnMouseUp)
+                            .$on("contextmenu", preventContextMenu);
+
+    const map = new Uint8Array(MAP_SIZE * MAP_SIZE);
+    for (let i = 0; i < map.length; i++) {
+      const x = i % MAP_SIZE;
+      const y = Math.floor(i / MAP_SIZE);
+      map[i] = (x === MAP_SIZE-1 || x === 0) || (y === MAP_SIZE-1 || y === 0) ? 1 : 0;
+    }
+
+    const drawButton = (id, text) => {
+      return $button(text).$style("color", MAP_COLORS[id])
+                          .$style("font-weight", "bold")
+                          .$style("flex", "1 1 0px")
+                          .$onclick(() => canvas._switchMode(id));
+    };
+
+    const buttons = [
+      drawButton(MAP_DRAW_CLEAR,   "CLEAR").$style("text-shadow", "1px 0 black, -1px 0 black, 0 1px black, 0 -1px black"),
+      drawButton(MAP_DRAW_WALL,    "WALL"),
+      drawButton(MAP_DRAW_PLAYER1, "PLAYER 1"),
+      drawButton(MAP_DRAW_PLAYER2, "PLAYER 2"),
+      drawButton(MAP_DRAW_PLAYER3, "PLAYER 3"),
+      drawButton(MAP_DRAW_PLAYER4, "PLAYER 4"),
+    ];
+
+    canvas._ctx = canvas.getContext("2d");
+    canvas._dirty = false;
+    canvas._drawMode = null;
+    canvas._prevDrawMode = null;
+    canvas._drawButtons = buttons;
+    canvas._map = map;
+    canvas._redraw = renderMapCanvas;
+    canvas._switchMode = mapEditorSwitchMode;
+
+    canvas._redraw();
+    canvas._switchMode(MAP_DRAW_WALL);
+
+    return createWindow(
+      {
+        title: "Map Editor",
+        buttons: {
+          help: showMapEditorHelp,
+          close: mapEditorOnClose
+        }
+      },
+      $div(
+        $div(
+          ...buttons
+        ).$style("padding", "4px")
+         .$style("display", "flex"),
+        $div(
+          canvas
+        ).$class("sunken")
+         .$style("padding", "2px 2px 0px 2px")
+         .$style("margin", "2px"),
+        $div(
+          $button("Cancel").$onclick(() => $goto("/")),
+          $button("Save").$class("default")
+                         .$style("margin-left", "8px")
+                         .$onclick(doSaveMap)
+        ).$style("padding", "8px")
+         .$style("float", "right")
+      ).$style("padding", "4px")
     );
   };
   
@@ -647,6 +841,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
         },
         "/login/help": loginHelp,
         "/signup": signup,
+        "/map": map,
         "/game": {
           onRoute: game,
           onLeave: () => {

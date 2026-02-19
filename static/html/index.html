@@ -8,8 +8,25 @@
     <link rel="preload" type="text/javascript" href="/static/js/bundle.min.js" as="script" />
     <link rel="stylesheet" type="text/css" href="/static/css/98.css" />
     <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico" />
+
+    <!-- Custom style classes -->
+    <style>
+      button.active {
+        box-shadow: inset -1px -1px #ffffff, inset 1px 1px #0a0a0a, inset -2px -2px #dfdfdf, inset 2px 2px #808080;
+      }
+
+      div.sunken {
+        box-shadow: inset -1px -1px #fff, inset 1px 1px grey, inset -2px -2px #dfdfdf, inset 2px 2px #0a0a0a;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        background: #008080;
+      }
+    </style>
   </head>
-  <body style="margin: 0; padding: 0; background: #008080">
+  <body>
     <div id="root"></div>
     <script type="text/javascript" src="/static/js/bundle.min.js" defer></script>
   </body>

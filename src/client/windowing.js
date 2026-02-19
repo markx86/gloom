@@ -1,3 +1,4 @@
+import { createWebSocketStream } from "ws";
 import "./reactive.js";
 
 export const MSGWND_ERROR = "error";
@@ -12,7 +13,7 @@ function capitalize(str) {
 
 function setDisabledRecursive(obj, yes) {
   for (const child of obj.children) {
-    $assert(child.$attribute != null, "trying to disable a non prev.js component");
+    $assert(child.$attribute != null, "trying to disable a non reactive.js component");
     setDisabledRecursive(child, yes);
   }
   obj.$attribute("disabled", yes ? "" : null);
@@ -144,4 +145,30 @@ export function showWarningWindow(message, onclose) {
 
 export function showInfoWindow(message, onclose) {
   showMessageWindow($p(message), MSGWND_INFO, onclose);
+}
+
+function createYesNoWindow(message, type, onclose, yesclicked, noclicked) {
+  return createWindow(
+    {
+      title: capitalize(type),
+    },
+    $div(
+      windowIcon(`/static/img/${type}.png`, "32px", "32px"),
+      $div(
+        $p(message)
+      ).$style("padding", "0px 8px")
+    ).$style("padding", "8px 12px 0px 12px")
+     .$style("display", "flex"),
+    $div(
+      $button("No").$style("margin-left", "8px").$onclick(event => { closeWindow(event); noclicked(); }),
+      $button("Yes").$class("default").$onclick(event => { closeWindow(event); yesclicked(); })
+    ).$style("padding", "8px 8px 12px 8px")
+     .$style("display", "flex")
+     .$style("flex-direction", "row-reverse")
+  ).$style("max-width", "400px")
+   .$ondestroy(onclose);
+}
+
+export function showYesNoWindow(message, type, onclose, yesclicked, noclicked) {
+  $root().$add(createYesNoWindow(message, type, onclose, yesclicked, noclicked));
 }
