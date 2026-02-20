@@ -28,7 +28,7 @@ app.get("/", (_, res) => { res.sendFile("index.html", { root: "static/html" }); 
 app.use("/static", express.static("static"));
 
 app.use("/api", cookieParser(COOKIE_SECRET))
-app.use("/api", (req, res, next) => {
+app.use("/api", async (req, res, next) => {
   if (req.path === "/register" || req.path === "/login") {
     next();
     return;
@@ -43,18 +43,18 @@ app.use("/api", (req, res, next) => {
 
   // Retrieve session data.
   const sessionId = Buffer.from(sessionCookie, "base64url");
+
   try {
-    getUsernameBySessionId(sessionId, (username) => {
-      if (username == null) {
-        res.status(401).send();
-      } else {
-        res.locals.username = username;
-        res.locals.sessionId = sessionId;
-        next();
-      }
-    });
-  } catch (e) {
-    Logger.error(e.message);
+    const username = await getUsernameBySessionId(sessionId);
+    if (username == null) {
+      res.status(401).send();
+    } else {
+      res.locals.username = username;
+      res.locals.sessionId = sessionId;
+      next();
+    }
+  } catch(error) {
+    Logger.error(error.message);
     res.status(500).send();
   }
 });
@@ -104,7 +104,7 @@ function checkPasswordLength(password: string): number {
   }
 }
 
-app.post("/api/register", (req, res) => {
+app.post("/api/register", async (req, res) => {
   let rc: number;
 
   const data = req.body;
@@ -142,21 +142,20 @@ app.post("/api/register", (req, res) => {
   }
 
   try {
-    registerUser(username, password, (success) => {
-      if (success) {
-        Logger.trace("Registered user %s", username);
-        res.status(200).send();
-      } else {
-        res.status(400).json({ message: "That username is already taken!" });
-      }
-    });
-  } catch (e) {
-    Logger.error(e.message);
+    const success = await registerUser(username, password);
+    if (success) {
+      Logger.trace("Registered user %s", username);
+      res.status(200).send();
+    } else {
+      res.status(400).json({ message: "That username is already taken!" });
+    }
+  } catch(error) {
+    Logger.error(error.message);
     res.status(500).send();
-  }
+  };
 });
 
-app.post("/api/login", (req, res) => {
+app.post("/api/login", async (req, res) => {
   const data = req.body;
   if (data == null || typeof(data.username) !== "string" || typeof(data.password) !== "string") {
     res.status(400).json({ message: "Invalid request body!" });
@@ -180,61 +179,70 @@ app.post("/api/login", (req, res) => {
   }
 
   try {
-    checkUserCrendentials(username, password, (success) => {
-      if (success) {
-        Logger.trace("Logging in user %s", username);
-        // Generate session id and compute expiry date.
-        const sessionId = generateSessionId();
-        const expirationTimestamp = getSessionCookieExpirationTimestamp();
-        // Store session.
-        setUserSession(username, sessionId, expirationTimestamp);
-        // Set session cookie.
-        setSessionCookie(res, sessionId);
-        res.status(200).send();
-      } else {
-        res.status(401).send(errorResponse);
-      }
-    });
-  } catch (e) {
-    Logger.error(e.message);
+    const success = await checkUserCrendentials(username, password);
+    if (success) {
+      Logger.trace("Logging in user %s", username);
+      // Generate session id and compute expiry date.
+      const sessionId = generateSessionId();
+      const expirationTimestamp = getSessionCookieExpirationTimestamp();
+      // Store session.
+      await setUserSession(username, sessionId, expirationTimestamp);
+      // Set session cookie.
+      setSessionCookie(res, sessionId);
+      res.status(200).send();
+    } else {
+      res.status(401).send(errorResponse);
+    }
+  } catch (error) {
+    Logger.error(error.message);
     res.status(500).send();
   }
 });
 
-app.get("/api/logout", (_, res) => {
+app.get("/api/logout", async (_, res) => {
   Logger.trace("Logging out user %s", res.locals.username);
-  invalidateSession(res.locals.sessionId);
-  clearSessionCookie(res);
-  res.status(200).send();
+  try {
+    await invalidateSession(res.locals.sessionId);
+    clearSessionCookie(res);
+    res.status(200).send();
+  } catch(error) {
+    Logger.error("Could not invalidate session!");
+    Logger.error(error.message);
+    res.status(500).send();
+  }
 });
 
-app.get("/api/stats", (_, res) => {
+app.get("/api/stats", async (_, res) => {
   const username = res.locals.username;
   Logger.trace("Fetching leaderboard for user %s", username);
-  getStatsAndLeaderboard(username, (userStats, leaderboard) => {
+  try {
+    const [userStats, leaderboard] = await getStatsAndLeaderboard(username);
     res.status(200).json({
       userStats,
       leaderboard
     });
-  });
+  } catch (error) {
+    Logger.error(error.message);
+    res.status(500).send();
+  }
 });
 
 app.get("/api/session/validate", (_, res) => {
   res.status(200).json({ username: res.locals.username });
 });
 
-app.get("/api/session/refresh", (_, res) => {
+app.get("/api/session/refresh", async (_, res) => {
   // If got here that means the session cookie is valid.
+  Logger.trace("Refreshing session for user %s", res.locals.username);
+  const expirationTimestamp = getSessionCookieExpirationTimestamp();
+  const currentSessionId = res.locals.sessionId;
+  const newSessionId = generateSessionId();
   try {
-    Logger.trace("Refreshing session for user %s", res.locals.username);
-    const expirationTimestamp = getSessionCookieExpirationTimestamp();
-    const currentSessionId = res.locals.sessionId;
-    const newSessionId = generateSessionId();
-    refreshSession(currentSessionId, newSessionId, expirationTimestamp);
+    await refreshSession(currentSessionId, newSessionId, expirationTimestamp);
     setSessionCookie(res, newSessionId);
     res.status(200).json({ username: res.locals.username });
-  } catch (e) {
-    Logger.error(e.message);
+  } catch(error) {
+    Logger.error(error.message);
     res.status(500).send();
   }
 });

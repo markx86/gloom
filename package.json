@@ -6,12 +6,13 @@
   "dependencies": {
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
-    "sqlite3": "^5.1.7",
+    "pg": "^8.18.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.1",
     "@types/cookie-parser": "^1.4.8",
+    "@types/express": "^5.0.1",
+    "@types/pg": "^8.16.0",
     "@types/ws": "^8.5.14",
     "esbuild": "^0.25.0"
   },

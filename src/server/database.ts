@@ -1,8 +1,8 @@
-import { Database } from "sqlite3";
+import { Pool } from "pg";
 import { randomBytes, hash } from "node:crypto";
-import { getEnvStringOrDefault } from "./util";
 import Logger from "./logger";
 
+export const MAP_NAME_MAX_LEN = 32;
 export const USERNAME_MAX_LEN = 24;
 export const USERNAME_MIN_LEN = 3;
 export const PASSWORD_MAX_LEN = 64;
@@ -11,95 +11,87 @@ export const SESSION_ID_LEN = 32;
 export const GAME_ID_LEN = 8;
 
 const SALT_LEN = 8;
+const PASSWORD_HASH_LEN = 32;
 
-const DATABASE_PATH = getEnvStringOrDefault("DATABASE", ":memory:");
-
-const db = new Database(DATABASE_PATH);
+const pool = new Pool();
 
 export type UserStats = { username: string, wins: number, kills: number, deaths: number, games: number, score: number };
 
 export const closeDb = () => {
   Logger.trace("Closing database...");
-  db.close(() => {})
+  pool.end();
 };
 
 // Log unhandled exceptions.
-db.on("error", Logger.error);
+pool.on("error", Logger.error);
 
-// Users table.
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    username VARCHAR(${USERNAME_MAX_LEN}) PRIMARY KEY,
-    password BINARY(32) NOT NULL,
-    salt BINARY(${SALT_LEN}) NOT NULL
-  )
-`);
+initDatabase();
 
-// Sessions table.
-db.exec(`
-  CREATE TABLE IF NOT EXISTS sessions (
-    session_id BINARY(${SESSION_ID_LEN}) PRIMARY KEY,
-    username VARCHAR(${USERNAME_MAX_LEN}) NOT NULL UNIQUE,
-    expiration_timestamp BIGINT NOT NULL,
-    FOREIGN KEY (username) REFERENCES users(username)
-  )
-`);
+async function initDatabase() {
+  // Users table.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      username VARCHAR(${USERNAME_MAX_LEN}) PRIMARY KEY,
+      password CHAR(${PASSWORD_HASH_LEN * 2}) NOT NULL,
+      salt CHAR(${SALT_LEN * 2}) NOT NULL
+    )
+  `);
 
-// Scoreboard table.
-db.exec(`
-  CREATE TABLE IF NOT EXISTS scoreboard (
-    username VARCHAR(${USERNAME_MAX_LEN}) PRIMARY KEY,
-    wins BIGINT NOT NULL,
-    kills BIGINT NOT NULL,
-    deaths BIGINT NOT NULL,
-    games BIGINT NOT NULL,
-    FOREIGN KEY (username) REFERENCES users(username)
-  )
-`);
-
-// TODO
-/*
-db.exec(`
-  CREATE TABLE IF NOT EXISTS maps (
-    map_id BIGINT PRIMARY KEY,
-    map_name VARCHAR(${0}) NOT NULL,
-    corner TINYBLOB NOT NULL,
-    creator VARCHAR(${USERNAME_MAX_LEN}) NOT NULL,
-    FOREIGN KEY (username) REFERENCES users(username)
-  )
-`);
-*/
+  // Sessions table.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      session_id CHAR(${SESSION_ID_LEN * 2}) PRIMARY KEY,
+      username VARCHAR(${USERNAME_MAX_LEN}) NOT NULL UNIQUE,
+      expiration_timestamp BIGINT NOT NULL,
+      FOREIGN KEY (username) REFERENCES users(username)
+    )
+  `);
+  
+  // Stats table.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS stats (
+      username VARCHAR(${USERNAME_MAX_LEN}) PRIMARY KEY,
+      wins BIGINT NOT NULL,
+      kills BIGINT NOT NULL,
+      deaths BIGINT NOT NULL,
+      games BIGINT NOT NULL,
+      FOREIGN KEY (username) REFERENCES users(username)
+    )
+  `);
+  
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS maps (
+      map_id BIGSERIAL PRIMARY KEY,
+      map_name VARCHAR(${MAP_NAME_MAX_LEN}) NOT NULL,
+      creator VARCHAR(${USERNAME_MAX_LEN}) NOT NULL,
+      FOREIGN KEY (creator) REFERENCES users(username)
+    )
+  `);
+}
 
 // Cleanup sessions every 15 minutes.
-setInterval(() => {
-  db.run(
-    `
-    DELETE FROM sessions
-    WHERE expiration_timestamp <= unixepoch()
-    `,
-    function (err) {
-      if (err) {
-        Logger.error("Could not expire old sessions");
-        Logger.error(err.message);
-      }
-    }
-  );
+setInterval(async () => {
+  try {
+    await pool.query(`
+      DELETE FROM sessions
+      WHERE expiration_timestamp <= EXTRACT(epoch FROM now())
+    `);
+  } catch (err) {
+    Logger.error("Could not expire old sessions");
+    Logger.error(err.message);
+  }
 }, 15 * 60 * 1000);
 
-export function getUsernameBySessionId(sessionId: Buffer, callback: (username: string) => undefined) {
-  db.get<{ username: string }>(
-    `
+export async function getUsernameBySessionId(sessionId: Buffer): Promise<string | undefined> {
+  const res = await pool.query(`
     SELECT username
     FROM sessions
-    WHERE session_id = ? AND expiration_timestamp > unixepoch()
-    `, sessionId,
-    function (err, row) {
-      if (err != null) {
-        throw err;
-      }
-      callback(row?.username);
-    }
+    WHERE session_id = $1 AND expiration_timestamp > EXTRACT(epoch FROM now())
+    `, [sessionId.toString("hex")]
   );
+  if (res.rowCount === 1) {
+    return res.rows[0].username;
+  }
 }
 
 function computePasswordHash(password: string, salt: Buffer): Buffer<ArrayBufferLike> {
@@ -107,141 +99,117 @@ function computePasswordHash(password: string, salt: Buffer): Buffer<ArrayBuffer
   return hash('sha256', Buffer.concat([passwordBuffer, salt]), "buffer");
 }
 
-export function registerUser(username: string, password: string, callback: (success: boolean) => undefined) {
+export async function registerUser(username: string, password: string): Promise<boolean> {
   const salt = randomBytes(SALT_LEN);
   const passwordHash = computePasswordHash(password, salt);
 
-  db.run(
-    `
-    INSERT INTO users (username, password, salt)
-    VALUES (?, ?, ?)
-    `, [username, passwordHash, salt],
-    function (err) {
-      let rv = true;
-      if (err != null) {
-        if (err["errno"] === 19) {
-          rv = false;
-        } else {
-          Logger.error(
-            "An error occurred when creating a user (username = '%s', password = %s, salt = %s)",
-            username, passwordHash.toString("hex"), salt.toString("hex")
-          );
-          throw err;
-        }
-      }
-      callback(rv);
+  try {
+    await pool.query(`
+      INSERT INTO users (username, password, salt)
+      VALUES ($1, $2, $3)
+      `, [username, passwordHash.toString("hex"), salt.toString("hex")]
+    );
+    return true;
+  } catch (err) {
+    if (err.code === "23505") {
+      return false;
     }
-  );
+    Logger.error(
+      "An error occurred when creating a user (username = '%s', password = %s, salt = %s)",
+      username, passwordHash.toString("hex"), salt.toString("hex")
+    );
+    throw err;
+  }
 }
 
-export function checkUserCrendentials(username: string, password: string, callback: (success: boolean) => undefined) {
-  db.get<{ password: Buffer, salt: Buffer }>(
-    `
+export async function checkUserCrendentials(username: string, password: string): Promise<boolean> {
+  const res = await pool.query(`
     SELECT password, salt
     FROM users
-    WHERE username = ?
-    `, username,
-    function (err, row) {
-      if (err != null) {
-        throw err;
-      } else if (row != null) {
-        // Check if the passwords match.
-        const storedHash = row.password;
-        const salt = row.salt;
-        const passwordHash = computePasswordHash(password, salt);
-        callback(Buffer.compare(storedHash, passwordHash) === 0);
-      } else {
-        callback(false);
-      }
-    }
+    WHERE username = $1
+    `, [username]
   );
+  if (res.rowCount === 1) {
+    const row = res.rows[0];
+    // Binary data is stored as a hex string, that's why we use Buffer.from(.., "hex")
+    const storedHash = Buffer.from(row.password, "hex");
+    const salt = Buffer.from(row.salt, "hex");
+    const passwordHash = computePasswordHash(password, salt);
+    return Buffer.compare(storedHash, passwordHash) === 0;
+  } else {
+    return false;
+  }
 }
 
-export function setUserSession(username: string, sessionId: Buffer, expirationTimestamp: number) {
-  db.run(
-    `
-    INSERT INTO sessions (session_id, username, expiration_timestamp)
-    VALUES ($sessionId, $username, $expirationTimestamp)
-    ON CONFLICT(username) DO UPDATE SET session_id = $sessionId, expiration_timestamp = $expirationTimestamp
-    `, { $sessionId: sessionId, $username: username, $expirationTimestamp: expirationTimestamp },
-    function (err) {
-      if (err != null) {
-        Logger.error(
-          "An error occurred during login (sessionId = %s, username = %s, expirationTimestamp = %d)",
-          sessionId.toString("hex"), username, expirationTimestamp
-        );
-        throw err;
-      }
-    }
-  );
+export async function setUserSession(username: string, sessionId: Buffer, expirationTimestamp: number) {
+  try {
+    await pool.query(`
+      INSERT INTO sessions (session_id, username, expiration_timestamp)
+      VALUES ($1, $2, $3)
+      ON CONFLICT(username)
+      DO UPDATE SET session_id = excluded.session_id, expiration_timestamp = excluded.expiration_timestamp
+      `, [sessionId.toString("hex"), username, expirationTimestamp]
+    );
+  } catch (err) {
+    Logger.error(
+      "An error occurred during when storing user session (sessionId = %s, username = %s, expirationTimestamp = %d)",
+      sessionId.toString("hex"), username, expirationTimestamp
+    );
+    throw err;
+  }
 }
 
-export function invalidateSession(sessionId: Buffer) {
-  db.run(
-    `
-    DELETE FROM sessions
-    WHERE session_id = ?
-    `, sessionId,
-    function (err) {
-      if (err != null || this.changes === 0) {
-        Logger.warning("Could not remove session from database");
-        Logger.warning(err?.message ?? "Session is not in database");
-      }
-    }
-  );
+export async function invalidateSession(sessionId: Buffer) {
+  try {
+    await pool.query(
+      `
+      DELETE FROM sessions
+      WHERE session_id = $1
+      `, [sessionId.toString("hex")]
+    );
+  } catch (err) {
+    Logger.warning("Could not remove session from database");
+    Logger.warning(err?.message ?? "Session is not in database");
+  }
 }
 
-export function refreshSession(currentSessionId: Buffer, newSessionId: Buffer, expirationTimestamp: number) {
-  db.run(
-    `
+export async function refreshSession(currentSessionId: Buffer, newSessionId: Buffer, expirationTimestamp: number) {
+  const res = await pool.query(`
     UPDATE sessions
-    SET session_id = ?, expiration_timestamp = ?
-    WHERE session_id = ?
-    `, [newSessionId, expirationTimestamp, currentSessionId],
-    function (err) {
-      if (err != null) {
-        throw err;
-      } else if (this.changes === 0) {
-        throw new Error("Could not update session ID");
-      }
-    }
+    SET session_id = $1, expiration_timestamp = $2
+    WHERE session_id = $3
+    `, [newSessionId.toString("hex"), expirationTimestamp, currentSessionId.toString("hex")]
+  );
+  if (res.rowCount == null || res.rowCount === 0) {
+    throw new Error("Could not update session ID");
+  }
+}
+
+export async function updateUserStats(username: string, kills: number, isDead: boolean) {
+  const won = !isDead ? 1 : 0;
+  const died = isDead ? 1 : 0;
+  await pool.query(`
+    INSERT INTO stats (username, wins, kills, deaths, games)
+    VALUES ($1, $2, $3, $4, 1)
+    ON CONFLICT(username)
+    DO UPDATE
+    SET wins = stats.wins + excluded.wins, kills = stats.kills + excluded.kills, deaths = stats.deaths + excluded.deaths, games = stats.games + 1
+    `, [username, won, kills, died]
   );
 }
 
-export function updateUserStats(username: string, kills: number, isDead: boolean) {
-  db.run(
-    `
-    INSERT INTO scoreboard (username, wins, kills, deaths, games)
-    VALUES ($username, $wins, $kills, $deaths, 1)
-    ON CONFLICT(username) DO UPDATE SET wins = wins + $wins, kills = kills + $kills, deaths = deaths + $deaths, games = games + 1
-    `, { $username: username, $wins: !isDead ? 1 : 0, $kills: kills, $deaths: isDead ? 1 : 0 },
-    function (err) {
-      if (err != null) {
-        throw err;
-      }
-    }
-  );
-}
-
-export function getStatsAndLeaderboard(
-  username: string,
-  callback: (userStats: UserStats, scoreboard: Array<UserStats>) => void
-) {
-  db.all<UserStats>(
-    `
-    SELECT username, wins, kills, deaths, games, ((wins * kills * 1000) / (deaths * games)) as score
-    FROM scoreboard
-    ORDER BY username = ?, score DESC
+export async function getStatsAndLeaderboard(username: string): Promise<[UserStats, Array<UserStats>]> {
+  const res = await pool.query(`
+    SELECT username, wins, kills, deaths, games, ((wins + kills) * 1000 / (deaths + games)) as score
+    FROM stats
+    ORDER BY username = $1, score DESC
     LIMIT 11
-    `, username,
-    function (err, rows) {
-      if (err != null) {
-        throw err;
-      } else {
-        const userStats = rows.find(stats => stats.username === username)!;
-        const leaderBoard = rows.sort((statsA, statsB) => statsB.score - statsA.score).slice(0, 10);
-        callback(userStats, leaderBoard);
-      }
-    }
-  )
+    `, [username]
+  );
+  if (res.rowCount == null || res.rowCount === 0) {
+    throw Error("Could not get stats and leaderboard");
+  }
+  const userStats = res.rows.find(stats => stats.username === username)!;
+  const leaderboard = res.rows.sort((statsA, statsB) => statsB.score - statsA.score).slice(0, 10);
+  return [userStats, leaderboard];
 }

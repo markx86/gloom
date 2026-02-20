@@ -5,10 +5,14 @@ export function getEnvStringOrDefault(name: string, def: string): string {
   return value != null && value.length > 0 ? value : def;
 }
 
-export function getEnvIntOrDefault(name: string, def: number, min: number, max: number): number {
+export function getEnvIntOrDefault(name: string, def: number): number {
   const value = process.env[name];
   const int = parseInt(value ?? "");
-  return int >= min && int <= max ? int : def;
+  if (isNaN(int) || !isFinite(int)) {
+    return def;
+  } else {
+    return int;
+  }
 }
 
 export function genUniqueIntForArray(arr: Array<number>): number {

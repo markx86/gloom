@@ -2,16 +2,26 @@ services:
   gloom:
     build: .
     image: gloom
+    restart: always
     ports:
-      - 8492:8492
       - 8080:8080
       - 8443:8443
     environment:
-      - DATABASE=/database/gloom.db
+      - PGHOST=db
+      - PGPORT=5432
+      - PGUSER=gloom
+      - PGPASSWORD=${PG_PASSWD}
       - COOKIE_SECRET=${COOKIE_SECRET}
       - LOG_VERBOSE=${LOG_VERBOSE}
+
+  db:
+    image: postgres:latest
+    restart: always
+    environment:
+      - POSTGRES_USER=gloom
+      - POSTGRES_PASSWORD=${PG_PASSWD}
     volumes:
-      - database:/database
+      - database:/var/lib/postgresql
 
 volumes:
   database:
