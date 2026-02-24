@@ -35,7 +35,7 @@ wss.on("connection", ws => {
     }
     ws.removeAllListeners();
 
-    const view = new DataView(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const playerToken = view.getUint32(0, true);
     const gameId = view.getUint32(4, true);
     const magic = view.getUint32(8, true);

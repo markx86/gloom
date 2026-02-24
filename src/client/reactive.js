@@ -221,11 +221,6 @@ window.$root = function (node) {
   return window.$_root;
 }
 
-window.$defer = function (callback) {
-  new Promise(resolve => resolve())
-    .then(callback);
-}
-
 window.$router = function (routes, callbacks) {
   const root = $root();
   $assert(root != null, "no root node found!");

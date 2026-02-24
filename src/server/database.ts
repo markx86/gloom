@@ -2,7 +2,7 @@ import { Pool, types } from "pg";
 import { randomBytes, hash } from "node:crypto";
 
 import Logger from "./logger";
-import { MAP_SERIALIZED_SIZE } from "./map";
+import { MAP_BASE64_SIZE } from "./map";
 
 export const MAP_NAME_MAX_LEN = 32;
 export const MAP_NAME_MIN_LEN = 3;
@@ -65,7 +65,7 @@ export async function initDb() {
       map_id SERIAL PRIMARY KEY,
       map_name VARCHAR(${MAP_NAME_MAX_LEN}) NOT NULL,
       creator VARCHAR(${USERNAME_MAX_LEN}) NOT NULL,
-      map_data CHAR(${MAP_SERIALIZED_SIZE * 2}),
+      map_data CHAR(${MAP_BASE64_SIZE}),
       FOREIGN KEY (creator) REFERENCES users(username),
       CONSTRAINT UC_map_name_creator UNIQUE (map_name, creator)
     )

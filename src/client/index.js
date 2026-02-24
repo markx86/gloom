@@ -178,10 +178,10 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     });
   }
 
-  function serializeMap(mapArray, rotations) {
-    const spawnPoints = [];
+  function serializeMap(canvas) {
+    const spawnPoints = [0, 0, 0, 0];
     const mapTiles = [];
-    mapArray.forEach((cell, index) => {
+    canvas._map.forEach((cell, index) => {
       const x = index % MAP_SIZE;
       const y = Math.floor(index / MAP_SIZE);
       // Skip corner blocks
@@ -191,24 +191,25 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
 
       const playerIndex = getPlayerIndex(cell);
       if (playerIndex != null) {
-        const u16 = (x & 0b11111) | ((y & 0b11111) << 5) | ((rotations[playerIndex] & 0b111111) << 10);
-        spawnPoints.push(u16);
+        const u16 = (x & 0b11111) | ((y & 0b11111) << 5) | ((canvas._getPlayerRotation(playerIndex) & 0b111111) << 10);
+        spawnPoints[playerIndex] = u16;
       }
 
       mapTiles.push(cell === MAP_DRAW_WALL ? 1 : 0);
     });
 
-    if (spawnPoints.length !== 4) {
+    // There's an invalid player position in the array
+    if (spawnPoints.find(u16 => u16 === 0) != null) {
       return;
     }
 
-    const serialized = new Uint8Array(2*rotations.length + Math.ceil(((MAP_SIZE-2)**2) / 8));
-    const view = new DataView(serialized.buffer, 0, 8);
+    const serialized = new Uint8Array(2*spawnPoints.length + Math.ceil(((MAP_SIZE-2)**2) / 8));
+    const view = new DataView(serialized.buffer, serialized.byteOffset, 2*spawnPoints.length);
     spawnPoints.forEach((u16, index) => view.setUint16(index << 1, u16, true));
 
-    let j = 8;
+    let j = view.byteLength * 8;
     for (let i = 0; i < mapTiles.length; i++) {
-      const bit = j & 3;
+      const bit = j & 7;
       const byte = j >> 3;
       serialized[byte] |= mapTiles[i] << bit;
       ++j;
@@ -223,7 +224,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
 
     wndDisable();
 
-    const mapData = serializeMap(canvas._map, canvas._playerRotations);
+    const mapData = serializeMap(canvas);
     if (mapData == null) {
       showErrorWindow("A map must support up to four players!", wndEnable);
       return;
@@ -231,7 +232,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
 
     const res = await api.post("/map/update", {
       mapId: canvas._mapId,
-      mapData: mapData.toHex()
+      mapData: mapData.toBase64()
     });
 
     switch (res.status) {
@@ -670,7 +671,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   const homeLeaderboard = () => {
     if (Globals.leaderboard == null) {
       return $div(
-        $p($strong("Error fetching leader data.")).$style("color", "red")
+        $p($strong("Error fetching leaderboard data.")).$style("color", "red")
       );
     }
 
@@ -834,8 +835,9 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       typeof(currentUser) == "string"
     );
   
-    // NOTE: This queues the task to be executed later.
-    $defer(() => Globals.gameWs = gloomLaunch(currentUser, gameId, playerToken, gotoHome));
+    queueMicrotask(() => {
+      Globals.gameWs = gloomLaunch(currentUser, gameId, playerToken, gotoHome);
+    });
   
     return createWindow(
       {
@@ -977,6 +979,9 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   }
 
   const map = (mapId, mapData) => {
+    $assert(typeof(mapId) === "number");
+    $assert(mapData == null || typeof(mapData) === "string");
+
     const canvasSize = MAP_SIZE * MAP_CANVAS_SCALE;
     const canvas = $canvas().$id("map-editor")
                             .$attribute("width", canvasSize.toString())
@@ -989,16 +994,45 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
                             .$on("contextmenu", preventContextMenu);
 
     const map = new Uint8Array(MAP_SIZE * MAP_SIZE);
-    if (mapData == null) {
+    const playerRotations = [0, 0, 0, 0];
+
+    if (mapData != null) {
+      // Deserialize map data
+      const serialized = Uint8Array.fromBase64(mapData);
+      const view = new DataView(serialized.buffer, serialized.byteOffset, 8);
+
+      let bitmap_pos = view.byteLength * 8;
+      for (let i = 0; i < map.length; i++) {
+        const x = i % MAP_SIZE;
+        const y = Math.floor(i / MAP_SIZE);
+        if (x === MAP_SIZE-1 || x === 0 || y === MAP_SIZE-1 || y === 0) {
+          map[i] = MAP_DRAW_WALL;
+          continue;
+        }
+        const bit = bitmap_pos & 7;
+        const byte = bitmap_pos >> 3;
+        map[i] = (serialized[byte] & (1 << bit)) !== 0 ? MAP_DRAW_WALL : MAP_DRAW_CLEAR;
+        ++bitmap_pos;
+      }
+
+      for (let i = 0; i < playerRotations.length; i++) {
+        const u16 = view.getUint16(i << 1, true);
+        const x = u16 & 0b11111;
+        const y = (u16 >> 5) & 0b11111;
+        const r = u16 >> 10;
+
+        $assert(x > 0 && x < MAP_SIZE-1);
+        $assert(y > 0 && y < MAP_SIZE-1);
+        map[x + y * MAP_SIZE] = i + MAP_DRAW_PLAYER1;
+        playerRotations[i] = r;
+      }
+    } else {
       // Initialize empty map
       for (let i = 0; i < map.length; i++) {
         const x = i % MAP_SIZE;
         const y = Math.floor(i / MAP_SIZE);
-        map[i] = (x === MAP_SIZE-1 || x === 0) || (y === MAP_SIZE-1 || y === 0) ? 1 : 0;
+        map[i] = (x === MAP_SIZE-1 || x === 0 || y === MAP_SIZE-1 || y === 0) ? MAP_DRAW_WALL : MAP_DRAW_CLEAR;
       }
-    } else {
-      // Deserialize map data
-      // TODO
     }
 
     const drawButton = (id, text) => {
@@ -1024,7 +1058,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     canvas._drawMode = null;
     canvas._prevDrawMode = null;
     canvas._drawButtons = buttons;
-    canvas._playerRotations = [0, 0, 0, 0];
+    canvas._playerRotations = playerRotations;
     canvas._map = map;
     canvas._mapId = mapId;
     canvas._redraw = renderMapCanvas;

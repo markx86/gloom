@@ -1,7 +1,12 @@
 import { randomInt } from "node:crypto";
+import { MAX_PLAYERS } from "./game";
 
 export const MAP_SIZE = 32;
-export const MAP_SERIALIZED_SIZE = 2*4 + Math.ceil(((MAP_SIZE-2)**2)/8)
+
+const MAP_SERIALIZED_BITMAP_SIZE = Math.ceil(((MAP_SIZE-2)**2) / 8);
+const MAP_SERIALIZED_PLAYERS_SIZE = 2*MAX_PLAYERS;
+export const MAP_SERIALIZED_SIZE = MAP_SERIALIZED_PLAYERS_SIZE + MAP_SERIALIZED_BITMAP_SIZE;
+export const MAP_BASE64_SIZE = Math.ceil(Math.ceil(MAP_SERIALIZED_SIZE * 8 / 6) / 4) * 4;
 
 const SPAWN_PRESET_ROTATIONS = [0, 45, 90, 135, 180, 225, 270, 315];
 
@@ -17,8 +22,8 @@ export class SpawnPosition {
   }
 
   public serialize(): number {
-    const x = this.x & 0b11111;
-    const y = this.y & 0b11111;
+    const x = Math.floor(this.x) & 0b11111;
+    const y = Math.floor(this.y) & 0b11111;
     const rotDeg = this.rot * 180.0 / Math.PI;
     const rotPreset = SPAWN_PRESET_ROTATIONS
                         .map((v, k) => [k, Math.abs(v - rotDeg)])
@@ -28,10 +33,14 @@ export class SpawnPosition {
     return (x) | (y << 5) | (rotPreset << 10);
   }
 
-  public static deserialize(u16: number): SpawnPosition {
+  public static deserialize(u16: number): SpawnPosition | undefined {
     const x = u16 & 0b11111;
     const y = (u16 >> 5) & 0b11111;
-    const r = SPAWN_PRESET_ROTATIONS[u16 >> 10];
+    const rIndex = u16 >> 10;
+    if (x === 0 || x === MAP_SIZE-1 || y === 0 || y === MAP_SIZE-1 || rIndex >= SPAWN_PRESET_ROTATIONS.length) {
+      return;
+    }
+    const r = SPAWN_PRESET_ROTATIONS[rIndex];
     return new SpawnPosition(x, y, r);
   }
 }
@@ -114,15 +123,25 @@ export class GameMap {
   }
 
   public static deserialize(mapData: string): GameMap {
-    if (mapData.length < MAP_SERIALIZED_SIZE*2) {
+    if (mapData.length < MAP_BASE64_SIZE) {
       // Not enough map data.
       throw new Error("Map data too short!");
     }
-    const mapBuffer = Buffer.from(mapData, "hex");
-    const view = new DataView(mapBuffer.buffer, 0, 2*4);
-    const bitmap = new Uint8Array(mapBuffer.buffer, 2*4, MAP_SERIALIZED_SIZE - 2*4);
-    const spawnPositions = [0, 1, 2, 3].map((index) => SpawnPosition.deserialize(view.getInt16(index << 1, true)));
+    const mapBuffer = Buffer.from(mapData, "base64");
+    const view = new DataView(mapBuffer.buffer, mapBuffer.byteOffset, MAP_SERIALIZED_PLAYERS_SIZE);
+    const bitmap = new Uint8Array(mapBuffer.buffer, mapBuffer.byteOffset + MAP_SERIALIZED_PLAYERS_SIZE, MAP_SERIALIZED_BITMAP_SIZE);
+
+    const spawnPositions = new Array<SpawnPosition>(MAX_PLAYERS);
+    for (let i = 0; i < MAX_PLAYERS; i++) {
+      const spawnPosition = SpawnPosition.deserialize(view.getUint16(i << 1, true));
+      if (spawnPosition == null) {
+        throw new Error(`Spawn position for player #${i} is invalid.`);
+      }
+      spawnPositions[i] = spawnPosition;
+    }
+
     const tiles = GameMap.deserializeBitmap(bitmap);
+
     return new GameMap(MAP_SIZE, MAP_SIZE, tiles, spawnPositions);
   }
 
@@ -142,12 +161,12 @@ export class GameMap {
   }
 
   public serialize(): string {
-    const buffer = Buffer.alloc(MAP_SERIALIZED_SIZE)
-    const view = new DataView(buffer.buffer, 0, 2*4);
+    const mapBuffer = Buffer.alloc(MAP_SERIALIZED_SIZE)
+    const view = new DataView(mapBuffer.buffer, mapBuffer.byteOffset, MAP_SERIALIZED_PLAYERS_SIZE);
+    const bitmap = new Uint8Array(mapBuffer.buffer, mapBuffer.byteOffset + MAP_SERIALIZED_PLAYERS_SIZE, MAP_SERIALIZED_BITMAP_SIZE);
     this.spawnPositions.forEach((spawnPosition, index) => view.setUint16(index << 1, spawnPosition.serialize(), true));
-    const bitmap = new Uint8Array(buffer.buffer, 2*4, MAP_SERIALIZED_SIZE - 2*4);
     this.serializeBitmap(bitmap);
-    return buffer.toString("hex");
+    return mapBuffer.toString("base64");
   }
 
   public check(): boolean {

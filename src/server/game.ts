@@ -8,8 +8,9 @@ import { Player } from "./player";
 
 export const DT = 1000 / 60;
 
-const MIN_PLAYERS = 2;
-const MAX_PLAYERS = 4;
+export const MIN_PLAYERS = 2;
+export const MAX_PLAYERS = 4;
+
 const MAX_SPRITES = 256;
 const MAX_GAMES = 256;
 
