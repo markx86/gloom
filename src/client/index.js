@@ -36,6 +36,8 @@ const MAP_DRAW_PLAYER2 = 3;
 const MAP_DRAW_PLAYER3 = 4;
 const MAP_DRAW_PLAYER4 = 5;
 
+const MAP_SCROLL_SENSITIVITY = 8;
+
 const MAP_COLORS = [
   "white",
   "black",
@@ -45,12 +47,24 @@ const MAP_COLORS = [
   "magenta"
 ];
 
+const MAP_DIRECTION_ARROWS = [
+  "\ud83e\udc72", //   0 deg
+  "\ud83e\udc75", //  45 deg
+  "\ud83e\udc71", //  90 deg
+  "\ud83e\udc74", // 135 deg
+  "\ud83e\udc70", // 180 deg
+  "\ud83e\udc77", // 225 deg
+  "\ud83e\udc73", // 270 deg
+  "\ud83e\udc76", // 315 deg
+];
+
 gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   const Globals = {
     gameWs: null,
     myGameId: null,
     myUsername: null,
     myStats: null,
+    myMaps: null,
     leaderboard: null,
     homePageTab: HOME_TAB_PLAY
   };
@@ -164,8 +178,113 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     });
   }
 
-  function doSaveMap(event) {
-    // TODO
+  function serializeMap(mapArray, rotations) {
+    const spawnPoints = [];
+    const mapTiles = [];
+    mapArray.forEach((cell, index) => {
+      const x = index % MAP_SIZE;
+      const y = Math.floor(index / MAP_SIZE);
+      // Skip corner blocks
+      if (x === 0 || x === MAP_SIZE-1 || y === 0 || y === MAP_SIZE-1) {
+        return;
+      }
+
+      const playerIndex = getPlayerIndex(cell);
+      if (playerIndex != null) {
+        const u16 = (x & 0b11111) | ((y & 0b11111) << 5) | ((rotations[playerIndex] & 0b111111) << 10);
+        spawnPoints.push(u16);
+      }
+
+      mapTiles.push(cell === MAP_DRAW_WALL ? 1 : 0);
+    });
+
+    if (spawnPoints.length !== 4) {
+      return;
+    }
+
+    const serialized = new Uint8Array(2*rotations.length + Math.ceil(((MAP_SIZE-2)**2) / 8));
+    const view = new DataView(serialized.buffer, 0, 8);
+    spawnPoints.forEach((u16, index) => view.setUint16(index << 1, u16, true));
+
+    let j = 8;
+    for (let i = 0; i < mapTiles.length; i++) {
+      const bit = j & 3;
+      const byte = j >> 3;
+      serialized[byte] |= mapTiles[i] << bit;
+      ++j;
+    }
+
+    return serialized;
+  }
+
+  async function doSaveMap(event) {
+    const [wndEnable, wndDisable] = getWindowControls(event.target);
+    const canvas = $("#map-editor");
+
+    wndDisable();
+
+    const mapData = serializeMap(canvas._map, canvas._playerRotations);
+    if (mapData == null) {
+      showErrorWindow("A map must support up to four players!", wndEnable);
+      return;
+    }
+
+    const res = await api.post("/map/update", {
+      mapId: canvas._mapId,
+      mapData: mapData.toHex()
+    });
+
+    switch (res.status) {
+      case 200: { $goto("/"); break; }
+      case 400: { showErrorWindow((await res.json())?.message ?? "Invalid map!", wndEnable); break; }
+      default:  { showWarningWindow("An error occurred while trying to save the map! Try again later.", wndEnable); break; }
+    }
+  }
+
+  async function doCreateMap(event) {
+    const mapName = $("#field-map-name")?.value;
+    if (mapName == null) {
+      return;
+    }
+
+    const [wndEnable, wndDisable] = getWindowControls(event.target);
+    wndDisable();
+
+    const res = await api.post("/map/create", { mapName });
+    switch (res.status) {
+      case 200: { $goto("/map", (await res.json()).mapId); break; }
+      case 400: { showErrorWindow((await res.json()).message, wndEnable); break; }
+      default:  { showWarningWindow("An error occurred while trying to create the map! Try again later.", wndEnable); break; }
+    }
+  }
+
+  async function doDeleteMap(event, mapId) {
+    const [wndEnable, wndDisable] = getWindowControls(event.target);
+    wndDisable();
+
+    const res = await api.post("/map/delete", { mapId });
+    switch (res.status) {
+      case 200: {
+        if (Globals.myMaps != null) {
+          // Do not refetch the maps list, just remove entry from the existing list.
+          Globals.myMaps = Globals.myMaps.filter(map => map.mapId !== mapId);
+          root.$refresh();
+        }
+        wndEnable();
+        break;
+      }
+
+      case 400:
+      case 404: {
+        showErrorWindow((await res.json()).message, wndEnable);
+        break;
+      }
+
+      default: {
+        showWarningWindow("An error occurred while trying to deleting the map! Try again later.", wndEnable);
+        break;
+      }
+    }
   }
 
   function refreshMyGameId() {
@@ -193,27 +312,42 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       });
   }
 
-  function refreshStats() {
-    api.get("/stats")
-      .then(res => {
-        if (res.status === 200) {
-          return res.json();
-        } else {
-          throw Error(`HTTP error ${res.status}`);
-        }
-      })
-      .then(data => {
+  async function refreshStats() {
+    const res = await api.get("/stats");
+    switch (res.status) {
+      case 200: {
+        const data = await res.json();
+
         Globals.myStats = data.userStats;
         Globals.leaderboard = data.leaderboard;
+
         // Maybe refresh scoreboard screen.
-        if ($route() === "/" && Globals.homePageTab) {
+        if (
+          $route() === "/"
+          && (Globals.homePageTab === HOME_TAB_LEADERBOARD || Globals.homePageTab === HOME_TAB_STATS)
+        ) {
           root.$refresh();
         }
-      })
-      .catch(e => {
-        console.error("Could not refresh scoreboard");
-        console.error(e);
-      })
+
+        break;
+      }
+      case 404: { return; }
+      default:  { console.error("Could not refresh scoreboard: %s", res.statusText); break; }
+    }
+  }
+
+  async function fetchMaps() {
+    const res = await api.get("/map/list");
+    switch (res.status) {
+      case 200: {
+        Globals.myMaps = await res.json();
+        if ($route() === "/" && Globals.homePageTab === HOME_TAB_MAPS) {
+          root.$refresh();
+        }
+        break;
+      }
+      default:  { console.error("Could not fetch maps: %s", res.statusText); break; }
+    }
   }
 
   function zeroPadL(s, w) {
@@ -576,9 +710,72 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     );
   };
 
-  const homeMaps = () => {
+  function generateMapsTableRows() {
+    const actionButton = (icon, onclick) => {
+      return $img(icon, "16px", "16px")
+        .$style("cursor", "pointer")
+        .$style("margin", "1px 4px 1px 0px")
+        .$onclick(onclick);
+    };
+
     return $div(
-      $button("Create").$onclick(() => $goto("/map"))
+      $label("Your maps"),
+      $div(
+        $table(
+          $thead(
+            $tr(
+              $th("ID"),
+              $th("Name"),
+              $th("Actions")
+            )
+          ),
+          $tbody(
+            ...Globals.myMaps.map(map => {
+              return $tr(
+                $td(map.mapId.toString()),
+                $td(map.mapName),
+                $td(
+                  actionButton("/static/img/edit.png", () => $goto("/map", map.mapId, map.mapData)),
+                  actionButton("/static/img/delete.png", event => doDeleteMap(event, map.mapId))
+                )
+              );
+            })
+          )
+        ).$style("width", "100%")
+      ).$class("sunken-panel")
+       .$style("max-height", "200px"),
+    ).$class("field-row-stacked");
+  }
+
+  const homeMaps = () => {
+    const extraComponents = [];
+
+    if (Globals.myMaps == null) {
+      extraComponents.push(homeSeparator());
+      extraComponents.push(
+        $div(
+          $p($strong("Error fetching maps.")).$style("color", "red")
+        )
+      );
+    } else if (Globals.myMaps.length > 0) {
+      extraComponents.push(homeSeparator());
+      extraComponents.push(generateMapsTableRows());
+    }
+
+    return $div(
+      $div(
+        $label("Map name").$for("field-map-name"),
+        $div(
+          $input().$type("text")
+                  .$id("field-map-name")
+                  .$attribute("placeholder", "Enter a map name")
+                  .$style("flex-grow", "2"),
+          $button("Create").$onclick(doCreateMap)
+                           .$style("margin", "0px 0px 0px 12px")
+        ).$style("display", "flex")
+         .$style("align-items", "center")
+      ).$class("field-row-stacked"),
+      ...extraComponents
     );
   };
 
@@ -656,12 +853,31 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     );
   };
 
+  function getMapIndex(event) {
+    const x = Math.floor(event.offsetX / MAP_CANVAS_SCALE);
+    const y = Math.floor(event.offsetY / MAP_CANVAS_SCALE);
+    // NOTE: This check makes sure that border pixels cannot be modified
+    if (x < MAP_SIZE-1 && x > 0 && y < MAP_SIZE-1 && y > 0) {
+      return x + y * MAP_SIZE;
+    }
+  }
+
+  function getPlayerIndex(cellValue) {
+    if (cellValue >= MAP_DRAW_PLAYER1 && cellValue <= MAP_DRAW_PLAYER4) {
+      return cellValue - MAP_DRAW_PLAYER1;
+    }
+  }
+
   function renderMapCanvas() {
     const ctx = this._ctx;
+
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, this.width, this.height);
+
     ctx.strokeStyle = "gray";
     ctx.lineWidth = 0.5;
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
     this._map.forEach((cell, index) => {
       const x = (index % MAP_SIZE) * MAP_CANVAS_SCALE;
       const y = Math.floor(index / MAP_SIZE) * MAP_CANVAS_SCALE;
@@ -670,6 +886,14 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
         ctx.fillRect(x, y, MAP_CANVAS_SCALE, MAP_CANVAS_SCALE);
       }
       ctx.strokeRect(x, y, MAP_CANVAS_SCALE, MAP_CANVAS_SCALE);
+
+      const playerIndex = getPlayerIndex(cell);
+      if (playerIndex != null) {
+        const arrowIndex = this._getPlayerRotation(playerIndex);
+        const arrow = MAP_DIRECTION_ARROWS[arrowIndex];
+        ctx.fillStyle = "white";
+        ctx.fillText(arrow, x + MAP_CANVAS_SCALE / 2, y + MAP_CANVAS_SCALE / 2);
+      }
     });
   }
 
@@ -685,31 +909,39 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     this._drawMode = mode;
   }
 
+  function mapEditorOnScroll(event) {
+    const index = getMapIndex(event);
+    if (index == null) {
+      return;
+    }
+    const playerIndex = getPlayerIndex(this._map[index]);
+    if (playerIndex != null) {
+      const delta = event.deltaY / MAP_SCROLL_SENSITIVITY;
+      this._addPlayerRotation(playerIndex, delta);
+      this._redraw();
+    }
+  }
+
   function mapEditorOnMouseEvent(event) {
     if (event.buttons > 0) {
       if (event.buttons === 2) {
         this._switchMode(MAP_DRAW_CLEAR);
       }
-      const x = Math.floor(event.offsetX / MAP_CANVAS_SCALE);
-      const y = Math.floor(event.offsetY / MAP_CANVAS_SCALE);
-      const index = x + y * MAP_SIZE;
-      // NOTE: This check makes sure that border pixels cannot be modified
-      if (x < MAP_SIZE-1 && x > 0 && y < MAP_SIZE-1 && y > 0) {
-        if (this._map[index] !== this._drawMode) {
-          if (this._drawMode >= MAP_DRAW_PLAYER1 && this._map.find(cell => cell === this._drawMode) != null) {
-            return;
-          }
-          this._dirty = true;
-          this._map[index] = this._drawMode;
-          // Only redraw if we change the map
-          this._redraw();
+      const index = getMapIndex(event);
+      if (this._map[index] !== this._drawMode) {
+        if (this._drawMode >= MAP_DRAW_PLAYER1 && this._map.find(cell => cell === this._drawMode) != null) {
+          return;
         }
+        this._dirty = true;
+        this._map[index] = this._drawMode;
+        // Only redraw if we change the map
+        this._redraw();
       }
     }
   }
 
-  function mapEditorOnMouseUp(event) {
-    if (event.button === 2) {
+  function mapEditorCancelClear(event) {
+    if (event.button === 2 || event.buttons === 2) {
       this._switchMode(this._prevDrawMode);
     }
   }
@@ -733,37 +965,58 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     event.stopPropagation();
   }
 
-  const map = () => {
+  function getPlayerRotation(index) {
+    return Math.round(this._playerRotations[index]) % MAP_DIRECTION_ARROWS.length;
+  }
+
+  function addPlayerRotation(index, delta) {
+    this._playerRotations[index] = (this._playerRotations[index] + delta) % MAP_DIRECTION_ARROWS.length;
+    while (this._playerRotations[index] < 0) {
+      this._playerRotations[index] += MAP_DIRECTION_ARROWS.length;
+    }
+  }
+
+  const map = (mapId, mapData) => {
     const canvasSize = MAP_SIZE * MAP_CANVAS_SCALE;
     const canvas = $canvas().$id("map-editor")
                             .$attribute("width", canvasSize.toString())
                             .$attribute("height", canvasSize.toString())
                             .$on("mousemove", mapEditorOnMouseEvent)
                             .$on("mousedown", mapEditorOnMouseEvent)
-                            .$on("mouseup", mapEditorOnMouseUp)
+                            .$on("mouseup", mapEditorCancelClear)
+                            .$on("mouseleave", mapEditorCancelClear)
+                            .$on("wheel", mapEditorOnScroll)
                             .$on("contextmenu", preventContextMenu);
 
     const map = new Uint8Array(MAP_SIZE * MAP_SIZE);
-    for (let i = 0; i < map.length; i++) {
-      const x = i % MAP_SIZE;
-      const y = Math.floor(i / MAP_SIZE);
-      map[i] = (x === MAP_SIZE-1 || x === 0) || (y === MAP_SIZE-1 || y === 0) ? 1 : 0;
+    if (mapData == null) {
+      // Initialize empty map
+      for (let i = 0; i < map.length; i++) {
+        const x = i % MAP_SIZE;
+        const y = Math.floor(i / MAP_SIZE);
+        map[i] = (x === MAP_SIZE-1 || x === 0) || (y === MAP_SIZE-1 || y === 0) ? 1 : 0;
+      }
+    } else {
+      // Deserialize map data
+      // TODO
     }
 
     const drawButton = (id, text) => {
       return $button(text).$style("color", MAP_COLORS[id])
                           .$style("font-weight", "bold")
+                          .$style("font-size", "10px")
                           .$style("flex", "1 1 0px")
+                          .$style("margin", "0px 4px 2px 4px")
                           .$onclick(() => canvas._switchMode(id));
     };
 
     const buttons = [
-      drawButton(MAP_DRAW_CLEAR,   "CLEAR").$style("text-shadow", "1px 0 black, -1px 0 black, 0 1px black, 0 -1px black"),
-      drawButton(MAP_DRAW_WALL,    "WALL"),
-      drawButton(MAP_DRAW_PLAYER1, "PLAYER 1"),
-      drawButton(MAP_DRAW_PLAYER2, "PLAYER 2"),
-      drawButton(MAP_DRAW_PLAYER3, "PLAYER 3"),
-      drawButton(MAP_DRAW_PLAYER4, "PLAYER 4"),
+      drawButton(MAP_DRAW_CLEAR,     "CLEAR").$style("text-shadow", "1px 0 black, -1px 0 black, 0 1px black, 0 -1px black"),
+      drawButton(MAP_DRAW_WALL,      "WALL"),
+      drawButton(MAP_DRAW_PLAYER1,   "PLAYER 1"),
+      drawButton(MAP_DRAW_PLAYER2,   "PLAYER 2"),
+      drawButton(MAP_DRAW_PLAYER3,   "PLAYER 3"),
+      drawButton(MAP_DRAW_PLAYER4,   "PLAYER 4"),
     ];
 
     canvas._ctx = canvas.getContext("2d");
@@ -771,9 +1024,13 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     canvas._drawMode = null;
     canvas._prevDrawMode = null;
     canvas._drawButtons = buttons;
+    canvas._playerRotations = [0, 0, 0, 0];
     canvas._map = map;
+    canvas._mapId = mapId;
     canvas._redraw = renderMapCanvas;
     canvas._switchMode = mapEditorSwitchMode;
+    canvas._getPlayerRotation = getPlayerRotation;
+    canvas._addPlayerRotation = addPlayerRotation;
 
     canvas._redraw();
     canvas._switchMode(MAP_DRAW_WALL);
@@ -789,15 +1046,14 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       $div(
         $div(
           ...buttons
-        ).$style("padding", "4px")
-         .$style("display", "flex"),
+        ).$style("display", "flex"),
         $div(
           canvas
         ).$class("sunken")
          .$style("padding", "2px 2px 0px 2px")
          .$style("margin", "2px"),
         $div(
-          $button("Cancel").$onclick(() => $goto("/")),
+          $button("Cancel").$onclick(mapEditorOnClose),
           $button("Save").$class("default")
                          .$style("margin-left", "8px")
                          .$onclick(doSaveMap)
@@ -821,6 +1077,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
                 if (success) {
                   refreshStats();
                   refreshMyGameId();
+                  fetchMaps();
                   $interval(300000, refreshStats); // Refresh scoreboard every 5 minutes.
                   $interval(5000, refreshMyGameId); // Refresh game id every 5 seconds.
                   root.$refresh();

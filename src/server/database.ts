@@ -1,8 +1,11 @@
-import { Pool } from "pg";
+import { Pool, types } from "pg";
 import { randomBytes, hash } from "node:crypto";
+
 import Logger from "./logger";
+import { MAP_SERIALIZED_SIZE } from "./map";
 
 export const MAP_NAME_MAX_LEN = 32;
+export const MAP_NAME_MIN_LEN = 3;
 export const USERNAME_MAX_LEN = 24;
 export const USERNAME_MIN_LEN = 3;
 export const PASSWORD_MAX_LEN = 64;
@@ -25,9 +28,7 @@ export const closeDb = () => {
 // Log unhandled exceptions.
 pool.on("error", Logger.error);
 
-initDatabase();
-
-async function initDatabase() {
+export async function initDb() {
   // Users table.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -42,7 +43,7 @@ async function initDatabase() {
     CREATE TABLE IF NOT EXISTS sessions (
       session_id CHAR(${SESSION_ID_LEN * 2}) PRIMARY KEY,
       username VARCHAR(${USERNAME_MAX_LEN}) NOT NULL UNIQUE,
-      expiration_timestamp BIGINT NOT NULL,
+      expiration_timestamp INT NOT NULL,
       FOREIGN KEY (username) REFERENCES users(username)
     )
   `);
@@ -51,26 +52,31 @@ async function initDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS stats (
       username VARCHAR(${USERNAME_MAX_LEN}) PRIMARY KEY,
-      wins BIGINT NOT NULL,
-      kills BIGINT NOT NULL,
-      deaths BIGINT NOT NULL,
-      games BIGINT NOT NULL,
+      wins INT NOT NULL,
+      kills INT NOT NULL,
+      deaths INT NOT NULL,
+      games INT NOT NULL,
       FOREIGN KEY (username) REFERENCES users(username)
     )
   `);
   
   await pool.query(`
     CREATE TABLE IF NOT EXISTS maps (
-      map_id BIGSERIAL PRIMARY KEY,
+      map_id SERIAL PRIMARY KEY,
       map_name VARCHAR(${MAP_NAME_MAX_LEN}) NOT NULL,
       creator VARCHAR(${USERNAME_MAX_LEN}) NOT NULL,
-      FOREIGN KEY (creator) REFERENCES users(username)
+      map_data CHAR(${MAP_SERIALIZED_SIZE * 2}),
+      FOREIGN KEY (creator) REFERENCES users(username),
+      CONSTRAINT UC_map_name_creator UNIQUE (map_name, creator)
     )
   `);
+
+  clearExpiredSessions();
+  // Cleanup sessions every 15 minutes.
+  setInterval(clearExpiredSessions, 15 * 60 * 1000);
 }
 
-// Cleanup sessions every 15 minutes.
-setInterval(async () => {
+async function clearExpiredSessions() {
   try {
     await pool.query(`
       DELETE FROM sessions
@@ -80,7 +86,7 @@ setInterval(async () => {
     Logger.error("Could not expire old sessions");
     Logger.error(err.message);
   }
-}, 15 * 60 * 1000);
+}
 
 export async function getUsernameBySessionId(sessionId: Buffer): Promise<string | undefined> {
   const res = await pool.query(`
@@ -99,7 +105,7 @@ function computePasswordHash(password: string, salt: Buffer): Buffer<ArrayBuffer
   return hash('sha256', Buffer.concat([passwordBuffer, salt]), "buffer");
 }
 
-export async function registerUser(username: string, password: string): Promise<boolean> {
+export async function createUser(username: string, password: string): Promise<boolean> {
   const salt = randomBytes(SALT_LEN);
   const passwordHash = computePasswordHash(password, salt);
 
@@ -159,7 +165,7 @@ export async function setUserSession(username: string, sessionId: Buffer, expira
   }
 }
 
-export async function invalidateSession(sessionId: Buffer) {
+export async function deleteSession(sessionId: Buffer) {
   try {
     await pool.query(
       `
@@ -173,7 +179,7 @@ export async function invalidateSession(sessionId: Buffer) {
   }
 }
 
-export async function refreshSession(currentSessionId: Buffer, newSessionId: Buffer, expirationTimestamp: number) {
+export async function updateSession(currentSessionId: Buffer, newSessionId: Buffer, expirationTimestamp: number) {
   const res = await pool.query(`
     UPDATE sessions
     SET session_id = $1, expiration_timestamp = $2
@@ -198,8 +204,8 @@ export async function updateUserStats(username: string, kills: number, isDead: b
   );
 }
 
-export async function getStatsAndLeaderboard(username: string): Promise<[UserStats, Array<UserStats>]> {
-  const res = await pool.query(`
+export async function getStatsAndLeaderboard(username: string): Promise<[UserStats, Array<UserStats>] | undefined> {
+  const res = await pool.query<UserStats>(`
     SELECT username, wins, kills, deaths, games, ((wins + kills) * 1000 / (deaths + games)) as score
     FROM stats
     ORDER BY username = $1, score DESC
@@ -207,9 +213,66 @@ export async function getStatsAndLeaderboard(username: string): Promise<[UserSta
     `, [username]
   );
   if (res.rowCount == null || res.rowCount === 0) {
-    throw Error("Could not get stats and leaderboard");
+    return;
   }
-  const userStats = res.rows.find(stats => stats.username === username)!;
+  const userStats = res.rows.find((stats) => stats.username === username)!;
   const leaderboard = res.rows.sort((statsA, statsB) => statsB.score - statsA.score).slice(0, 10);
   return [userStats, leaderboard];
+}
+
+export async function getUserMapList(username: string): Promise<Array<{mapId: number, mapName: string, mapData: string}>> {
+  const res = await pool.query<{ map_id: number, map_name: string, map_data: string }>(`
+    SELECT map_id, map_name, map_data FROM maps WHERE creator = $1
+    `, [username]
+  );
+  if (res.rowCount == null || res.rowCount === 0) {
+    return [];
+  } else {
+    return res.rows.map((row) => {
+      return {
+        mapId: row.map_id,
+        mapName: row.map_name,
+        mapData: row.map_data
+      }
+    });
+  }
+}
+
+export async function deleteMap(mapId: number, creator: string): Promise<boolean> {
+  const res = await pool.query(`
+    DELETE FROM maps
+    WHERE map_id = $1 AND creator = $2
+    `, [mapId, creator]
+  );
+  return (res.rowCount != null && res.rowCount === 1);
+}
+
+export async function createMap(mapName: string, creator: string): Promise<number | undefined> {
+  try {
+    const res = await pool.query<{ map_id: number }>(`
+      INSERT INTO maps (map_name, creator)
+      VALUES ($1, $2)
+      RETURNING map_id
+      `, [mapName, creator]
+    );
+    if (res.rowCount == null || res.rowCount !== 1) {
+      throw new Error("Database returned 0 rows");
+    } else {
+      return res.rows[0].map_id;
+    }
+  } catch (err) {
+    if (err.code !== "23505") {
+      throw err;
+    }
+  }
+}
+
+export async function updateMap(mapId: number, mapData: string): Promise<boolean> {
+  const res = await pool.query(`
+    UPDATE maps
+    SET map_data = $1
+    WHERE map_id = $2
+    `, [mapData, mapId]
+  );
+  return res.rowCount != null && res.rowCount === 1;
 }

@@ -1,5 +1,5 @@
 import { PlayerSprite } from "./sprite";
-import { updateUserStats } from "./database";
+import * as db from "./database";
 
 export class Player {
   readonly username: string;
@@ -35,6 +35,6 @@ export class PlayerStats {
   }
 
   public save() {
-    updateUserStats(this.username, this.kills, this.dead);
+    db.updateUserStats(this.username, this.kills, this.dead);
   }
 };

@@ -6,7 +6,7 @@ import Stream from "node:stream";
 import { readFileSync } from "node:fs";
 
 import Logger from "./logger";
-import { closeDb } from "./database";
+import { initDb, closeDb } from "./database";
 import { getEnvStringOrDefault } from "./util";
 import { HTTP_PORT, HTTPS_PORT } from "./ports";
 import { app } from "./http-server";
@@ -27,6 +27,8 @@ process.on("uncaughtException", (e) => {
   closeDb();
   process.exit(-1);
 });
+
+initDb();
 
 function handleUpgrade(request: http.IncomingMessage, socket: Stream.Duplex, head: Buffer) {
   if (request.url === "/game") {

@@ -263,11 +263,6 @@ window.$router = function (routes, callbacks) {
       }
 
       const args = $_getArgsForRoute(location) ?? [];
-      $assert(
-        routeFn.length === args.length,
-        `invalid parameters passed to route ${location}`
-      );
-
       const boundRouteFn = routeFn.bind(undefined, ...args);
 
       root.$refresh = function () {

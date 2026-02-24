@@ -1,5 +1,10 @@
 import { randomInt } from "node:crypto";
 
+export const MAP_SIZE = 32;
+export const MAP_SERIALIZED_SIZE = 2*4 + Math.ceil(((MAP_SIZE-2)**2)/8)
+
+const SPAWN_PRESET_ROTATIONS = [0, 45, 90, 135, 180, 225, 270, 315];
+
 export class SpawnPosition {
   readonly x: number;
   readonly y: number;
@@ -8,7 +13,26 @@ export class SpawnPosition {
   constructor(x: number, y: number, rot: number) {
     this.x = x + 0.5;
     this.y = y + 0.5;
-    this.rot = -rot * Math.PI / 180.0;
+    this.rot = rot * Math.PI / 180.0;
+  }
+
+  public serialize(): number {
+    const x = this.x & 0b11111;
+    const y = this.y & 0b11111;
+    const rotDeg = this.rot * 180.0 / Math.PI;
+    const rotPreset = SPAWN_PRESET_ROTATIONS
+                        .map((v, k) => [k, Math.abs(v - rotDeg)])
+                        .sort(([ak, av], [bk, bv]) => bv - av)
+                        .map(([k, v]) => k)
+                        .pop()!;
+    return (x) | (y << 5) | (rotPreset << 10);
+  }
+
+  public static deserialize(u16: number): SpawnPosition {
+    const x = u16 & 0b11111;
+    const y = (u16 >> 5) & 0b11111;
+    const r = SPAWN_PRESET_ROTATIONS[u16 >> 10];
+    return new SpawnPosition(x, y, r);
   }
 }
 
@@ -68,9 +92,71 @@ export class GameMap {
       return this.spawnPositions[index];
     }
   }
+
+  private static deserializeBitmap(bitmap: Uint8Array): Uint8Array {
+    const map = new Uint8Array(MAP_SIZE * MAP_SIZE)
+    let bitmap_pos = 0;
+    for (let i = 0; i < map.length; i++) {
+      const x = i % MAP_SIZE;
+      const y = Math.floor(i / MAP_SIZE);
+      // All border blocks are walls
+      if (x === 0 || x === MAP_SIZE-1 || y === 0 || y === MAP_SIZE-1) {
+        map[i] = 1;
+        continue;
+      }
+      // If it's not a border block, we read it from the map
+      const bit = bitmap_pos & 7;
+      const byte = bitmap_pos >> 3;
+      map[i] = (bitmap[byte] & (1 << bit)) !== 0 ? 1 : 0;
+      ++bitmap_pos;
+    }
+    return map;
+  }
+
+  public static deserialize(mapData: string): GameMap {
+    if (mapData.length < MAP_SERIALIZED_SIZE*2) {
+      // Not enough map data.
+      throw new Error("Map data too short!");
+    }
+    const mapBuffer = Buffer.from(mapData, "hex");
+    const view = new DataView(mapBuffer.buffer, 0, 2*4);
+    const bitmap = new Uint8Array(mapBuffer.buffer, 2*4, MAP_SERIALIZED_SIZE - 2*4);
+    const spawnPositions = [0, 1, 2, 3].map((index) => SpawnPosition.deserialize(view.getInt16(index << 1, true)));
+    const tiles = GameMap.deserializeBitmap(bitmap);
+    return new GameMap(MAP_SIZE, MAP_SIZE, tiles, spawnPositions);
+  }
+
+  private serializeBitmap(bitmap: Uint8Array) {
+    let bitmap_pos = 0;
+    this.tiles.forEach((cell, index) => {
+      const x = index % MAP_SIZE;
+      const y = Math.floor(index / MAP_SIZE);
+      if (x === 0 || x === MAP_SIZE-1 || y === 0 || y === MAP_SIZE-1) {
+        return;
+      }
+      const bit = bitmap_pos & 7;
+      const byte = bitmap_pos >> 3;
+      bitmap[byte] |= cell << bit;
+      ++bitmap_pos;
+    });
+  }
+
+  public serialize(): string {
+    const buffer = Buffer.alloc(MAP_SERIALIZED_SIZE)
+    const view = new DataView(buffer.buffer, 0, 2*4);
+    this.spawnPositions.forEach((spawnPosition, index) => view.setUint16(index << 1, spawnPosition.serialize(), true));
+    const bitmap = new Uint8Array(buffer.buffer, 2*4, MAP_SERIALIZED_SIZE - 2*4);
+    this.serializeBitmap(bitmap);
+    return buffer.toString("hex");
+  }
+
+  public check(): boolean {
+    // TODO
+    return true;
+  }
 }
 
-const mapLabyrinth = new GameMap(32, 32, [
+const mapLabyrinth = new GameMap(MAP_SIZE, MAP_SIZE, [
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
   1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1,
   1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1,
@@ -105,12 +191,12 @@ const mapLabyrinth = new GameMap(32, 32, [
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 ], [
   new SpawnPosition(3, 3, +135),
-  new SpawnPosition(32 - 4, 32 - 4, -45),
-  new SpawnPosition(32 - 4, 3, +45),
-  new SpawnPosition(3, 32 - 4, -135),
+  new SpawnPosition(MAP_SIZE - 4, MAP_SIZE - 4, -45),
+  new SpawnPosition(MAP_SIZE - 4, 3, +45),
+  new SpawnPosition(3, MAP_SIZE - 4, -135),
 ]);
 
-const mapBigFan = new GameMap(32, 32, [
+const mapBigFan = new GameMap(MAP_SIZE, MAP_SIZE, [
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
   1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 
   1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 
@@ -145,13 +231,13 @@ const mapBigFan = new GameMap(32, 32, [
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 ], [
   new SpawnPosition(3, 3, 0),
-  new SpawnPosition(32 - 4, 32 - 4, 180),
-  new SpawnPosition(32 - 4, 3, -90),
-  new SpawnPosition(3, 32 - 4, 90),
+  new SpawnPosition(MAP_SIZE - 4, MAP_SIZE - 4, 180),
+  new SpawnPosition(MAP_SIZE - 4, 3, -90),
+  new SpawnPosition(3, MAP_SIZE - 4, 90),
 ]);
 
 
-const mapSpirals = new GameMap(32, 32, [
+const mapSpirals = new GameMap(MAP_SIZE, MAP_SIZE, [
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
   1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 
   1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 
@@ -186,12 +272,12 @@ const mapSpirals = new GameMap(32, 32, [
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 ], [
   new SpawnPosition(10, 8, 180),
-  new SpawnPosition(32 - 11, 32 - 9, 0),
-  new SpawnPosition(8, 32 - 11, 90),
-  new SpawnPosition(32 - 9, 10, -90)
+  new SpawnPosition(MAP_SIZE - 11, MAP_SIZE - 9, 0),
+  new SpawnPosition(8, MAP_SIZE - 11, 90),
+  new SpawnPosition(MAP_SIZE - 9, 10, -90)
 ]);
 
-const mapCrazyCurves = new GameMap(32, 32, [
+const mapCrazyCurves = new GameMap(MAP_SIZE, MAP_SIZE, [
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
   1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1,
   1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1,
@@ -226,9 +312,9 @@ const mapCrazyCurves = new GameMap(32, 32, [
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 ], [
   new SpawnPosition(1, 1, -45),
-  new SpawnPosition(32 - 2, 32 - 2, 135),
-  new SpawnPosition(32 - 2, 1, -135),
-  new SpawnPosition(1, 32 - 2, 45)
+  new SpawnPosition(MAP_SIZE - 2, MAP_SIZE - 2, 135),
+  new SpawnPosition(MAP_SIZE - 2, 1, -135),
+  new SpawnPosition(1, MAP_SIZE - 2, 45)
 ]);
 
 export class Maps {

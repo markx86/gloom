@@ -2,16 +2,11 @@ import {
   USERNAME_MAX_LEN, USERNAME_MIN_LEN,
   PASSWORD_MAX_LEN, PASSWORD_MIN_LEN,
   SESSION_ID_LEN,
-  getUsernameBySessionId,
-  registerUser,
-  checkUserCrendentials,
-  setUserSession,
-  invalidateSession,
-  refreshSession,
-  getStatsAndLeaderboard
+  MAP_NAME_MIN_LEN, MAP_NAME_MAX_LEN
 } from "./database";
+import * as db from "./database";
 import Logger from "./logger";
-import { Maps } from "./map"
+import { GameMap, Maps } from "./map"
 import { Game } from "./game";
 import { getEnvStringOrDefault } from "./util";
 
@@ -36,7 +31,7 @@ app.use("/api", async (req, res, next) => {
 
   // Get session cookie.
   const sessionCookie = req.signedCookies.session;
-  if (sessionCookie == null || typeof(sessionCookie) !== "string") {
+  if (typeof(sessionCookie) !== "string") {
     res.status(401).send();
     return;
   }
@@ -45,7 +40,7 @@ app.use("/api", async (req, res, next) => {
   const sessionId = Buffer.from(sessionCookie, "base64url");
 
   try {
-    const username = await getUsernameBySessionId(sessionId);
+    const username = await db.getUsernameBySessionId(sessionId);
     if (username == null) {
       res.status(401).send();
     } else {
@@ -61,6 +56,7 @@ app.use("/api", async (req, res, next) => {
 app.use("/api", express.json());
 
 function getSessionCookieExpirationTimestamp(): number {
+  // TODO: Fix 2038 problem
   return Math.floor(Date.now() / 1e3) + SESSION_LIFETIME;
 }
 
@@ -108,7 +104,7 @@ app.post("/api/register", async (req, res) => {
   let rc: number;
 
   const data = req.body;
-  if (data == null || typeof(data.username) !== "string" || typeof(data.password) !== "string") {
+  if (typeof(data?.username) !== "string" || typeof(data?.password) !== "string") {
     res.status(400).json({ message: "Invalid request body!" });
     return;
   }
@@ -142,7 +138,7 @@ app.post("/api/register", async (req, res) => {
   }
 
   try {
-    const success = await registerUser(username, password);
+    const success = await db.createUser(username, password);
     if (success) {
       Logger.trace("Registered user %s", username);
       res.status(200).send();
@@ -157,7 +153,7 @@ app.post("/api/register", async (req, res) => {
 
 app.post("/api/login", async (req, res) => {
   const data = req.body;
-  if (data == null || typeof(data.username) !== "string" || typeof(data.password) !== "string") {
+  if (typeof(data?.username) !== "string" || typeof(data?.password) !== "string") {
     res.status(400).json({ message: "Invalid request body!" });
     return;
   }
@@ -179,14 +175,14 @@ app.post("/api/login", async (req, res) => {
   }
 
   try {
-    const success = await checkUserCrendentials(username, password);
+    const success = await db.checkUserCrendentials(username, password);
     if (success) {
       Logger.trace("Logging in user %s", username);
       // Generate session id and compute expiry date.
       const sessionId = generateSessionId();
       const expirationTimestamp = getSessionCookieExpirationTimestamp();
       // Store session.
-      await setUserSession(username, sessionId, expirationTimestamp);
+      await db.setUserSession(username, sessionId, expirationTimestamp);
       // Set session cookie.
       setSessionCookie(res, sessionId);
       res.status(200).send();
@@ -202,7 +198,7 @@ app.post("/api/login", async (req, res) => {
 app.get("/api/logout", async (_, res) => {
   Logger.trace("Logging out user %s", res.locals.username);
   try {
-    await invalidateSession(res.locals.sessionId);
+    await db.deleteSession(res.locals.sessionId);
     clearSessionCookie(res);
     res.status(200).send();
   } catch(error) {
@@ -216,11 +212,16 @@ app.get("/api/stats", async (_, res) => {
   const username = res.locals.username;
   Logger.trace("Fetching leaderboard for user %s", username);
   try {
-    const [userStats, leaderboard] = await getStatsAndLeaderboard(username);
-    res.status(200).json({
-      userStats,
-      leaderboard
-    });
+    const result = await db.getStatsAndLeaderboard(username);
+    if (result == null) {
+      res.status(404).send();
+    } else {
+      const [userStats, leaderboard] = result;
+      res.status(200).json({
+        userStats,
+        leaderboard
+      });
+    }
   } catch (error) {
     Logger.error(error.message);
     res.status(500).send();
@@ -238,7 +239,7 @@ app.get("/api/session/refresh", async (_, res) => {
   const currentSessionId = res.locals.sessionId;
   const newSessionId = generateSessionId();
   try {
-    await refreshSession(currentSessionId, newSessionId, expirationTimestamp);
+    await db.updateSession(currentSessionId, newSessionId, expirationTimestamp);
     setSessionCookie(res, newSessionId);
     res.status(200).json({ username: res.locals.username });
   } catch(error) {
@@ -278,7 +279,7 @@ app.get("/api/game/create", (_, res) => {
 
 app.post("/api/game/join", (req, res) => {
   const data = req.body;
-  if (data == null || typeof(data.gameId) !== "number") {
+  if (typeof(data?.gameId) !== "number") {
     res.status(400).json({ message: "Invalid request body." });
     return;
   }
@@ -295,5 +296,93 @@ app.post("/api/game/join", (req, res) => {
     res.status(403).json({ message: playerToken });
   } else {
     res.status(200).json({ playerToken });
+  }
+});
+
+app.get("/api/map/list", async (_, res) => {
+  try {
+    const maps = await db.getUserMapList(res.locals.username);
+    res.status(200).json(maps);
+  } catch (error) {
+    Logger.error("Could not get map list for user '%s'", res.locals.username);
+    Logger.error(error);
+    res.status(500).send();
+  }
+});
+
+app.post("/api/map/delete", async (req, res) => {
+  const mapId = req.body?.mapId;
+  if (typeof(mapId) !== "number") {
+    res.status(400).json({ message: "Invalid map ID!" });
+    return;
+  }
+
+  try {
+    if (await db.deleteMap(mapId, res.locals.username)) {
+      res.status(200).send();
+    } else {
+      res.status(404).json({ message: `Could not find map with ID ${mapId} that belongs to you!` });
+    }
+  } catch (error) {
+    Logger.error("Could not delete map with ID %d", mapId);
+    Logger.error(error);
+    res.status(500).send();
+  }
+});
+
+app.post("/api/map/create", async (req, res) => {
+  const mapName = req.body?.mapName;
+
+  if (typeof(mapName) !== "string") {
+    res.status(400).json({ message: "Invalid map name." });
+    return;
+  } else if (mapName.length < MAP_NAME_MIN_LEN) {
+    res.status(400).json({ message: `Map name is too short. It must be at least ${MAP_NAME_MIN_LEN} characters.` })
+    return;
+  } else if (mapName.length > MAP_NAME_MAX_LEN) {
+    res.status(400).json({ message: `Map name is too long. The maximum length is ${MAP_NAME_MAX_LEN} characters.` })
+    return;
+  }
+
+  try {
+    const mapId = await db.createMap(mapName, res.locals.username);
+    if (mapId == null) {
+      res.status(400).json({ message: "That map already exists!" });
+    } else {
+      res.status(200).json({ mapId });
+    }
+  } catch (error) {
+    Logger.error("Could not create map with name '%s'", mapName);
+    Logger.error(error);
+    res.status(500).send();
+  }
+});
+
+app.post("/api/map/update", async (req, res) => {
+  const data = req.body;
+
+  const mapId = data?.mapId;
+  const mapData = data?.mapData;
+  if (typeof(mapId) !== "number" || typeof(mapData) !== "string") {
+    res.status(400).json({ message: "Invalid request body." });
+    return;
+  }
+
+  try {
+    const map = GameMap.deserialize(mapData);
+    if (map.check()) {
+      // NOTE: Maybe we can avoid reserializing the map?
+      if (await db.updateMap(mapId, map.serialize())) {
+        res.status(200).send();
+      } else {
+        res.status(404).json({ message: `No map with ID ${mapId} exists` })
+      }
+    } else {
+      res.status(400).json({ message: "Invalid map! Not all players can reach each other." })
+    }
+  } catch (error) {
+    Logger.error("Could not deserialize map %d", mapId);
+    Logger.error(error);
+    res.status(400).json({ message: "Invalid map data!" });
   }
 });
