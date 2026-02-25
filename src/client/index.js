@@ -3,8 +3,8 @@ import * as gloom from "./gloom.js";
 import "./reactive.js";
 import {
   showErrorWindow, showInfoWindow, showWarningWindow,
-  showMessageWindow, showYesNoWindow,
-  createWindow, getWindowControls,
+  showMessageWindow, showYesNoWindow, showWindow,
+  createWindow, getWindowControls, closeWindow,
   helpLink, windowIcon, separator,
   MSGWND_HELP, MSGWND_WARN
 } from "./windowing.js";
@@ -58,6 +58,13 @@ const MAP_DIRECTION_ARROWS = [
   "\ud83e\udc76", // 315 deg
 ];
 
+const BUILTIN_MAPS = [
+  { mapId: -1, mapName: "Labyrinth",    creator: "builtin" },
+  { mapId: -2, mapName: "Big Fan",      creator: "builtin" },
+  { mapId: -3, mapName: "Spirals",      creator: "builtin" },
+  { mapId: -4, mapName: "Crazy Curves", creator: "builtin" }
+];
+
 gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   const Globals = {
     gameWs: null,
@@ -65,16 +72,18 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     myUsername: null,
     myStats: null,
     myMaps: null,
+    otherMaps: [],
+    selectedMap: 0,
     leaderboard: null,
     homePageTab: HOME_TAB_PLAY
   };
 
-  function validateInput(event) {
+  function validateInput(event, regex) {
     const inputBox = event.target;
     const data = event.data;
     const value = inputBox.value;
     if (data != null) {
-      if (!(/^[a-fA-F0-9]+$/.test(data))) {
+      if (!(regex.test(data))) {
         const caret = inputBox.selectionStart;
         inputBox.value = value.substring(0, caret - data.length) + value.substring(caret);
       } else {
@@ -82,7 +91,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       }
     }
   }
-  
+
   const gotoHelp = () => $goto("/login/help");
   const gotoHome = () => $goto("/");
   
@@ -218,6 +227,37 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     return serialized;
   }
 
+  function deserializeMap(mapData, map, playerRotations) {
+    const serialized = Uint8Array.fromBase64(mapData);
+    const view = new DataView(serialized.buffer, serialized.byteOffset, 8);
+
+    let bitmap_pos = view.byteLength * 8;
+    for (let i = 0; i < map.length; i++) {
+      const x = i % MAP_SIZE;
+      const y = Math.floor(i / MAP_SIZE);
+      if (x === MAP_SIZE-1 || x === 0 || y === MAP_SIZE-1 || y === 0) {
+        map[i] = MAP_DRAW_WALL;
+        continue;
+      }
+      const bit = bitmap_pos & 7;
+      const byte = bitmap_pos >> 3;
+      map[i] = (serialized[byte] & (1 << bit)) !== 0 ? MAP_DRAW_WALL : MAP_DRAW_CLEAR;
+      ++bitmap_pos;
+    }
+
+    for (let i = 0; i < playerRotations.length; i++) {
+      const u16 = view.getUint16(i << 1, true);
+      const x = u16 & 0b11111;
+      const y = (u16 >> 5) & 0b11111;
+      const r = u16 >> 10;
+
+      $assert(x > 0 && x < MAP_SIZE-1);
+      $assert(y > 0 && y < MAP_SIZE-1);
+      map[x + y * MAP_SIZE] = i + MAP_DRAW_PLAYER1;
+      playerRotations[i] = r;
+    }
+  }
+
   async function doSaveMap(event) {
     const [wndEnable, wndDisable] = getWindowControls(event.target);
     const canvas = $("#map-editor");
@@ -307,7 +347,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
         // Should've used $refresh()
         const gameIdLabel = $("#game-id");
         if (gameIdLabel != null) {
-          gameIdLabel.textContent = "Could not fetch game ID";
+          gameIdLabel.textContent = "Could not fetch game ID.";
         }
         console.error(e);
       });
@@ -337,7 +377,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     }
   }
 
-  async function fetchMaps() {
+  async function fetchUserMaps() {
     const res = await api.get("/map/list");
     switch (res.status) {
       case 200: {
@@ -349,6 +389,119 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       }
       default:  { console.error("Could not fetch maps: %s", res.statusText); break; }
     }
+  }
+
+  async function addOtherMap(event) {
+    const [wndEnable, wndDisable] = getWindowControls(event.target);
+
+    const mapIdField = $("#field-map-id");
+    $assert(mapIdField != null);
+    const mapSelector = $("#selector-map");
+    $assert(mapSelector != null);
+
+    wndDisable();
+
+    if (mapIdField.value.length === 0) {
+      showErrorWindow("You must enter a map ID first!", wndEnable);
+      return;
+    }
+
+    const mapId = parseInt(mapIdField.value);
+    if (!isFinite(mapId) || isNaN(mapId)) {
+      showErrorWindow(`Invalid map ID '${mapIdField.value}'`, wndEnable);
+      return;
+    }
+
+    const mapIdsInList = [...mapSelector.children].map(child => parseInt(child.$attribute("map-id")));
+    if (mapIdsInList.find(id => mapId === id) != null) {
+      showErrorWindow("That map is already in the list!", wndEnable);
+      return;
+    }
+
+    const res = await api.get(`/map/info/${mapId}`);
+    if (res.status === 500) {
+      showWarningWindow("An error occurred while trying to fetch map information. Try again later.", wndEnable);
+      return;
+    }
+
+    const json = await res.json();
+    if (res.status === 200) {
+      delete json.mapData;
+      Globals.otherMaps.push(json);
+      mapSelector.$add(getSelectorOptionForMap(json))
+      // Clear map ID field
+      mapIdField.value = "";
+      wndEnable();
+    } else {
+      showErrorWindow(json.message ?? "Could not add map!", wndEnable);
+    }
+  }
+
+  function onMapSelectionChanged(event) {
+    const selector = event.target;
+    const mapId = parseInt(selector[selector.selectedIndex].$attribute("map-id"));
+    if (isFinite(mapId) && !isNaN(mapId)) {
+      Globals.selectedMap = mapId;
+    }
+  }
+
+  function getLocalStorageKey() {
+    return `maps-${Globals.myUsername}`;
+  }
+
+  function saveMapSettings() {
+    const maps = { selected: Globals.selectedMap, other: Globals.otherMaps.map(map => map.mapId) };
+    const b64Maps = btoa(JSON.stringify(maps));
+    localStorage.setItem(getLocalStorageKey(), b64Maps);
+  }
+
+  async function filterInvalidMaps(mapIds) {
+    const res = await api.post("/map/info", mapIds);
+    if (res.status === 500) {
+      throw new Error("Could not check other maps validity.");
+    }
+
+    const json = await res.json();
+    if (res.status === 200) {
+      return json;
+    } else {
+      console.error(json.message ?? "An error occurred while checking maps.");
+    }
+  }
+
+  async function loadMapSettings() {
+    const b64Maps = localStorage.getItem(getLocalStorageKey());
+    if (b64Maps == null) {
+      return;
+    }
+
+    const maps = JSON.parse(atob(b64Maps));
+
+    if (maps.selected != null) {
+      Globals.selectedMap = maps.selected;
+    }
+
+    if (maps.other != null && maps.other.length != null && maps.other.length > 0) {
+      try {
+        Globals.otherMaps = await filterInvalidMaps(maps.other);
+        if (Globals.otherMaps.length < maps.other.length) {
+          saveMapSettings();
+          const onScreenWindows = [...document.getElementsByClassName("wnd-toplevel")];
+          onScreenWindows.forEach(wnd => wnd.setDisabled(true));
+          showWarningWindow(
+            "Some of your added maps have since been deleted by their creator. You will not see them in the list anymore!",
+            () => onScreenWindows.forEach(wnd => wnd.setDisabled(false))
+          );
+        }
+      } catch (error) {
+        console.warn(error);
+      }
+    }
+  }
+
+  async function loadMaps() {
+    await fetchUserMaps();
+    await loadMapSettings();
   }
 
   function zeroPadL(s, w) {
@@ -396,20 +549,29 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       return false;
     }
   }
+
+  function getSelectedMapId() {
+    if (Globals.selectedMap === 0) {
+      const allMaps = [...BUILTIN_MAPS, ...(Globals.myMaps ?? []), ...Globals.otherMaps];
+      const randomMap = Math.floor(Math.random() * allMaps.length)
+      return allMaps[randomMap].mapId;
+    }
+    return Globals.selectedMap;
+  }
   
   async function doCreateGame(event) {
     const button = event.target;
     button.$disable();
     try {
-    const response = await api.get("/game/create");
+      const response = await api.post("/game/create", { mapId: getSelectedMapId() });
       if (response.status === 500) {
         showWarningWindow("Something went wrong while creating your game. Please try again later", button.$enable);
         return;
       }
       const data = await response.json();
       if (response.status !== 200) {
-        const showWindow = response.status > 500 ? showWarningWindow : showErrorWindow;
-        showWindow(data.message, button.$enable);
+        const showWindowFn = response.status > 500 ? showWarningWindow : showErrorWindow;
+        showWindowFn(data.message, button.$enable);
       } else {
         Globals.myGameId = data.gameId;
         root.$refresh();
@@ -500,6 +662,61 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
         ).$style("padding-left", "12px")
       ).$style("padding-left", "4px"),
       MSGWND_HELP, wndEnable
+    );
+  }
+
+  function getSelectorOptionForMap(map) {
+    return $option(`${map.mapName} - ${map.creator}`).$attribute("map-id", map.mapId.toString());
+  }
+
+  function getMapSelectorOptions() {
+    const allMaps = [...BUILTIN_MAPS, ...(Globals.myMaps ?? []), ...Globals.otherMaps];
+    return allMaps.map(map => {
+      const option = getSelectorOptionForMap(map);
+      if (map.mapId === Globals.selectedMap) {
+        option.$attribute("selected", "");
+      }
+      return option;
+    });
+  }
+
+  function showMapSettings(event) {
+    const [wndEnable, wndDisable] = getWindowControls(event.target);
+    wndDisable();
+
+    const options = getMapSelectorOptions();
+    
+    showWindow(
+      {
+        title: "Map settings",
+        close: () => {
+          saveMapSettings();
+          wndEnable();
+        }
+      },
+      $div(
+        $div(
+          $label("Map").$for("selector-map"),
+          $select(
+            $option("(random)").$attribute("map-id", "0"),
+            ...options
+          ).$id("selector-map")
+           .$on("change", onMapSelectionChanged)
+        ).$class("field-row"),
+        homeSeparator(),
+        $div(
+          $label($strong("Add a map")).$for("field-map-id"),
+          $div(
+            $input().$id("field-map-id")
+                    .$type("text")
+                    .$attribute("placeholder", "Enter a map ID.")
+                    .$on("input", (event) => validateInput(event, /^[0-9]+$/)),
+            $button("Add").$style("margin", "0px 0px 0px 8px")
+                          .$onclick(addOtherMap)
+          ).$style("display", "flex")
+           .$style("align-items", "center")
+        ).$class("field-row-stacked")
+      )
     );
   }
   
@@ -609,20 +826,30 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     const myGameIdString = gameIdToString(Globals.myGameId) ?? "No game running.";
     const currentGameId = $("#field-game-id")?.value ?? null;
     const placeholderString = Globals.myGameId == null
-                              ? "Enter a game ID"
-                              : `Enter a game ID (default: ${myGameIdString})`;
+                              ? "Enter a game ID."
+                              : `Enter a game ID (default: ${myGameIdString}).`;
 
     return $div(
       $div(
         $label("Your game").$for("game-id")
                            .$style("font-weight", "bold")
-                           .$style("margin-bottom", "8px"),
+                           .$style("margin-bottom", "6px"),
         $div(
-          $p(myGameIdString).$id("game-id")
-                            .$style("margin", "0px")
-                            .$style("flex-grow", "1"),
+          $div(
+            $p(myGameIdString).$id("game-id")
+                              .$style("flex-grow", "1"),
+            $button(
+              $img("/static/img/settings.png").$style("filter", Globals.myGameId == null ? "" : "grayscale(100%)")
+            ).$style("min-width", "0")
+             .$style("padding", "0px 4px")
+             .$style("width", "24px")
+             .$enable(Globals.myGameId == null)
+             .$onclick(showMapSettings)
+          ).$style("display", "flex")
+           .$style("align-items", "center")
+           .$style("flex-grow", "1"),
           $button("Create").$id("btn-create")
-                           .$style("margin-left", "12px")
+                           .$style("margin-left", "8px")
                            .$onclick(doCreateGame)
                            .$enable(Globals.myGameId == null)
         ).$style("display", "flex")
@@ -637,7 +864,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
                   .$attribute("placeholder", placeholderString)
                   .$attribute("value", currentGameId)
                   .$style("flex-grow", "1")
-                  .$on("input", validateInput),
+                  .$on("input", event => validateInput(event, /^[a-fA-F0-9]+$/)),
           $button("Join").$style("margin", "0px 0px 0px 8px")
                          .$onclick(doJoinGame)
         ).$style("display", "flex")
@@ -712,15 +939,15 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   };
 
   function generateMapsTableRows() {
-    const actionButton = (icon, onclick) => {
-      return $img(icon, "16px", "16px")
+    const actionButton = (img, onclick) => {
+      return $img(img, "16px", "16px")
         .$style("cursor", "pointer")
         .$style("margin", "1px 4px 1px 0px")
         .$onclick(onclick);
     };
 
     return $div(
-      $label("Your maps"),
+      $label($strong("Your maps")),
       $div(
         $table(
           $thead(
@@ -765,11 +992,11 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
 
     return $div(
       $div(
-        $label("Map name").$for("field-map-name"),
+        $label($strong("Create a map")).$for("field-map-name"),
         $div(
           $input().$type("text")
                   .$id("field-map-name")
-                  .$attribute("placeholder", "Enter a map name")
+                  .$attribute("placeholder", "Enter a map name.")
                   .$style("flex-grow", "2"),
           $button("Create").$onclick(doCreateMap)
                            .$style("margin", "0px 0px 0px 12px")
@@ -918,7 +1145,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     }
     const playerIndex = getPlayerIndex(this._map[index]);
     if (playerIndex != null) {
-      const delta = event.deltaY / MAP_SCROLL_SENSITIVITY;
+      const delta = -event.deltaY / MAP_SCROLL_SENSITIVITY;
       this._addPlayerRotation(playerIndex, delta);
       this._redraw();
     }
@@ -998,34 +1225,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
 
     if (mapData != null) {
       // Deserialize map data
-      const serialized = Uint8Array.fromBase64(mapData);
-      const view = new DataView(serialized.buffer, serialized.byteOffset, 8);
-
-      let bitmap_pos = view.byteLength * 8;
-      for (let i = 0; i < map.length; i++) {
-        const x = i % MAP_SIZE;
-        const y = Math.floor(i / MAP_SIZE);
-        if (x === MAP_SIZE-1 || x === 0 || y === MAP_SIZE-1 || y === 0) {
-          map[i] = MAP_DRAW_WALL;
-          continue;
-        }
-        const bit = bitmap_pos & 7;
-        const byte = bitmap_pos >> 3;
-        map[i] = (serialized[byte] & (1 << bit)) !== 0 ? MAP_DRAW_WALL : MAP_DRAW_CLEAR;
-        ++bitmap_pos;
-      }
-
-      for (let i = 0; i < playerRotations.length; i++) {
-        const u16 = view.getUint16(i << 1, true);
-        const x = u16 & 0b11111;
-        const y = (u16 >> 5) & 0b11111;
-        const r = u16 >> 10;
-
-        $assert(x > 0 && x < MAP_SIZE-1);
-        $assert(y > 0 && y < MAP_SIZE-1);
-        map[x + y * MAP_SIZE] = i + MAP_DRAW_PLAYER1;
-        playerRotations[i] = r;
-      }
+      deserializeMap(mapData, map, playerRotations);
     } else {
       // Initialize empty map
       for (let i = 0; i < map.length; i++) {
@@ -1111,7 +1311,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
                 if (success) {
                   refreshStats();
                   refreshMyGameId();
-                  fetchMaps();
+                  loadMaps();
                   $interval(300000, refreshStats); // Refresh scoreboard every 5 minutes.
                   $interval(5000, refreshMyGameId); // Refresh game id every 5 seconds.
                   root.$refresh();

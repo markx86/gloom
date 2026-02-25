@@ -28,7 +28,6 @@ export function getWindow(component) {
       component = component.parentElement;
     }
   }
-  return undefined;
 }
 
 export function getWindowControls(target) {
@@ -129,6 +128,18 @@ function createMessageWindow(content, type, onclose) {
      .$style("align-items", "center")
   ).$style("max-width", "400px")
    .$ondestroy(onclose);
+}
+
+export function showWindow(options, content) {
+  const onclose = options?.close;
+  options.close = closeWindow;
+  $root().$add(
+    createWindow(
+      options,
+      $div(content).$style("max-width", "400px")
+                   .$style("padding", "8px")
+    ).$ondestroy(onclose)
+  );
 }
 
 export function showMessageWindow(content, type, onclose) {

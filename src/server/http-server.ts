@@ -258,7 +258,7 @@ app.get("/api/game/id", (_, res) => {
   }
 });
 
-app.get("/api/game/create", (_, res) => {
+app.post("/api/game/create", async (req, res) => {
   const creator = res.locals.username;
   if (Game.getByCreator(creator) != null) {
     res.status(403).json({
@@ -266,8 +266,24 @@ app.get("/api/game/create", (_, res) => {
     });
     return;
   }
+
+  const mapId = req.body?.mapId;
+  if (typeof(mapId) !== "number") {
+    res.status(400).json({
+      message: "Invalid map ID!"
+    });
+    return;
+  }
+
+  const map = await Maps.get(mapId);
+  if (map == null) {
+    res.status(404).json({
+      message: `Map with ID ${mapId} not found!`
+    });
+    return;
+  }
   
-  const gameId = Game.create(creator, Maps.random());
+  const gameId = Game.create(creator, map);
   if (gameId == null) {
     res.status(503).json({
       message: "The server is overloaded. Please try again later."
@@ -301,7 +317,7 @@ app.post("/api/game/join", (req, res) => {
 
 app.get("/api/map/list", async (_, res) => {
   try {
-    const maps = await db.getUserMapList(res.locals.username);
+    const maps = await db.getUserMapsList(res.locals.username);
     res.status(200).json(maps);
   } catch (error) {
     Logger.error("Could not get map list for user '%s'", res.locals.username);
@@ -384,5 +400,52 @@ app.post("/api/map/update", async (req, res) => {
     Logger.error("Could not deserialize map %d", mapId);
     Logger.error(error);
     res.status(400).json({ message: "Invalid map data!" });
+  }
+});
+
+app.get("/api/map/info/:id", async (req, res) => {
+  const mapId = parseInt(req.params.id, 10);
+
+  if (!isFinite(mapId) || isNaN(mapId) || mapId <= 0) {
+    res.status(400).json({ message: "Invalid map ID." });
+    return;
+  }
+
+  try {
+    const mapInfo = await db.getMapInfoById(mapId);
+    if (mapInfo == null) {
+      res.status(404).json({ message: `Map with ID ${mapId} not found.` })
+    } else {
+      res.status(200).json(mapInfo);
+    }
+  } catch (error) {
+    Logger.error("Could not get info for map %d", mapId);
+    Logger.error(error);
+    res.status(500).send();
+  }
+});
+
+app.post("/api/map/info", async (req, res) => {
+  const array = req.body;
+  if (array == null || array.length == null || array.length === 0) {
+    res.status(400).json({ message: "Invalid request body." });
+    return;
+  }
+
+  const mapIds: number[] = array.filter((value: any) => typeof(value) === "number");
+
+  const uniqueMapIds = [...(new Set(mapIds)).values()];
+  if (uniqueMapIds.length > 100) {
+    res.status(403).json({ message: "Too many maps to check. Max is 100." });
+    return;
+  }
+
+  try {
+    const maps = await db.getBulkMapInfoByIds(uniqueMapIds)
+    res.status(200).json(maps);
+  } catch (error) {
+    Logger.error("Could not check maps");
+    Logger.error(error);
+    res.status(500).send();
   }
 });

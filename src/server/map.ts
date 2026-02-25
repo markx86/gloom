@@ -1,5 +1,6 @@
-import { randomInt } from "node:crypto";
 import { MAX_PLAYERS } from "./game";
+import Logger from "./logger";
+import * as db from "./database";
 
 export const MAP_SIZE = 32;
 
@@ -18,13 +19,13 @@ export class SpawnPosition {
   constructor(x: number, y: number, rot: number) {
     this.x = x + 0.5;
     this.y = y + 0.5;
-    this.rot = rot * Math.PI / 180.0;
+    this.rot = -rot * Math.PI / 180.0;
   }
 
   public serialize(): number {
     const x = Math.floor(this.x) & 0b11111;
     const y = Math.floor(this.y) & 0b11111;
-    const rotDeg = this.rot * 180.0 / Math.PI;
+    const rotDeg = -this.rot * 180.0 / Math.PI;
     const rotPreset = SPAWN_PRESET_ROTATIONS
                         .map((v, k) => [k, Math.abs(v - rotDeg)])
                         .sort(([ak, av], [bk, bv]) => bv - av)
@@ -209,10 +210,10 @@ const mapLabyrinth = new GameMap(MAP_SIZE, MAP_SIZE, [
   1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1,
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 ], [
-  new SpawnPosition(3, 3, +135),
-  new SpawnPosition(MAP_SIZE - 4, MAP_SIZE - 4, -45),
-  new SpawnPosition(MAP_SIZE - 4, 3, +45),
-  new SpawnPosition(3, MAP_SIZE - 4, -135),
+  new SpawnPosition(3, 3, 135),
+  new SpawnPosition(MAP_SIZE - 4, MAP_SIZE - 4, 315),
+  new SpawnPosition(MAP_SIZE - 4, 3, 45),
+  new SpawnPosition(3, MAP_SIZE - 4, 225),
 ]);
 
 const mapBigFan = new GameMap(MAP_SIZE, MAP_SIZE, [
@@ -251,7 +252,7 @@ const mapBigFan = new GameMap(MAP_SIZE, MAP_SIZE, [
 ], [
   new SpawnPosition(3, 3, 0),
   new SpawnPosition(MAP_SIZE - 4, MAP_SIZE - 4, 180),
-  new SpawnPosition(MAP_SIZE - 4, 3, -90),
+  new SpawnPosition(MAP_SIZE - 4, 3, 270),
   new SpawnPosition(3, MAP_SIZE - 4, 90),
 ]);
 
@@ -293,7 +294,7 @@ const mapSpirals = new GameMap(MAP_SIZE, MAP_SIZE, [
   new SpawnPosition(10, 8, 180),
   new SpawnPosition(MAP_SIZE - 11, MAP_SIZE - 9, 0),
   new SpawnPosition(8, MAP_SIZE - 11, 90),
-  new SpawnPosition(MAP_SIZE - 9, 10, -90)
+  new SpawnPosition(MAP_SIZE - 9, 10, 270)
 ]);
 
 const mapCrazyCurves = new GameMap(MAP_SIZE, MAP_SIZE, [
@@ -330,18 +331,36 @@ const mapCrazyCurves = new GameMap(MAP_SIZE, MAP_SIZE, [
   1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1,
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 ], [
-  new SpawnPosition(1, 1, -45),
+  new SpawnPosition(1, 1, 315),
   new SpawnPosition(MAP_SIZE - 2, MAP_SIZE - 2, 135),
-  new SpawnPosition(MAP_SIZE - 2, 1, -135),
+  new SpawnPosition(MAP_SIZE - 2, 1, 225),
   new SpawnPosition(1, MAP_SIZE - 2, 45)
 ]);
 
 export class Maps {
-  private static allMaps = [
+  private static builtins = [
     mapLabyrinth, mapBigFan, mapSpirals, mapCrazyCurves
   ];
 
-  public static random(): GameMap {
-    return Maps.allMaps[randomInt(Maps.allMaps.length)];
+  public static async get(index: number): Promise<GameMap | undefined> {
+    if (index < 0) {
+      index = -(index + 1);
+      if (index < Maps.builtins.length) {
+        return Maps.builtins[index];
+      }
+    } else {
+      try {
+        // NOTE: We do not check if the user owns the map. This is intended.
+        //       It's so that users are be able to create games using other people's
+        //       maps, by using the map ID.
+        const mapInfo = await db.getMapInfoById(index);
+        if (mapInfo != null) {
+          return GameMap.deserialize(mapInfo.mapData);
+        }
+      } catch (error) {
+        Logger.error("Could not get map with ID %d", index);
+        Logger.error(error);
+      }
+    }
   }
 }

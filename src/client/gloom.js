@@ -198,7 +198,7 @@ export async function loadGloom() {
   }
 
   function loadSettings(username) {
-    settingsKey = `settings-${username}`;
+    settingsKey = `gloom-${username}`;
     const b64Settings = localStorage.getItem(settingsKey);
     if (b64Settings != null) {
       const settings = JSON.parse(atob(b64Settings));

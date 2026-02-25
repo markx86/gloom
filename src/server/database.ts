@@ -1,4 +1,4 @@
-import { Pool, types } from "pg";
+import { Pool } from "pg";
 import { randomBytes, hash } from "node:crypto";
 
 import Logger from "./logger";
@@ -19,6 +19,7 @@ const PASSWORD_HASH_LEN = 32;
 const pool = new Pool();
 
 export type UserStats = { username: string, wins: number, kills: number, deaths: number, games: number, score: number };
+export type MapInfo = { mapId: number, mapName: string, creator: string, mapData: string };
 
 export const closeDb = () => {
   Logger.trace("Closing database...");
@@ -220,9 +221,11 @@ export async function getStatsAndLeaderboard(username: string): Promise<[UserSta
   return [userStats, leaderboard];
 }
 
-export async function getUserMapList(username: string): Promise<Array<{mapId: number, mapName: string, mapData: string}>> {
+export async function getUserMapsList(username: string): Promise<Array<MapInfo>> {
   const res = await pool.query<{ map_id: number, map_name: string, map_data: string }>(`
-    SELECT map_id, map_name, map_data FROM maps WHERE creator = $1
+    SELECT map_id, map_name, map_data
+    FROM maps
+    WHERE creator = $1
     `, [username]
   );
   if (res.rowCount == null || res.rowCount === 0) {
@@ -232,6 +235,7 @@ export async function getUserMapList(username: string): Promise<Array<{mapId: nu
       return {
         mapId: row.map_id,
         mapName: row.map_name,
+        creator: username,
         mapData: row.map_data
       }
     });
@@ -275,4 +279,42 @@ export async function updateMap(mapId: number, mapData: string): Promise<boolean
     `, [mapData, mapId]
   );
   return res.rowCount != null && res.rowCount === 1;
+}
+
+export async function getMapInfoById(mapId: number): Promise<MapInfo | undefined> {
+  const res = await pool.query<{ map_name: string, creator: string, map_data: string }>(`
+    SELECT map_name, creator, map_data
+    FROM maps
+    WHERE map_id = $1
+    `, [mapId]
+  );
+  if (res.rowCount != null && res.rowCount === 1) {
+    const row = res.rows[0];
+    return {
+      mapId,
+      mapName: row.map_name,
+      creator: row.creator,
+      mapData: row.map_data
+    }
+  }
+}
+
+export async function getBulkMapInfoByIds(mapIds: Array<number>): Promise<Array<MapInfo>> {
+  const res = await pool.query<{ map_id: number, map_name: string, creator: string, map_data: string }>(`
+    SELECT map_id, map_name, creator
+    FROM maps
+    WHERE map_id = ANY($1)
+    `, [mapIds]
+  );
+  if (res.rowCount == null || res.rowCount === 0) {
+    return [];
+  }
+  return res.rows.map(row => {
+    return {
+      mapId: row.map_id,
+      mapName: row.map_name,
+      creator: row.creator,
+      mapData: row.map_data
+    };
+  });
 }
