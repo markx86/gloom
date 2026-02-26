@@ -207,7 +207,7 @@ export async function updateUserStats(username: string, kills: number, isDead: b
 
 export async function getStatsAndLeaderboard(username: string): Promise<[UserStats, Array<UserStats>] | undefined> {
   const res = await pool.query<UserStats>(`
-    SELECT username, wins, kills, deaths, games, ((wins + kills) * 1000 / (deaths + games)) as score
+    SELECT username, wins, kills, deaths, games, ((wins + kills) * 100 / deaths) as score
     FROM stats
     ORDER BY username = $1, score DESC
     LIMIT 11
