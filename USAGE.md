@@ -20,14 +20,50 @@ click on the help button in the window title bar.
 
 ## Home screen
 
-Once you're logged in, you will see a window with two options.
+Once you're logged in, you will be presented with the following screen.
 
 ![home](.github/images/home.png)
 
+### The `Play` tab
+
 Clicking on `Create`, will tell the game server to instantiate a game. Once the game is ready, its ID will be displayed under
 `Your game`. You can copy this ID and share it with your friends to play together.
+
 To join a game, you have to enter the correct ID in the text-box (or leave it empty if you want to join the game you've just created),
-and then click on the `Join` button. 
+and then click on the `Join` button.
+
+If you wish to change the map, click the gear icon to the left of the `Create` button.
+
+![map-selection](.github/images/map-selection.png)
+
+In the window that appears, you can choose a map from the dropdown or add a map created by your friend to the list.
+
+### The `Maps` tab
+
+From the maps tab, you can create and manage your maps!
+
+![maps-tab](.github/images/maps.png)
+
+To create a map, enter a name and click create. Another window will open, where you can draw the layout of your map and decide the players' starting position.
+
+![map-editor](.github/images/map-editor.png)
+
+Press the `Save` button to save your changes.  
+Note tha your can edit the map at any time, by clicking on the pen button under the `Actions` column of the map list.
+
+If you wish to delete a map, click on the recycle bin under the `Actions` column in the map list.
+
+### The `Statistics` and `Leaderboard` tabs
+
+In the `Statistics` tab you can check your cumulative stats.
+
+![stats](.github/images/stats.png)
+
+The `Leaderboard` tab shows a list of the top 10 players, ordered by score, descending.
+
+![leaderboard](.github/images/leaderboard.png)
+
+If your score is high enough to be on the list, it will be highlited in blue.
 
 ## In-game
 
