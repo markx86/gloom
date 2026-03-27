@@ -5,10 +5,10 @@ export function getEnvStringOrDefault(name: string, def: string): string {
   return value != null && value.length > 0 ? value : def;
 }
 
-export function getEnvIntOrDefault(name: string, def: number): number {
+export function getEnvIntOrDefault(name: string, def: number, min?: number, max?: number): number {
   const value = process.env[name];
   const int = parseInt(value ?? "");
-  if (isNaN(int) || !isFinite(int)) {
+  if (isNaN(int) || !isFinite(int) || (min != null && min > int) || (max != null && max < int)) {
     return def;
   } else {
     return int;
