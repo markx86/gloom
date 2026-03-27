@@ -93,13 +93,15 @@ docker compose logs -f
 
 The server accepts the following environment variables:
 - `LOG_VERBOSE`: Enables/Disables verbose logging. Set to `1` to enable. By default, it's disabled.
-- `DATABASE`: Path to the database file. This a SQLite3 database path, therefore things like `:memory:` will also work. It is set to `:memory:` by default, but the provided `docker-compose` file will create a volume and store the database there.
 - `COOKIE_SECRET`: The secret key used to sign the cookies. If it's not set, the server will generate a random one each time it is started.
-- `WSS_PORT`: Controls the port on which the WebSocket server should listen for incoming connections. By default, it's set to 8492.
 - `HTTP_PORT`: Controls the port on which the HTTP server should listen for incoming requests. By default, it's set to 8080.
 - `HTTPS_PORT`: Controls the port on which the HTTPS server should listen for incoming requests. By default, it's set to 8443.
 - `HTTPS_KEY`: Path to the HTTPS server's certificate key. By default, it's `./cert.key`.
 - `HTTPS_CERT`: Path to the HTTPS server's certificate. By default, it's `./cert.pem`.
+- `PGHOST`: Hostname of the PostgreSQL server.
+- `PGPORT`: Port of the PostgreSQL server.
+- `PGUSER`: PostgreSQL user.
+- `PGPASSWORD`: Password for the PostgreSQL user.
 
 > [!IMPORTANT]
 > If you're using `docker-compose`, you can change these options by creating a `.env` file in the project root,
