@@ -618,7 +618,13 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     wndDisable();
     showMessageWindow(
       $div(
-        $h5("TODO")
+        $h5("Controls").$style("margin", "12px 0px")
+                       .$style("font-size", "20px"),
+        $ul(
+          $li(listEntry("Left-Click", "Paint with the selected brush")),
+          $li(listEntry("Right-Click", "Clear cells")),
+          $li(listEntry("Scroll wheel", "If used on a player, it changes its starting rotation"))
+        ).$style("padding-left", "12px")
       ),
       MSGWND_HELP, wndEnable
     );
