@@ -388,7 +388,7 @@ app.post("/api/map/update", async (req, res) => {
     const map = GameMap.deserialize(mapData);
     if (map.check()) {
       // NOTE: Maybe we can avoid reserializing the map?
-      if (await db.updateMap(mapId, map.serialize())) {
+      if (await db.updateMap(res.locals.username, mapId, map.serialize())) {
         res.status(200).send();
       } else {
         res.status(404).json({ message: `No map with ID ${mapId} exists` })
@@ -412,7 +412,7 @@ app.get("/api/map/info/:id", async (req, res) => {
   }
 
   try {
-    const mapInfo = await db.getMapInfoById(mapId);
+    const mapInfo = await db.getMapDataById(mapId);
     if (mapInfo == null) {
       res.status(404).json({ message: `Map with ID ${mapId} not found.` })
     } else {

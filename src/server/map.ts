@@ -353,7 +353,7 @@ export class Maps {
         // NOTE: We do not check if the user owns the map. This is intended.
         //       It's so that users are be able to create games using other people's
         //       maps, by using the map ID.
-        const mapInfo = await db.getMapInfoById(index);
+        const mapInfo = await db.getMapDataById(index);
         if (mapInfo != null) {
           return GameMap.deserialize(mapInfo.mapData);
         }

@@ -34,7 +34,7 @@ export async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       username VARCHAR(${USERNAME_MAX_LEN}) PRIMARY KEY,
-      password CHAR(${PASSWORD_HASH_LEN * 2}) NOT NULL,
+      password_hash CHAR(${PASSWORD_HASH_LEN * 2}) NOT NULL,
       salt CHAR(${SALT_LEN * 2}) NOT NULL
     )
   `);
@@ -57,10 +57,12 @@ export async function initDb() {
       kills INT NOT NULL,
       deaths INT NOT NULL,
       games INT NOT NULL,
+      score INT GENERATED ALWAYS AS ((wins + kills) * 100 / (deaths + 1)) STORED,
       FOREIGN KEY (username) REFERENCES users(username)
     )
   `);
   
+  // Maps table.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS maps (
       map_id SERIAL PRIMARY KEY,
@@ -112,7 +114,7 @@ export async function createUser(username: string, password: string): Promise<bo
 
   try {
     await pool.query(`
-      INSERT INTO users (username, password, salt)
+      INSERT INTO users (username, password_hash, salt)
       VALUES ($1, $2, $3)
       `, [username, passwordHash.toString("hex"), salt.toString("hex")]
     );
@@ -122,7 +124,7 @@ export async function createUser(username: string, password: string): Promise<bo
       return false;
     }
     Logger.error(
-      "An error occurred when creating a user (username = '%s', password = %s, salt = %s)",
+      "An error occurred when creating a user (username = '%s', password hash = %s, salt = %s)",
       username, passwordHash.toString("hex"), salt.toString("hex")
     );
     throw err;
@@ -131,7 +133,7 @@ export async function createUser(username: string, password: string): Promise<bo
 
 export async function checkUserCrendentials(username: string, password: string): Promise<boolean> {
   const res = await pool.query(`
-    SELECT password, salt
+    SELECT password_hash, salt
     FROM users
     WHERE username = $1
     `, [username]
@@ -139,7 +141,7 @@ export async function checkUserCrendentials(username: string, password: string):
   if (res.rowCount === 1) {
     const row = res.rows[0];
     // Binary data is stored as a hex string, that's why we use Buffer.from(.., "hex")
-    const storedHash = Buffer.from(row.password, "hex");
+    const storedHash = Buffer.from(row.password_hash, "hex");
     const salt = Buffer.from(row.salt, "hex");
     const passwordHash = computePasswordHash(password, salt);
     return Buffer.compare(storedHash, passwordHash) === 0;
@@ -168,8 +170,7 @@ export async function setUserSession(username: string, sessionId: Buffer, expira
 
 export async function deleteSession(sessionId: Buffer) {
   try {
-    await pool.query(
-      `
+    await pool.query(`
       DELETE FROM sessions
       WHERE session_id = $1
       `, [sessionId.toString("hex")]
@@ -207,7 +208,7 @@ export async function updateUserStats(username: string, kills: number, isDead: b
 
 export async function getStatsAndLeaderboard(username: string): Promise<[UserStats, Array<UserStats>] | undefined> {
   const res = await pool.query<UserStats>(`
-    SELECT username, wins, kills, deaths, games, ((wins + kills) * 100 / deaths) as score
+    SELECT username, wins, kills, deaths, games, score
     FROM stats
     ORDER BY username = $1, score DESC
     LIMIT 11
@@ -271,17 +272,17 @@ export async function createMap(mapName: string, creator: string): Promise<numbe
   }
 }
 
-export async function updateMap(mapId: number, mapData: string): Promise<boolean> {
+export async function updateMap(username: string, mapId: number, mapData: string): Promise<boolean> {
   const res = await pool.query(`
     UPDATE maps
     SET map_data = $1
-    WHERE map_id = $2
-    `, [mapData, mapId]
+    WHERE map_id = $2 AND creator = $3
+    `, [mapData, mapId, username]
   );
   return res.rowCount != null && res.rowCount === 1;
 }
 
-export async function getMapInfoById(mapId: number): Promise<MapInfo | undefined> {
+export async function getMapDataById(mapId: number): Promise<MapInfo | undefined> {
   const res = await pool.query<{ map_name: string, creator: string, map_data: string }>(`
     SELECT map_name, creator, map_data
     FROM maps
