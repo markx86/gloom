@@ -22,7 +22,9 @@ Other projects that helped me:
 
 See [USAGE.md](USAGE.md)
 
+## Database structure
 
+See [DATABASE.md](DATABASE.md)
 
 ## Project structure
 
