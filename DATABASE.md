@@ -3,24 +3,29 @@
 ## Requirements
 
 The application is a multiplayer game with a leaderboard and support for user created content.  
-Since it's a multiplayer game, it has to support multiple users. To do this, the application
+Since it's a multiplayer game, it has to support multiple users.  
+To do this, the application
 must be able to store the **name** and **password information** of each user and
 to authenticate their requests, the application must also be able to track each user's
 active **session**.  
-To build the leaderboard, the server has to calculate the score for each player.
+To build the leaderboard, the server has to calculate the score for each player.  
 To achieve this, the application must store cumulative game statistics for every registered user, such as:
 **total kills**, **total deaths**, **total wins**, **total games played**, **kill/death ratio**.  
 Since the *K/D ratio* can be derived from the *total kills* and the *total deaths*, we can
 avoid storing it in the database and we can offload the calculation to the client.  
-However, while the **score** is calculated using other values already present in the database (such as the number of wins, deaths and kills), the score for each user is also needed building the leaderboard. Since computing the value every time we read from
+However, while the **score** is calculated using other values already present in the
+database (such as the number of wins, deaths and kills), the score for each user is also needed
+building the leaderboard.  
+Since computing the value every time we read from
 the database can become expensive when there are a lot of users, it's preferable to
-use a bit more memory and store the pre-computed score for each user inside the database.
+use a bit more memory and store the pre-computed score for each user inside the database.  
 Since the users can also create custom maps, the application must also store
-information about each map, such as **the map name**, **its level data** and **the map's creator**.
+information about each map, such as **the map name**, **its level data** and **the map's creator**.  
 While a map could be uniquely identified by its name and creator, searching for one would
-become very expensive when the table grows big.
+become very expensive when the table grows big.  
 Identifying maps this way also makes it harder for users to share them around, since they would have share both the name of
-the map and that of its creator. Therefore, it's better to identify maps by a numerical ID,
+the map and that of its creator.  
+Therefore, it's better to identify maps by a numerical ID,
 which is fast to compare (which also means faster to search for) and easier for users to share.
 
 ## E-R diagram
@@ -43,7 +48,7 @@ There is only one entity constraint, and it is that the pair (**map**.creator, *
 
 ## Implemented queries
 
-To see where the queries are used in the code, take a look at [`database.ts`](./src/server/database.ts)
+To see where the queries are used in the code, take a look at [`database.ts`](./src/server/database.ts).
 
 This query is for creating the **users** table.
 ```pgsql
