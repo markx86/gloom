@@ -2,8 +2,9 @@
 
 export async function loadGloom() {
   const textDecoder = new TextDecoder("utf-8");
-  const canvasDefaultWidth = 640;
-  const canvasDefaultHeight = 480;
+  const CANVAS_DEFAULT_WIDTH = 640;
+  const CANVAS_DEFAULT_HEIGHT = 480;
+  const PACKET_BUFFER_SIZE = 0x1000;
 
   let canvasContainer = null, canvas = null, ctx = null, fb = null;
   let originTime = 0;
@@ -11,7 +12,7 @@ export async function loadGloom() {
   let settingsKey = null;
   
   function updateViewportSize() {
-    const aspectRatio = fb == null ? (canvasDefaultWidth / canvasDefaultHeight) : (fb.width / fb.height);
+    const aspectRatio = fb == null ? (CANVAS_DEFAULT_WIDTH / CANVAS_DEFAULT_HEIGHT) : (fb.width / fb.height);
     const parentWidth = window.innerWidth;
     const parentHeight = window.innerHeight;
     // Resize the canvas container.
@@ -56,17 +57,19 @@ export async function loadGloom() {
     return [instance.exports.gloom_framebuffer_width(), instance.exports.gloom_framebuffer_height()];
   }
 
+  function allocateMemoryBuffer(size) {
+    return instance.exports.__heap_base + memory.grow(getPages(size));
+  }
+
   function allocateFrameBuffer() {
     const [width, height] = getFramebufferSizes();
     const fbStride = width;
     const fbSize = 4 * fbStride * height;
-    const zbSize = 4 * width;
-    const fbAddress = instance.exports.__heap_base;
-    memory.grow(getPages(fbSize + zbSize));
-    instance.exports.gloom_framebuffer_set(fbAddress, fbAddress + fbSize, fbStride);
+    const fbAddress = allocateMemoryBuffer(fbSize);
+    instance.exports.gloom_framebuffer_set(fbAddress, fbStride);
     return [fbAddress, width, height, fbSize];
   }
-  
+
   function createFramebuffer() {
     const [fbAddress, fbWidth, fbHeight, fbSize] = allocateFrameBuffer();
     const fbArray = new Uint8ClampedArray(memory.buffer, fbAddress, fbSize);
@@ -222,8 +225,8 @@ export async function loadGloom() {
     
     ctx = canvas.getContext("2d");
     
-    canvas.width = canvasDefaultWidth;
-    canvas.height = canvasDefaultHeight;
+    canvas.width = CANVAS_DEFAULT_WIDTH;
+    canvas.height = CANVAS_DEFAULT_HEIGHT;
     canvas.style.transformOrigin = "top left";
     // TODO: Maybe use 'crisp-edges' instead of 'pixelated' on Firefox.
     canvas.style.imageRendering = "pixelated";
@@ -296,15 +299,17 @@ export async function loadGloom() {
     const wsErrorHandler = () => startGame(false);
     const wsOpenHandler = () => startGame(true);
 
-    const pktBuffer = instance.exports.gloom_packet_buffer();
-    const pktBufferSize = instance.exports.gloom_packet_buffer_size();
-  
+    const pktBufferAddress = allocateMemoryBuffer(PACKET_BUFFER_SIZE);
+
+    function writeToPktBuffer(pkt) { new Uint8Array(memory.buffer, pktBufferAddress, PACKET_BUFFER_SIZE).set(pkt); }
+
     ws.binaryType = "arraybuffer";
     ws.addEventListener("message", e => {
       if (e.data instanceof ArrayBuffer) {
         const pkt = new Uint8Array(e.data);
-        new Uint8Array(memory.buffer, pktBuffer, pktBufferSize).set(pkt);
-        instance.exports.gloom_on_recv_packet(pkt.byteLength);
+        const pktLength = pkt.byteLength < PACKET_BUFFER_SIZE ? pkt.byteLength : PACKET_BUFFER_SIZE;
+        writeToPktBuffer(pkt);
+        instance.exports.gloom_on_recv_packet(pktBufferAddress, pktLength);
       }
     });
     ws.addEventListener("close", instance.exports.gloom_on_ws_close);
