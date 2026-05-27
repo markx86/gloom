@@ -105,7 +105,7 @@ export class GameMap {
 
   private static deserializeBitmap(bitmap: Uint8Array): Uint8Array {
     const map = new Uint8Array(MAP_SIZE * MAP_SIZE)
-    let bitmap_pos = 0;
+    let bitmapPos = 0;
     for (let i = 0; i < map.length; i++) {
       const x = i % MAP_SIZE;
       const y = Math.floor(i / MAP_SIZE);
@@ -115,10 +115,10 @@ export class GameMap {
         continue;
       }
       // If it's not a border block, we read it from the map
-      const bit = bitmap_pos & 7;
-      const byte = bitmap_pos >> 3;
+      const bit = bitmapPos & 7;
+      const byte = bitmapPos >> 3;
       map[i] = (bitmap[byte] & (1 << bit)) !== 0 ? 1 : 0;
-      ++bitmap_pos;
+      ++bitmapPos;
     }
     return map;
   }
@@ -147,17 +147,17 @@ export class GameMap {
   }
 
   private serializeBitmap(bitmap: Uint8Array) {
-    let bitmap_pos = 0;
+    let bitmapPos = 0;
     this.tiles.forEach((cell, index) => {
       const x = index % MAP_SIZE;
       const y = Math.floor(index / MAP_SIZE);
       if (x === 0 || x === MAP_SIZE-1 || y === 0 || y === MAP_SIZE-1) {
         return;
       }
-      const bit = bitmap_pos & 7;
-      const byte = bitmap_pos >> 3;
+      const bit = bitmapPos & 7;
+      const byte = bitmapPos >> 3;
       bitmap[byte] |= cell << bit;
-      ++bitmap_pos;
+      ++bitmapPos;
     });
   }
 
@@ -353,7 +353,7 @@ export class Maps {
         // NOTE: We do not check if the user owns the map. This is intended.
         //       It's so that users are be able to create games using other people's
         //       maps, by using the map ID.
-        const mapInfo = await db.getMapDataById(index);
+        const mapInfo = await db.getMapInfoById(index);
         if (mapInfo != null) {
           return GameMap.deserialize(mapInfo.mapData);
         }

@@ -18,7 +18,7 @@ const IDLE_TIME = 300;
 const WAIT_TIME = 10;
 const OVER_TIME = 10;
 
-enum GameState {
+export enum GameState {
   WAITING,
   READY,
   PLAYING,
@@ -40,7 +40,7 @@ export class Game {
   private numOfPlayers: number;
   private startTime: number;
   private waitTime: number;
-  private deadSprites: Set<number>;
+  private spritesToRemove: Set<number>;
   private state: GameState;
 
   private static games = new Map<number, Game>();
@@ -51,7 +51,7 @@ export class Game {
     this.map = map;
 
     this.sprites = new Array<GameSprite>();
-    this.deadSprites = new Set<number>();
+    this.spritesToRemove = new Set<number>();
     this.players = new Map<number, Player>();
     this.numOfPlayers = 0;
     this.startTime = 0;
@@ -219,7 +219,7 @@ export class Game {
       // Try to spawn player.
       const playerSprite = this.trySpawnPlayer(player);
       if (playerSprite == null) {
-        Logger.warning("No place to spawn player with token %s", token);
+        Logger.warning("No place to spawn player with token %s", token.toString(16));
       }
       return playerSprite;
     }
@@ -270,8 +270,8 @@ export class Game {
   }
 
   private cleanupSprites() {
-    this.deadSprites.forEach(spriteIndex => this.sprites.splice(spriteIndex, 1));
-    this.deadSprites.clear();
+    this.spritesToRemove.forEach(spriteIndex => this.sprites.splice(spriteIndex, 1));
+    this.spritesToRemove.clear();
   }
 
   private removePlayerWithOptions(
@@ -294,10 +294,10 @@ export class Game {
 
   public removeSprite(sprite: GameSprite, actor?: GameSprite): boolean {
     const index = this.sprites.indexOf(sprite);
-    if (index < 0) {
+    if (index < 0 || this.spritesToRemove.has(index) /* ensure we don't double-delete remove a sprite */) {
       return false;
     }
-    this.deadSprites.add(index);
+    this.spritesToRemove.add(index);
     this.broadcastGroup.send(new DestroyPacket(sprite, actor));
     return true;
   }
@@ -308,5 +308,9 @@ export class Game {
 
   public getWaitTime(): number {
     return this.waitTime;
+  }
+
+  public getState(): GameState {
+    return this.state;
   }
 }

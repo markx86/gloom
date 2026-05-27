@@ -7,7 +7,7 @@ import {
 import * as db from "./database";
 import Logger from "./logger";
 import { GameMap, Maps } from "./map"
-import { Game } from "./game";
+import { Game, GameState } from "./game";
 import { getEnvStringOrDefault } from "./util";
 
 import { randomBytes } from "node:crypto";
@@ -228,11 +228,7 @@ app.get("/api/stats", async (_, res) => {
   }
 });
 
-app.get("/api/session/validate", (_, res) => {
-  res.status(200).json({ username: res.locals.username });
-});
-
-app.get("/api/session/refresh", async (_, res) => {
+app.get("/api/session/validate", async (_, res) => {
   // If got here that means the session cookie is valid.
   Logger.trace("Refreshing session for user %s", res.locals.username);
   const expirationTimestamp = getSessionCookieExpirationTimestamp();
@@ -248,13 +244,21 @@ app.get("/api/session/refresh", async (_, res) => {
   }
 });
 
-app.get("/api/game/id", (_, res) => {
+app.get("/api/game/info", (_, res) => {
   const username = res.locals.username;
   const game = Game.getByCreator(username);
   if (game == null) {
     res.status(404).send();
   } else {
-    res.status(200).json({ gameId: game.id });
+    const state = game.getState()
+    const response: { id: number, state: GameState, expiresIn?: number } = {
+      id: game.id,
+      state,
+    };
+    if (state === GameState.WAITING) {
+      response.expiresIn = game.getWaitTime()
+    }
+    res.status(200).json(response);
   }
 });
 
@@ -293,14 +297,14 @@ app.post("/api/game/create", async (req, res) => {
   }
 });
 
-app.post("/api/game/join", (req, res) => {
-  const data = req.body;
-  if (typeof(data?.gameId) !== "number") {
-    res.status(400).json({ message: "Invalid request body." });
+app.get("/api/game/join/:id", (req, res) => {
+  const gameId = parseInt(req.params.id, 10);
+
+  if (!isFinite(gameId) || isNaN(gameId) || gameId <= 0) {
+    res.status(400).json({ message: "Invalid game ID." });
     return;
   }
 
-  const gameId = data.gameId;
   const game = Game.getById(gameId);
   if (game == null) {
     res.status(404).json({ message: "No game found." });
@@ -326,10 +330,11 @@ app.get("/api/map/list", async (_, res) => {
   }
 });
 
-app.post("/api/map/delete", async (req, res) => {
-  const mapId = req.body?.mapId;
-  if (typeof(mapId) !== "number") {
-    res.status(400).json({ message: "Invalid map ID!" });
+app.get("/api/map/delete/:id", async (req, res) => {
+  const mapId = parseInt(req.params.id, 10);
+
+  if (!isFinite(mapId) || isNaN(mapId) || mapId <= 0) {
+    res.status(400).json({ message: "Invalid map ID." });
     return;
   }
 
@@ -348,7 +353,6 @@ app.post("/api/map/delete", async (req, res) => {
 
 app.post("/api/map/create", async (req, res) => {
   const mapName = req.body?.mapName;
-
   if (typeof(mapName) !== "string") {
     res.status(400).json({ message: "Invalid map name." });
     return;
@@ -360,8 +364,26 @@ app.post("/api/map/create", async (req, res) => {
     return;
   }
 
+  let mapData = req.body?.mapData;
+  if (typeof(mapData) !== "string") {
+    res.status(400).json({ message: "No map data provided." });
+    return;
+  }
+
   try {
-    const mapId = await db.createMap(mapName, res.locals.username);
+    const map = GameMap.deserialize(mapData);
+    if (!map.check()) {
+      res.status(400).json({ message: "Invalid map data!" });
+      return;
+    }
+    mapData = map.serialize(); // Re-serialize the map. Wasteful, but it ensures the data will fit into the database.
+  } catch (error) {
+    res.status(400).json({ message: error.toString() });
+    return;
+  }
+
+  try {
+    const mapId = await db.createMap(mapName, res.locals.username, mapData);
     if (mapId == null) {
       res.status(400).json({ message: "That map already exists!" });
     } else {
@@ -412,9 +434,9 @@ app.get("/api/map/info/:id", async (req, res) => {
   }
 
   try {
-    const mapInfo = await db.getMapDataById(mapId);
+    const mapInfo = await db.getMapInfoById(mapId);
     if (mapInfo == null) {
-      res.status(404).json({ message: `Map with ID ${mapId} not found.` })
+      res.status(404).json({ message: `Map with ID ${mapId} not found.` });
     } else {
       res.status(200).json(mapInfo);
     }
@@ -441,7 +463,7 @@ app.post("/api/map/info", async (req, res) => {
   }
 
   try {
-    const maps = await db.getBulkMapInfoByIds(uniqueMapIds)
+    const maps = await db.getPartialMapInfoByIds(uniqueMapIds)
     res.status(200).json(maps);
   } catch (error) {
     Logger.error("Could not check maps");

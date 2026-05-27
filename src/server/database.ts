@@ -20,6 +20,7 @@ const pool = new Pool();
 
 export type UserStats = { username: string, wins: number, kills: number, deaths: number, games: number, score: number };
 export type MapInfo = { mapId: number, mapName: string, creator: string, mapData: string };
+export type PartialMapInfo = { mapId: number, mapName: string, creator: string };
 
 export const closeDb = () => {
   Logger.trace("Closing database...");
@@ -68,7 +69,7 @@ export async function initDb() {
       map_id SERIAL PRIMARY KEY,
       map_name VARCHAR(${MAP_NAME_MAX_LEN}) NOT NULL,
       creator VARCHAR(${USERNAME_MAX_LEN}) NOT NULL,
-      map_data CHAR(${MAP_BASE64_SIZE}),
+      map_data CHAR(${MAP_BASE64_SIZE}) NOT NULL,
       FOREIGN KEY (creator) REFERENCES users(username),
       CONSTRAINT UC_map_name_creator UNIQUE (map_name, creator)
     )
@@ -252,13 +253,13 @@ export async function deleteMap(mapId: number, creator: string): Promise<boolean
   return (res.rowCount != null && res.rowCount === 1);
 }
 
-export async function createMap(mapName: string, creator: string): Promise<number | undefined> {
+export async function createMap(mapName: string, creator: string, mapData: string): Promise<number | undefined> {
   try {
     const res = await pool.query<{ map_id: number }>(`
-      INSERT INTO maps (map_name, creator)
-      VALUES ($1, $2)
+      INSERT INTO maps (map_name, creator, map_data)
+      VALUES ($1, $2, $3)
       RETURNING map_id
-      `, [mapName, creator]
+      `, [mapName, creator, mapData]
     );
     if (res.rowCount == null || res.rowCount !== 1) {
       throw new Error("Database returned 0 rows");
@@ -282,7 +283,7 @@ export async function updateMap(username: string, mapId: number, mapData: string
   return res.rowCount != null && res.rowCount === 1;
 }
 
-export async function getMapDataById(mapId: number): Promise<MapInfo | undefined> {
+export async function getMapInfoById(mapId: number): Promise<MapInfo | undefined> {
   const res = await pool.query<{ map_name: string, creator: string, map_data: string }>(`
     SELECT map_name, creator, map_data
     FROM maps
@@ -300,9 +301,9 @@ export async function getMapDataById(mapId: number): Promise<MapInfo | undefined
   }
 }
 
-export async function getBulkMapInfoByIds(mapIds: Array<number>): Promise<Array<MapInfo>> {
-  const res = await pool.query<{ map_id: number, map_name: string, creator: string, map_data: string }>(`
-    SELECT map_id, map_name, creator
+export async function getPartialMapInfoByIds(mapIds: Array<number>): Promise<Array<PartialMapInfo>> {
+  const res = await pool.query<{ map_id: number, map_name: string, creator: string }>(`
+    SELECT map_id, map_name, creator, map_data
     FROM maps
     WHERE map_id = ANY($1)
     `, [mapIds]
@@ -314,8 +315,7 @@ export async function getBulkMapInfoByIds(mapIds: Array<number>): Promise<Array<
     return {
       mapId: row.map_id,
       mapName: row.map_name,
-      creator: row.creator,
-      mapData: row.map_data
+      creator: row.creator
     };
   });
 }

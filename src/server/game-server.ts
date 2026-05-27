@@ -40,8 +40,12 @@ wss.on("connection", ws => {
     const gameId = view.getUint32(4, true);
     const magic = view.getUint32(8, true);
 
-    if (magic === HANDSHAKE_MAGIC && createClient(ws, playerToken, gameId)) {
-      Logger.success("Handshake with player successful (token %s)", playerToken.toString(16));
+    if (magic === HANDSHAKE_MAGIC) {
+      if (createClient(ws, playerToken, gameId)) {
+        Logger.success("Handshake with player successful (token %s)", playerToken.toString(16));
+      } else {
+        Logger.error("Handshake failed (error occurred)");
+      }
     } else {
       Logger.error("Handshake failed (invalid magic, got %s expected %s)", magic.toString(16), HANDSHAKE_MAGIC.toString(16));
       ws.close();

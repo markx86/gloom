@@ -1,7 +1,7 @@
 import Logger from "./logger";
 import { WebSocket } from "ws";
 import { PlayerSprite } from "./sprite";
-import { GamePacketType, ServerPacket, HelloPacket, UpdatePacket, DestroyPacket, GamePacket, WaitPacket } from "./packet";
+import { GamePacketType, ServerPacket, HelloPacket, UpdatePacket, GamePacket, WaitPacket } from "./packet";
 import { Peer } from "./broadcast";
 
 const MAX_PACKET_DROP = 10;
@@ -112,14 +112,18 @@ export class Client extends Peer {
 
     this.ws.on("error", Logger.error);
 
-    // Handle WebSocket close event.
-    this.ws.on("close", () => {
+    const closeHandler = () => {
       const game = this.sprite.game;
       if (game.isWaiting() || game.isReady()) {
         game.removePlayer(this.sprite);
       }
       this.removeFromBroadcastGroup();
-    });
+      Logger.trace("Player #%d (token: %s) left", this.sprite.id, this.sprite.player.token.toString(16));
+    };
+
+    // Handle WebSocket close and error events.
+    this.ws.on("close", closeHandler);
+    this.ws.on("error", closeHandler);
 
     // Handle WebSocket message event.
     this.ws.on("message", (data, isBinary) => {
