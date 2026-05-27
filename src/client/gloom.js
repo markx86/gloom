@@ -143,11 +143,23 @@ export async function loadGloom() {
     },
   };
   
+  const keys = { down: false, up: false, left: false, right: false };
+
   function processKeyEvent(event) {
     if (instance == null) {
       return;
     }
-    instance.exports.gloom_on_key_event(event.keyCode, event.key.charCodeAt(0), event.type === "keydown");
+    const pressed = event.type === "keydown";
+    switch (event.keyCode) {
+      case (/* KEY_A */ 65): { keys.left  = pressed; break; }
+      case (/* KEY_D */ 68): { keys.right = pressed; break; }
+      case (/* KEY_S */ 83): { keys.down  = pressed; break; }
+      case (/* KEY_W */ 87): { keys.up    = pressed; break; }
+      default:               { return; }
+    }
+    const inputX = keys.right - keys.left;
+    const inputY = keys.up - keys.down;
+    instance.exports.gloom_on_analog_change(inputX, inputY);
   }
   
   let mouseButtons = 0;

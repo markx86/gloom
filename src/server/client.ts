@@ -66,12 +66,13 @@ export class Client extends Peer {
       return;
     }
 
-    const keys = packet.popU32();
+    const inputX = packet.popF32();
+    const inputY = packet.popF32();
     const rot  = packet.popF32();
     const ts = packet.popF32();
-    Logger.trace("keys = %s, rot = %f, ts = %f", keys.toString(16), rot, ts);
+    Logger.trace("input = (%f, %f), rot = %f, ts = %f", inputX, inputY, rot, ts);
 
-    this.sprite.processUpdatePacket(keys, rot);
+    this.sprite.processUpdatePacket(inputX, inputY, rot);
     this.broadcastPacket(new UpdatePacket(this.sprite, ts), true);
   }
 

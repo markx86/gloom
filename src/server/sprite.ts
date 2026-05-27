@@ -228,12 +228,8 @@ export class PlayerSprite extends GameSprite {
     })
   }
 
-  public processUpdatePacket(keys: number, rotation: number) {
+  public processUpdatePacket(inputX: number, inputY: number, rotation: number) {
     this.rotation = rotation;
-
-    const longDir = ((keys & 0x00FF) !== 0 ? 1 : 0) - ((keys & 0xFF00) !== 0 ? 1 : 0);
-    keys >>= 16;
-    const sideDir = ((keys & 0x00FF) !== 0 ? 1 : 0) - ((keys & 0xFF00) !== 0 ? 1 : 0);
 
     const longDirX = Math.cos(rotation);
     const longDirY = Math.sin(rotation);
@@ -241,14 +237,30 @@ export class PlayerSprite extends GameSprite {
     const sideDirX = -longDirY;
     const sideDirY = +longDirX;
 
-    this.dirX = longDirX * longDir + sideDirX * sideDir;
-    this.dirY = longDirY * longDir + sideDirY * sideDir;
+    // Ensure inputX is between -1.0 and +1.0
+    if /**/ (inputX < -1.0) inputX = -1.0;
+    else if (inputX > +1.0) inputX = +1.0;
 
-    if (longDir !== 0 && sideDir !== 0) {
-      this.dirX *= Math.SQRT1_2;
-      this.dirY *= Math.SQRT1_2;
+    // Ensure inputY is between -1.0 and +1.0
+    if /**/ (inputY < -1.0) inputY = -1.0;
+    else if (inputY > +1.0) inputY = +1.0;
+
+    const inputStrength = Math.sqrt(inputX * inputX + inputY * inputY);
+    if (inputStrength > 0) {
+      const dirX = longDirX * inputY + sideDirX * inputX;
+      const dirY = longDirY * inputY + sideDirY * inputX;
+      const dirLength = Math.sqrt(dirX * dirX + dirY * dirY);
+
+      this.dirX = dirX / dirLength;
+      this.dirY = dirY / dirLength;
+
+      // Since both inputX and inputY are between -1.0 and +1.0, inputStrength is between
+      // 0 and sqrt(2), so to express the current inputStrength as a percentage of the maximum
+      // inputStrength, we can just divide it by sqrt(2).
+      this.velocity = (inputStrength * Math.SQRT1_2) * PLAYER_RUN_SPEED;
+    } else {
+      this.velocity = this.dirX = this.dirY = 0.0;
     }
-    this.velocity = (longDir !== 0 || sideDir !== 0) ? PLAYER_RUN_SPEED : 0;
 
     Logger.trace("Player %d is @ (x = %f, y = %f)", this.id, this.x, this.y);
   }
