@@ -38,6 +38,9 @@ const MAP_DRAW_PLAYER4 = 5;
 
 const MAP_SCROLL_SENSITIVITY = 8;
 
+const MAP_NAME_MAX_LEN = 32;
+const MAP_NAME_MIN_LEN = 3;
+
 const MAP_COLORS = [
   "white",
   "black",
@@ -231,7 +234,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     const serialized = Uint8Array.fromBase64(mapData);
     const view = new DataView(serialized.buffer, serialized.byteOffset, 8);
 
-    let bitmap_pos = view.byteLength * 8;
+    let bitmapPos = view.byteLength * 8;
     for (let i = 0; i < map.length; i++) {
       const x = i % MAP_SIZE;
       const y = Math.floor(i / MAP_SIZE);
@@ -239,10 +242,10 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
         map[i] = MAP_DRAW_WALL;
         continue;
       }
-      const bit = bitmap_pos & 7;
-      const byte = bitmap_pos >> 3;
+      const bit = bitmapPos & 7;
+      const byte = bitmapPos >> 3;
       map[i] = (serialized[byte] & (1 << bit)) !== 0 ? MAP_DRAW_WALL : MAP_DRAW_CLEAR;
-      ++bitmap_pos;
+      ++bitmapPos;
     }
 
     for (let i = 0; i < playerRotations.length; i++) {
@@ -264,17 +267,18 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
 
     wndDisable();
 
-    const mapData = serializeMap(canvas);
-    if (mapData == null) {
+    const mapDataBytes = serializeMap(canvas);
+    if (mapDataBytes == null) {
       showErrorWindow("A map must support up to four players!", wndEnable);
       return;
     }
 
-    const res = await api.post("/map/update", {
-      mapId: canvas._mapId,
-      mapData: mapData.toBase64()
-    });
+    const mapData = mapDataBytes.toBase64();
+    const isCreate = typeof(canvas._mapIdOrName) === "string";
+    const endpoint = isCreate ? "create" : "update";
+    const payload = isCreate ? { mapName: canvas._mapIdOrName, mapData } : { mapId: canvas._mapIdOrName, mapData };
 
+    const res = await api.post(`/map/${endpoint}`, payload);
     switch (res.status) {
       case 200: { $goto("/"); break; }
       case 400: { showErrorWindow((await res.json())?.message ?? "Invalid map!", wndEnable); break; }
@@ -282,7 +286,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     }
   }
 
-  async function doCreateMap(event) {
+  function doCreateMap(event) {
     const mapName = $("#field-map-name")?.value;
     if (mapName == null) {
       return;
@@ -291,11 +295,15 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     const [wndEnable, wndDisable] = getWindowControls(event.target);
     wndDisable();
 
-    const res = await api.post("/map/create", { mapName });
-    switch (res.status) {
-      case 200: { $goto("/map", (await res.json()).mapId); break; }
-      case 400: { showErrorWindow((await res.json()).message, wndEnable); break; }
-      default:  { showWarningWindow("An error occurred while trying to create the map! Try again later.", wndEnable); break; }
+    // Do name checking here
+    if (mapName.length < MAP_NAME_MIN_LEN) {
+      showErrorWindow(`Map name too short! (must be at least ${MAP_NAME_MIN_LEN} characters)`, wndEnable);
+    } else if (mapName.length > MAP_NAME_MAX_LEN) {
+      showErrorWindow(`Map name too long! (it cannot be more than ${MAP_NAME_MAX_LEN} characters)`, wndEnable);
+    } else if (Globals.myMaps != null && Globals.myMaps.find(map => mapName === map.mapName) != null) {
+      showErrorWindow("A map with that name already exists!", wndEnable);
+    } else {
+      $goto("/map", mapName);
     }
   }
 
@@ -303,11 +311,11 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     const [wndEnable, wndDisable] = getWindowControls(event.target);
     wndDisable();
 
-    const res = await api.post("/map/delete", { mapId });
+    const res = await api.get(`/map/delete/${mapId}`);
     switch (res.status) {
       case 200: {
         if (Globals.myMaps != null) {
-          // Do not refetch the maps list, just remove entry from the existing list.
+          // Do not re-fetch the maps list, just remove entry from the existing list.
           Globals.myMaps = Globals.myMaps.filter(map => map.mapId !== mapId);
           root.$refresh();
         }
@@ -328,29 +336,31 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     }
   }
 
-  function refreshMyGameId() {
-    api.get("/game/id")
-      .then(res => {
-        if (res.status === 200) {
-          return res.json();
-        } else {
-          return { gameId: null };
+  async function refreshMyGameId() {
+    let delay = 5000;
+    try {
+      const res = await api.get("/game/info");
+      let gameId = null;
+      if (res.status === 200) {
+        const data = await res.json();
+        gameId = data.id;
+        if (typeof(data.expiresIn) === "number" && data.expiresIn > 0) {
+          delay = data.expiresIn * 1000;
         }
-      })
-      .then(data => {
-        if (data.gameId !== Globals.myGameId) {
-          Globals.myGameId = data.gameId;
-          root.$refresh();
-        }
-      })
-      .catch(e => {
-        // Should've used $refresh()
-        const gameIdLabel = $("#game-id");
-        if (gameIdLabel != null) {
-          gameIdLabel.textContent = "Could not fetch game ID.";
-        }
-        console.error(e);
-      });
+      }
+      if (gameId !== Globals.myGameId) {
+        Globals.myGameId = gameId;
+        root.$refresh();
+      }
+    } catch (e) {
+      // Should've used $refresh()
+      const gameIdLabel = $("#game-id");
+      if (gameIdLabel != null) {
+        gameIdLabel.textContent = "Could not fetch game ID.";
+      }
+      console.error(e);
+    }
+    $timeout(delay, refreshMyGameId);
   }
 
   async function refreshStats() {
@@ -426,12 +436,16 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
 
     const json = await res.json();
     if (res.status === 200) {
-      delete json.mapData;
-      Globals.otherMaps.push(json);
-      mapSelector.$add(getSelectorOptionForMap(json))
-      // Clear map ID field
-      mapIdField.value = "";
-      wndEnable();
+      if (json.mapData == null) {
+        showErrorWindow("That map is not valid!", wndEnable);
+      } else {
+        delete json.mapData;
+        Globals.otherMaps.push(json);
+        mapSelector.$add(getSelectorOptionForMap(json))
+        // Clear map ID field
+        mapIdField.value = "";
+        wndEnable();
+      }
     } else {
       showErrorWindow(json.message ?? "Could not add map!", wndEnable);
     }
@@ -541,11 +555,12 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   async function doValidateSession() {
     try {
       const res = await api.get("/session/validate")
-      if (res.status !== 200) throw Error("Not authenticated")
+      if (res.status !== 200) throw Error("Not authenticated");
       const data = await res.json();
       Globals.myUsername = data?.username ?? "player";
       return true;
     } catch(e) {
+      console.error(e);
       return false;
     }
   }
@@ -562,22 +577,23 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
   async function doCreateGame(event) {
     const button = event.target;
     button.$disable();
+    const buttonEnable = button.$enable.bind(button);
     try {
       const response = await api.post("/game/create", { mapId: getSelectedMapId() });
       if (response.status === 500) {
-        showWarningWindow("Something went wrong while creating your game. Please try again later", button.$enable);
+        showWarningWindow("Something went wrong while creating your game. Please try again later", buttonEnable);
         return;
       }
       const data = await response.json();
       if (response.status !== 200) {
         const showWindowFn = response.status > 500 ? showWarningWindow : showErrorWindow;
-        showWindowFn(data.message, button.$enable);
+        showWindowFn(data.message, buttonEnable);
       } else {
         Globals.myGameId = data.gameId;
         root.$refresh();
       }
     } catch {
-      showWarningWindow("An unknown error occurred while trying to create your game. Please try again later", button.$enable);
+      showWarningWindow("An unknown error occurred while trying to create your game. Please try again later", buttonEnable);
     }
   }
   
@@ -597,7 +613,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     }
   
     try {
-      const response = await api.post("/game/join", { gameId });
+      const response = await api.get(`/game/join/${gameId}`);
       const data = await response.json();
       if (response.status === 200) {
         $goto("/game", gameId, data.playerToken, Globals.myUsername);
@@ -887,6 +903,8 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     }
 
     const myStats = Globals.myStats;
+    const avgKills = myStats.kills / myStats.games;
+    const kdRatio = myStats.kills / myStats.deaths;
 
     return $div(
       homeTitle(`${myStats.username} stats:`),
@@ -896,8 +914,8 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
       listEntry("Kills", myStats.kills.toString()),
       listEntry("Deaths", myStats.deaths.toString()),
       listEntry("Games played", myStats.games.toString()),
-      listEntry("Avg. kills per game", (myStats.kills / myStats.games).toPrecision(2)),
-      listEntry("K/D", (myStats.kills / myStats.deaths).toPrecision(2)),
+      listEntry("Avg. kills per game", isFinite(avgKills) ? avgKills.toPrecision(2) : "???"),
+      listEntry("K/D", isFinite(kdRatio) ? kdRatio.toPrecision(2) : "???")
     );
   };
 
@@ -1211,9 +1229,13 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     }
   }
 
-  const map = (mapId, mapData) => {
-    $assert(typeof(mapId) === "number");
-    $assert(mapData == null || typeof(mapData) === "string");
+  const map = (mapIdOrName, mapData) => {
+    if (mapData != null) {
+      $assert(typeof(mapIdOrName) === "number");
+      $assert(typeof(mapData) === "string");
+    } else {
+      $assert(typeof(mapIdOrName) === "string");
+    }
 
     const canvasSize = MAP_SIZE * MAP_CANVAS_SCALE;
     const canvas = $canvas().$id("map-editor")
@@ -1266,7 +1288,7 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     canvas._drawButtons = buttons;
     canvas._playerRotations = playerRotations;
     canvas._map = map;
-    canvas._mapId = mapId;
+    canvas._mapIdOrName = mapIdOrName;
     canvas._redraw = renderMapCanvas;
     canvas._switchMode = mapEditorSwitchMode;
     canvas._getPlayerRotation = getPlayerRotation;
@@ -1303,58 +1325,54 @@ gloom.loadGloom().then(([gloomLaunch, gloomExit]) => {
     );
   };
   
-  api.get("/session/refresh").then(res => {
-    const initialRoute = res.status === 200 ? $route() : "/login";
-    $router(
-      {
-        $first: initialRoute,
-        $default: "/login",
-        "/": {
-          onRoute: home,
-          onEnter: () => {
-            doValidateSession()
-              .then(success => {
-                if (success) {
-                  refreshStats();
-                  refreshMyGameId();
-                  loadMaps();
-                  $interval(300000, refreshStats); // Refresh scoreboard every 5 minutes.
-                  $interval(5000, refreshMyGameId); // Refresh game id every 5 seconds.
-                  root.$refresh();
-                } else {
-                  $goto("/login");
-                }
-              });
-          }
-        },
-        "/login": {
-          onRoute: login,
-          onEnter: () => {
-            doValidateSession()
-              .then(success => {
-                if (success) $goto("/");
-              });
-          }
-        },
-        "/login/help": loginHelp,
-        "/signup": signup,
-        "/map": map,
-        "/game": {
-          onRoute: game,
-          onLeave: () => {
-            if (Globals.gameWs != null && Globals.gameWs.readyState !== WebSocket.CLOSED) {
-              Globals.gameWs.close();
-            }
-            Globals.gameWs = undefined;
-          }
+  $router(
+    {
+      $first: "/login",
+      $default: "/login",
+      "/": {
+        onRoute: home,
+        onEnter: () => {
+          doValidateSession()
+            .then(success => {
+              if (success) {
+                refreshStats();
+                refreshMyGameId();
+                loadMaps();
+                $interval(300000, refreshStats); // Refresh scoreboard every 5 minutes.
+                root.$refresh();
+              } else {
+                $goto("/login");
+              }
+            });
         }
       },
-      {
-        onError: (exc) => {
-          console.error(exc);
-          $goto("/");
-        },
+      "/login": {
+        onRoute: login,
+        onEnter: () => {
+          doValidateSession()
+            .then(success => {
+              if (success) $goto("/");
+            });
+        }
+      },
+      "/login/help": loginHelp,
+      "/signup": signup,
+      "/map": map,
+      "/game": {
+        onRoute: game,
+        onLeave: () => {
+          if (Globals.gameWs != null && Globals.gameWs.readyState !== WebSocket.CLOSED) {
+            Globals.gameWs.close();
+          }
+          Globals.gameWs = undefined;
+        }
       }
-    );
-  });
+    },
+    {
+      onError: (exc) => {
+        console.error(exc);
+        $goto("/");
+      },
+    }
+  );
 });

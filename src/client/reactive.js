@@ -148,10 +148,10 @@ window.$timeout = function (delay, callback, ...args) {
     $_removeTimeout(delay);
   } else {
     $assert(typeof(delay) === "number", "delay must be a number");
-    const id = setTimeout((...args) => {
-      callback(...args);
+    const id = setTimeout((a) => {
+      callback(...a);
       $_removeTimeout(id);
-    }, delay, ...args);
+    }, delay, args);
     $_globalState.timeouts.add(id);
   }
 }
