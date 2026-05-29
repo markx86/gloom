@@ -255,8 +255,8 @@ app.get("/api/game/info", (_, res) => {
       id: game.id,
       state,
     };
-    if (state === GameState.WAITING) {
-      response.expiresIn = game.getWaitTime()
+    if (state === GameState.WAITING || state === GameState.OVER) {
+      response.expiresIn = game.getWaitTime();
     }
     res.status(200).json(response);
   }

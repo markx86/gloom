@@ -146,7 +146,7 @@ export async function loadGloom() {
   const keys = { down: false, up: false, left: false, right: false };
 
   function processKeyEvent(event) {
-    if (instance == null) {
+    if (instance == null || event.repeat) {
       return;
     }
     const pressed = event.type === "keydown";

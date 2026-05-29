@@ -17,7 +17,8 @@ const MAX_GAMES = 256;
 const IDLE_TIME = 300;
 const WAIT_TIME = 10;
 const OVER_TIME = 10;
-const GAME_TIME = 600;
+
+const GAME_MAX_DURATION = 600;
 
 export enum GameState {
   WAITING,
@@ -152,8 +153,7 @@ export class Game {
       }
 
       case GameState.PLAYING: {
-        const elapsedTime = nowTime() - this.startTime;
-        if (this.numOfPlayers <= 1 || elapsedTime > GAME_TIME) {
+        if (this.numOfPlayers <= 1 || this.getTime() > GAME_MAX_DURATION) {
           this.waitTime = OVER_TIME;
           this.state = GameState.OVER;
           // Save stats for all remaining players.
