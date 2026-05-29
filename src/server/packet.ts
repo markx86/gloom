@@ -72,9 +72,9 @@ export abstract class ServerPacket {
     this.header = (type & 7) << 29;
   }
 
-  public getRaw(n: number): ArrayBuffer {
+  public getSequenced(n: number): ArrayBuffer {
     this.view.setUint32(0, this.header | (n & 0x1FFFFFFF), true);
-    return this.bytes;
+    return Buffer.copyBytesFrom(this.bytes);
   }
 
   private ensureSpace(size: number) {

@@ -14,7 +14,8 @@ export class Client extends Peer {
 
   public sendPacket(pkt: ServerPacket) {
     const seq = this.serverSequence++;
-    this.ws.send(pkt.getRaw(seq));
+    const pktSequenced = pkt.getSequenced(seq);
+    this.ws.send(pktSequenced);
   }
 
   private checkPacket(type: GamePacketType, sequence: number, playerToken: number): boolean {
